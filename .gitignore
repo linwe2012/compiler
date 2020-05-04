@@ -1,0 +1,15 @@
+
+# VS缓存
+.vs
+
+# 生成文件
+**/Debug
+**/Release
+**/x64
+
+# Flex & Bison 生成文件
+**/parser.c
+**/parser.h
+**/lexer.c
+
+3rdparty/bin
