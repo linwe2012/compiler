@@ -136,7 +136,7 @@ AST* make_function_body(AST* ast, AST* body)
 
 AST* make_return(AST* exp)
 {
-	NEW_AST(ReturnExpr, ast);
+	NEW_AST(ReturnStatement, ast);
 	ast->return_val = exp;
 
 	return SUPER(ast);

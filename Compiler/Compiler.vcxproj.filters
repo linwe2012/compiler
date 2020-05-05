@@ -36,6 +36,12 @@
     <ClCompile Include="error.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="msvc-feature-test.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="preprocessor.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="alloc.h">

@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include "config.h"
+#define AST_PARAMS 
 
 enum Types
 {
@@ -68,7 +69,7 @@ inline int type_is_float_point(enum Types t)
 #define AST_NODE_LIST(V) \
 	V(EmptyExpr) \
 	V(BlockExpr) \
-	V(ReturnExpr) \
+	V(ReturnStatement) \
 	V(ListExpr) \
 	V(FunctionCallExpr)\
     V(NumberExpr) \
@@ -124,7 +125,7 @@ struct BlockExpr
 	AST* first_child;
 };
 
-struct ReturnExpr
+struct ReturnStatement
 {
 	AST super;
 
@@ -151,7 +152,44 @@ struct FunctionCallExpr
 	const char* function_name;
 };
 
+// if(condition) then; else otherwise;
+struct IfStatement
+{
+	AST super;
 
+	AST* condition;
+	AST* then;
+	AST* otherwise;
+};
+
+// while (condition) body;
+// for(enter; condition; step) body;
+struct LoopStatement
+{
+	AST super;
+
+	AST* enter; // 进入循环前执行的代码
+	AST* condition; // 循环条件
+	AST* step; // 每一步
+	AST* body;
+};
+
+
+
+struct GotoStatement
+{
+	AST super;
+	const char* label;
+};
+
+// next_loop:       <-- label
+//      io += 10;   <-- target
+struct LabelStatement
+{
+	AST super;
+	const char* label;
+	AST* target;
+};
 
 struct NumberExpr
 {
@@ -167,6 +205,12 @@ struct NumberExpr
 		float f32;
 		double f64;
 	};
+};
+
+struct UnionOrStructExpr
+{
+	AST supr;
+	Symbol* ref;
 };
 
 // int x;

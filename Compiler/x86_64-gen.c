@@ -314,7 +314,7 @@ Value* x64_visit_BlockExpr(ASMContext* ctx, BlockExpr* ast)
 }
 
 
-Value* x64_visit_ReturnExpr(ASMContext* ctx, ReturnExpr* ast)
+Value* x64_visit_ReturnStatement(ASMContext* ctx, ReturnStatement* ast)
 {
 	Value* val = x64_visit_ast(ctx, ast->return_val);
 	emit_mov(ctx, rax, val);
