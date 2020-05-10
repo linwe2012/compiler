@@ -11,66 +11,66 @@
 
 #include "parser.h"
 
-#define COPY_STR()              yylval.str = strcpy((char*)malloc(strlen(yytext)+1), yytext)
-#define RET_TYPE()				return(TYPE)
-
 
 %}
 
 %option noyywrap
 
-integer [0-9]*
-identifier [a-zA-Z_][a-zA-Z0-9_]*
-whitespace [[:space:]]+
-floatpoint {integer}"."{integer}
+oct_int		0[0-7]*
+dec_int		[1-9][0-9]*
+hex_int		0[xX][0-9a-fA-F]+
+
+identifier	[a-zA-Z_][a-zA-Z0-9_]*
+whitespace	[[:space:]]+
+float		{dec_int}"."[0-9]*
 
 %%
 
-"auto"			{ }
-"void"          { COPY_STR(); RET_TYPE(); }
-"char"          { COPY_STR(); RET_TYPE(); }
-"short"         { COPY_STR(); RET_TYPE(); }
-"int"           { COPY_STR(); RET_TYPE(); }
-"long"          { COPY_STR(); RET_TYPE(); }
-"float"         { COPY_STR(); RET_TYPE(); }
-"double"        { COPY_STR(); RET_TYPE(); }
+"auto"			{ return(AUTO); }
+"void"          { return(VOID); }
+"char"          { return(CHAR); }
+"short"         { return(SHORT); }
+"int"           { return(INT); }
+"long"          { return(LONG); }
+"float"         { return(FLOAT); }
+"double"        { return(DOUBLE); }
 
-"signed"        { /* TODO */ }
-"unsigned"      { /* TODO */ }
+"signed"        { return(SIGNED); }
+"unsigned"      { return(UNSIGNED); }
 
-"const"			{ }
-"extern"		{ }
-"inline"		{ }
-"static"		{ }
-"volatile"		{ }
+"const"			{ return(CONST); }
+"extern"		{ return(EXTERN); }
+"inline"		{ return(INLINE); }
+"static"		{ return(STATIC); }
+"volatile"		{ return(VOLATILE); }
 
-"enum"			{ }
-"struct"		{ }
+"enum"			{ return(ENUM); }
+"struct"		{ return(STRUCT); }
 
-"typedef"		{ }
+"typedef"		{ return(TYPEDEF); }
 
-"break"			{ }
-"case"			{ }
-"continue"		{ }
-"default"		{ }
-"do"			{ }
-"else"			{ }
-"for"			{ }
-"goto"			{ }
-"if"			{ }
+"break"			{ return(BREAK); }
+"case"			{ return(CASE); }
+"continue"		{ return(CONTINUE); }
+"default"		{ return(DEFAULT); }
+"do"			{ return(DO); }
+"else"			{ return(ELSE); }
+"for"			{ return(FOR); }
+"goto"			{ return(GOTO); }
+"if"			{ return(IF); }
 "return"        { return RETURN; }
-"sizeof"		{ }
-"switch"		{ }
-"union"			{ }
-"while"			{ }
+"sizeof"		{ return(SIZEOF); }
+"switch"		{ return(SWITCH); }
+"union"			{ return(UNION); }
+"while"			{ return(WHILE); }
 
-"register"		{ }
-"restrict"		{ }
+"register"		{ return(REGISTER); }
+"restrict"		{ return(RESTRICT); }
 
 {identifier}    { COPY_STR(); return IDENTIFIER; }
-{integer}       { COPY_STR(); return NUM_INT; }
-{floatpoint}    { COPY_STR(); return NUM_FLOAT; }
-{floatpoint}"f" { COPY_STR(); return NUM_FLOAT32; }
+{dec_int}       { COPY_STR(); return NUM_INT; }
+{float}			{ COPY_STR(); return NUM_FLOAT; }
+{float}"f"		{ COPY_STR(); return NUM_FLOAT32; }
 
 /* TODO: 八进制 十六进制 科学计数法 */
 
