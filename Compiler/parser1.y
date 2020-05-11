@@ -113,17 +113,6 @@ declaration
     | declaration_specifiers init_declarator_list ';'
     ;
 
-declaration_specifiers
-    : storage_class_specifier
-    | storage_class_specifier declaration_specifiers
-    | type_specifier
-    | type_specifier declaration_specifiers
-    | type_qualifier 
-    | type_qualifier declaration_specifiers
-    | function_specifier
-    | function_specifier declaration_specifiers
-    ;
-
 type_qualifier
     : CONST         { $$ = TP_CONST; }
     | VOLATILE      { $$ = TP_VOLATILE; }
@@ -191,6 +180,12 @@ expression_statment
     : ';'                                     { $$ = make_empty(); }
     expression ';'                            { $$ = $1; }
     ;
+
+selection_statement
+	: IF '(' expression ')' statement
+	| IF '(' expression ')' statement ELSE statement
+	| SWITCH '(' expression ')' statement
+	;
 
 
 iteration_statement
@@ -313,9 +308,33 @@ unary_expression
 	| SIZEOF '(' type_name ')'
 	;
 
-cast_expression
-	: unary_expression
-	| '(' c ')' cast_expression
+type_name
+	: 
+	| type_specifier
+	| type_specifier pointer 
+	;
+
+pointer
+	: '*'
+	| '*' pointer
+	|
+
+type_specifier
+	: VOID
+	| CHAR
+	| SHORT
+	| INT
+	| LONG
+	| FLOAT
+	| DOUBLE
+	| SIGNED
+	| UNSIGNED
+	| BOOL
+	| COMPLEX
+	| IMAGINARY
+	| struct_or_union_specifier
+	| enum_specifier
+	| TYPE_NAME
 	;
 
 unary_operator
