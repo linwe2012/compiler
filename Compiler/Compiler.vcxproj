@@ -191,7 +191,6 @@
     <ClCompile Include="hashtable.c" />
     <ClCompile Include="lexer.c" />
     <ClCompile Include="main.c" />
-    <ClCompile Include="msvc-feature-test.cc" />
     <ClCompile Include="parser.c" />
     <ClCompile Include="preprocessor.c" />
     <ClCompile Include="symbol.c" />
