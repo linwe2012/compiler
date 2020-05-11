@@ -42,6 +42,7 @@ enum Types
 	// Type qualifier
 	TP_CONST = 0x010000u,
 	TP_VOLATILE = 0x020000u,
+	TP_RESTRICT = 0x040000u, //  TODO: this is not supported
 
 	TP_CLEAR_SIGNFLAGS = ~(TP_UNSIGNED | TP_SIGNED),
 	TP_GET_SIGNFLAGS = (TP_UNSIGNED | TP_SIGNED),

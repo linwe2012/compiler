@@ -340,7 +340,10 @@ AST* make_label_default(AST* statements);
 // return ret
 AST* make_jump(enum JumpType type, char* name, AST* ret);
 
-
+AST* make_declare_array(AST* direct, AST* constant);
+AST* make_declare_func(AST* direct, AST* constant);
+AST* make_declare_pointer(enum SymbolAttributes type_qulifiers);
+AST* make_declare_declarator(AST* pointer, AST* declarator);
 
 // while(condition) loop_body
 // for(before_loop; condition; loop_step) loop_body;
@@ -376,7 +379,6 @@ AST* make_type_add_attr(AST*target, enum SymbolAttributes attr);
 //    '*' type-qualifier-list? pointer
 AST* make_ptr(enum Types qualifier, AST* pointing);
 
-AST* make_identifier(char* name);
 
 // declarator:
 //    pointer? direct_declarator

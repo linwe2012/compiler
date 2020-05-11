@@ -67,12 +67,17 @@ float		{dec_int}"."[0-9]*
 "register"		{ return(REGISTER); }
 "restrict"		{ return(RESTRICT); }
 
+
+"__cdecl"       { return (MS_CDECL); }  /*  Microsoft extension */
+"__stdcall"       { return (MS_STDCALL); }
+"__inline"       { return (INLINE); }
+
 {identifier}    { COPY_STR(); return IDENTIFIER; }
 {dec_int}       { COPY_STR(); return NUM_INT; }
 {float}			{ COPY_STR(); return NUM_FLOAT; }
 {float}"f"		{ COPY_STR(); return NUM_FLOAT32; }
 
-/* TODO: °Ë½øÖÆ Ê®Áù½øÖÆ ¿ÆÑ§¼ÆÊý·¨ */
+/* TODO: ï¿½Ë½ï¿½ï¿½ï¿½ Ê®ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Ñ§ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ */
 
 {whitespace}    /* do nothing */
 

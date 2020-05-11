@@ -300,6 +300,7 @@ AST* make_trinary_expr(enum Operators triary_op, AST* cond, AST* lhs, AST* rhs)
 
 int ast_type_neq(AST* node, ASTType type)
 {
+
 	return !(node->type == type);
 }
 

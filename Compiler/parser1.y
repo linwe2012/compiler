@@ -29,12 +29,13 @@ AST* parser_result = NULL;
 %token <str> STRUCT UNION ENUM ELLIPSIS
 
 %token <str> CASE DEFAULT IF ELSE SWITCH WHILE DO FOR GOTO CONTINUE BREAK RETURN
+%token <str> MS_CDECL MS_STDCALL
 
 %type <val> primary_expression
 %type <val> postfix_expression
 
 %type <val> statement compound_statement block_item_list block_item labeled_statement expression_statment iteration_statement jump_statement 
-
+%type <type> assignment_operator
 %start translation_unit
 %%
 // defination part
@@ -124,12 +125,16 @@ declaration_specifiers
     ;
 
 type_qualifier
-    : CONST
-    | VOLATILE
-    | RESTRICT
+    : CONST         { $$ = TP_CONST; }
+    | VOLATILE      { $$ = TP_VOLATILE; }
+    | RESTRICT      { $$ = TP_RESTRICT; }
     ;
+	
 function_specifier
-    : INLINE;
+    : INLINE        { $$ = ATTR_INLINE; }
+	| MS_CDECL      { $$ = ATTR_CDECL; }
+	| MS_STDCALL    { $$ = ATTR_STDCALL; }
+	;
 
 init_declarator_list
     : init_declarator
@@ -214,12 +219,12 @@ expression
 
 assignment_expression
 	: conditional_expression
-	| unary_expression assignment_operator assignment_expression
+	| unary_expression assignment_operator assignment_expression { $$ = make_binary_expr($2, $1, $2); }
 	;
 
 assignment_operator
 	: '='
-	| MUL_ASSIGN
+	| MUL_ASSIGN { $$ = OP_ASSIGN_MUL; }
 	| DIV_ASSIGN
 	| MOD_ASSIGN
 	| ADD_ASSIGN
