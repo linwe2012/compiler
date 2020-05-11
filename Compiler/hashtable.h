@@ -12,7 +12,8 @@ typedef struct HashItem
 	struct HashItem* next;
 	const void* key;
 	HashedKey key_hash;
-	char payload[1];
+	void* payload;
+	// char payload[1];
 } HashItem;
 
 typedef struct HashTable

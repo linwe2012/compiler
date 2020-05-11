@@ -2,41 +2,10 @@
 #define _SYMBOL_H_
 
 #include "config.h"
-
-enum SymbolAttributes
-{
-	ATTR_EXTERN,
-	ATTR_STATIC,
-	ATTR_TYPEDEF,
-	ATTR_INLINE
-};
-
-enum Types
-{
-	TP_VOID,
-	TP_INT8, // signed char
-	TP_INT16, // short
-	TP_INT32, // int
-	TP_INT64, // long long
-	TP_INT128,
-
-	TP_FLOAT32, // float
-	TP_FLOAT64, // double
-	TP_FLOAT128,
-
-	TP_STRUCT = 0x0010,
-	TP_UNION,
-	TP_ENUM,
-	TP_PTR, // pointer
-	TP_FUNC, // function
-
-	TP_UNSIGNED = 0x00100,
-	TP_SIGNED   = 0x00200,
-	TP_ARRAY    = 0x00400,
-	TP_BITFIELD = 0x00800,
-	TP_CONST    = 0x01000,
-	TP_VOLATILE = 0x02000,
-};
+#include <stdlib.h>
+#include <string.h>
+#include "types.h"
+#include "hashtable.h"
 
 inline int type_is_number(int type)
 {
@@ -52,20 +21,92 @@ inline int type_native_alignment(int type)
 
 int type_number_size(int type);
 
+/*
+struct TypeAlias
+{
+	char* alias;
+	int is_alias;
+
+	struct TypeInfo* info;
+	struct TypeAlias* prev;
+	struct TypeAlias* next;
+};
+STRUCT_TYPE(TypeAlias)
+*/
+
+// 注意 类型名称 'struct A;'
+//                     ^
+//                     +------- 只能由一个空格
+// type_name
+//         : struct typename
+//         : union  typename
+//         : typename
 struct TypeInfo
 {
 	char* type_name;
+	int is_alias;
 	char* field_name;
 	enum Types type;
-	int aligned_size;
+
 	int alignment;
+	int aligned_size;
 	int offset; // 如果是结构体, 距离结构体首部的距离
+
+	union
+	{
+		struct StructOrUnion
+		{
+			struct TypeInfo* child;
+		};
+
+		struct Pointer
+		{
+			TypeInfo* pointing;
+			int indirection;
+		};
+
+		struct Array
+		{
+			struct TypeInfo* array_type;
+			uint64_t array_count;
+		};
+		
+		struct Function
+		{
+			TypeInfo* return_type;
+			TypeInfo* params;
+		};
+
+	};
+	
+	
+	int indirection; // 指针的层级, 比如 int*** 的 inderection = 3
 	struct TypeInfo* child;
 
 	struct TypeInfo* prev;
 	struct TypeInfo* next;
+
+	struct TypeAlias* alias;
+	struct TypeInfo* alias_origin;
 };
 STRUCT_TYPE(TypeInfo)
+
+struct VariableInfo
+{
+	char* name;
+	enum SymbolAttributes attributes;
+	TypeInfo* type;
+};
+STRUCT_TYPE(VariableInfo)
+
+struct FunctionInfo
+{
+	char* name;
+	TypeInfo* return_type;
+	TypeInfo* params;
+	struct AST* body;
+};
+STRUCT_TYPE(FunctionInfo)
 
 TypeInfo* type_access(TypeInfo* info, const char* name)
 {
@@ -106,6 +147,7 @@ int type_add_child(TypeInfo* info, TypeInfo* child)
 			size += move->alignment;
 		}
 
+
 		info->aligned_size = size;
 		info->alignment = max_alignment;
 	}
@@ -123,22 +165,56 @@ TypeInfo* type_append(TypeInfo* left, TypeInfo* right)
 
 }
 
-
-struct SymbolType
+struct SymbolBase
 {
-
+	char* key;
 };
 
+enum SymbolTypes
+{
+	Symbol_TypeInfo,
+	Symbol_VariableInfo,
+	Symbol_FunctionInfo
+};
 struct Symbol
 {
-	int type;
-	int attributes;
+	union 
+	{
+		struct
+		{
+			char* name;
+		};
+		TypeInfo type;
+		VariableInfo var;
+		FunctionInfo func;
+	};
+
+	Symbol* prev;
+	Symbol* next;
+	enum SymbolTypes usage;
+};
+STRUCT_TYPE(Symbol)
+
+struct SymbolTableEntry
+{
+	HashTable* table;
+	struct SymbolTableEntry* prev;
+	struct SymbolTableEntry* next;
+	int hide_bottom;
+	Symbol* first;
+	Symbol* last;
 };
 
-struct TypeDeclaration
+struct SymbolTable
 {
-	
+	struct SymbolTableEntry* stack_bottom;
+	struct SymbolTableEntry* stack_top;
+	struct SymbolTableEntry* global;
 };
+STRUCT_TYPE(SymbolTable)
+
+extern Symbol SymbolType_UINT64;
+
 
 
 #endif

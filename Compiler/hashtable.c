@@ -27,7 +27,20 @@ HashTable* hash_new(int payload_size, int capacity, HashEqual equal, Hasher* has
 
 HashTable* hash_destroy(HashTable* table)
 {
+	for (int i = 0; i < table->capacity; ++i)
+	{
+		HashItem* item = table->items[i];
+		HashItem* next;
+		while (item)
+		{
+			next = item->next;
+			free(item);
+			item = next;
+		}
+	}
 	deallocate(table->items);
+	deallocate(table->collisions);
+	deallocate(table);
 	return NULL;
 }
 
@@ -112,7 +125,8 @@ void* hash_add(HashTable* table, const void* key, void* payload)
 {
 	
 	HashItem* item = allocate(table->item_size);
-	memcpy(item->payload, payload, table->payload_size);
+	// memcpy(item->payload, payload, table->payload_size);
+	item->payload = payload;
 	item->key = key;
 	item->key_hash = table->hasher(key);
 
@@ -161,6 +175,34 @@ int hash_impl_strhash(const void* a)
 HashTable* hash_new_strkey(int payload_size, int capacity)
 {
 	hash_new(payload_size, capacity, hash_impl_strcmp, hash_impl_strhash);
+}
+
+int hash_remove(HashTable* table, const void* key)
+{
+	int hashed = table->hasher(key);
+	int hashed_key = hashed % table->capacity;
+	HashItem* item = table->items[hashed_key];
+
+	if (table->equal(item->key, key))
+	{
+		table->items[hashed_key] = item->next;
+		free(item);
+		return 0;
+	}
+
+	HashItem* prev = item;
+	item = item->next;
+	while (item)
+	{
+		if (table->equal(item->key, key))
+		{
+			prev->next = item->next;
+			free(item);
+			return 0;
+		}
+	}
+
+	return -1;
 }
 
 

@@ -180,10 +180,13 @@
     <ClInclude Include="lexer.h" />
     <ClInclude Include="parser.h" />
     <ClInclude Include="symbol.h" />
+    <ClInclude Include="types.h" />
+    <ClInclude Include="utils.h" />
     <ClInclude Include="x86_64-asm.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="ast.c" />
+    <ClCompile Include="context.c" />
     <ClCompile Include="error.c" />
     <ClCompile Include="hashtable.c" />
     <ClCompile Include="lexer.c" />
@@ -191,6 +194,8 @@
     <ClCompile Include="msvc-feature-test.cc" />
     <ClCompile Include="parser.c" />
     <ClCompile Include="preprocessor.c" />
+    <ClCompile Include="symbol.c" />
+    <ClCompile Include="utils.c" />
     <ClCompile Include="x86_64-gen.c" />
   </ItemGroup>
   <ItemGroup>

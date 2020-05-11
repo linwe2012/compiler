@@ -46,6 +46,9 @@ int test(){
     constexpr unsigned int x = 0xF0000000;
     constexpr int v = x;
 
+
+    constexpr unsigned n = -123456u;
+
     return 0;
 }
 
