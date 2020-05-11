@@ -189,5 +189,13 @@ enum JumpType
 	JUMP_RET,
 };
 
+enum LoopType { 
+	LOOP_WHILE, 
+	LOOP_FOR,
+	LOOP_DOWHILE
+};
+
+// static const char* const** (*a)(int a);
+
 #endif // !CC_TYPES_H
 

@@ -326,6 +326,34 @@ AST* make_binary_expr(enum Operators binary_op, AST* lhs, AST* rhs);
 AST* make_trinary_expr(enum Operators triary_op, AST* cond, AST* lhs, AST* rhs);
 
 
+// Statements
+// ======================================
+AST* make_block(AST* statements);
+
+AST* make_label(char* name, AST* statement);
+AST* make_label_case(AST* constant, AST* statements);
+AST* make_label_default(AST* statements);
+
+// goto name
+// continue
+// break
+// return ret
+AST* make_jump(enum JumpType type, char* name, AST* ret);
+
+
+
+// while(condition) loop_body
+// for(before_loop; condition; loop_step) loop_body;
+// do loop_body while(condition)
+AST* make_loop(AST* condition, AST* before_loop, AST* loop_body, AST* loop_step, enum LoopType loop_type);
+
+// if(condition) then else otherwise
+AST* make_ifelse(AST* condition, AST* then, AST* otherwise);
+
+AST* make_switch(AST* condition, AST* body);
+
+
+
 // Declarations
 // =================================
 
@@ -370,7 +398,7 @@ AST* make_struct_or_union_define(enum Types type, char* identifier, AST* field_l
 
 AST* make_symbol(const char* type, const char* name);
 
-AST* make_block(AST* first_child);
+
 
 AST* make_function_call(const char* function_name, AST* params);
 
