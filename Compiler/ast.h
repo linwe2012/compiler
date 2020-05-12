@@ -10,10 +10,12 @@
 	V(ReturnStatement) \
 	V(ListExpr) \
 	V(FunctionCallExpr)\
+	V(IdentifierExpr) \
     V(NumberExpr)   \
 	V(SymbolExpr)   \
 	V(FunctionExpr) \
 	V(OperatorExpr) \
+	V(LabelStmt) \
 
 #define AST_AUX_NODE_LIST(V)\
 	V(EmptyExpr) \
@@ -173,6 +175,7 @@ struct LabelStmt
 	AST super;
 	const char* label;
 	AST* target;
+	AST* condition; // < swtich case 中的 condition
 };
 
 
@@ -184,6 +187,10 @@ struct NumberExpr
 	enum Types number_type;
 	union
 	{
+		int8_t i8;
+		uint8_t ui8;
+		int16_t i16;
+		uint16_t ui16;
 		int32_t i32;
 		uint32_t ui32;
 		int64_t i64;
@@ -193,6 +200,15 @@ struct NumberExpr
 		char* str;
 	};
 };
+
+struct IdentifierExpr
+{
+	AST super;
+	char* name;
+	AST* val;
+};
+
+
 
 
 // x
@@ -287,6 +303,7 @@ struct DeclarationExpr
 
 
 
+
 #define FORWORD_DECL(x) STRUCT_TYPE(x)
 AST_NODE_LIST(FORWORD_DECL)
 AST_AUX_NODE_LIST(FORWORD_DECL)
@@ -305,6 +322,7 @@ AST* ast_append(AST* leader, AST* follower);
 //    identifier
 // 变量声明
 AST* make_identifier(const char* c);
+AST* make_identifier_with_constant_val(const char* c, AST* constant_val);
 
 // primary-expression:
 //    constants
@@ -325,7 +343,7 @@ AST* make_unary_expr(enum Operators unary_op, AST* rhs);
 AST* make_binary_expr(enum Operators binary_op, AST* lhs, AST* rhs);
 AST* make_trinary_expr(enum Operators triary_op, AST* cond, AST* lhs, AST* rhs);
 
-
+const int i = 0x22lu;
 // Statements
 // ======================================
 AST* make_block(AST* statements);
@@ -340,11 +358,6 @@ AST* make_label_default(AST* statements);
 // return ret
 AST* make_jump(enum JumpType type, char* name, AST* ret);
 
-AST* make_declare_array(AST* direct, AST* constant);
-AST* make_declare_func(AST* direct, AST* constant);
-AST* make_declare_pointer(enum SymbolAttributes type_qulifiers);
-AST* make_declare_declarator(AST* pointer, AST* declarator);
-
 // while(condition) loop_body
 // for(before_loop; condition; loop_step) loop_body;
 // do loop_body while(condition)
@@ -357,8 +370,6 @@ AST* make_switch(AST* condition, AST* body);
 
 
 
-// Declarations
-// =================================
 
 // attr 是 register/auto/extern/static
 // type 是 TP_VOID ~ TP_FLOAT128 等数字类型的时候, name = NULL
@@ -373,21 +384,42 @@ AST* make_typedef(AST* target, const char* new_name);
 // attr 是 __cdecl, __stdcall, inline
 AST* make_type_add_attr(AST*target, enum SymbolAttributes attr);
 
-// qualifier 是 const/volatile
+
+
+// Declarations
+// =================================
+
+// qualifier 是 const/volatile/restrict
 // pointer:
 //    '*' type-qualifier-list?
 //    '*' type-qualifier-list? pointer
-AST* make_ptr(enum Types qualifier, AST* pointing);
+AST* make_ptr(int type_qualifier_list, AST* pointing);
+int ast_merge_type_qualifier(int a, int b);
+
+
+// direct_declarator
+//     : IDENTIFIER
+AST* makr_init_direct_declarator(char *);
+// direct_declarator:
+//     : direct_declarator (wrapped)
+//     | direct_declarator [wrapped]
+AST* make_extent_direct_declarator(AST* direct, enum Types type, AST* wrapped);
 
 
 // declarator:
 //    pointer? direct_declarator
-// direct-declarator:
-//    identifier
-//    ( declarator )
-//    direct-declarator [ constant-expressionopt ]
-//    direct-declarator ( parameter-type-list )  
 AST* make_declarator(AST* pointer, AST* direct_declarator);
+
+// init_declarator:
+//       declarator = initializer
+AST* make_declarator_with_init(AST* declarator, AST* init);
+
+
+AST* make_type_specifier(enum Types type);
+AST* make_type_specifier_from_id(char*);
+AST* make_type_specifier_extend(AST* me, AST*other, enum SymbolAttributes storage);
+AST* make_declaration(AST* declaration_specifiers, enum SymbolAttributes attribute_specifier, AST* init_declarator_list);
+
 
 // enum_define:
 //     enum identifier { enum_list }
@@ -397,8 +429,7 @@ AST* make_enum_define(char* identifier, AST* enum_list);
 //     struct/union identifier { field_list }
 AST* make_struct_or_union_define(enum Types type, char* identifier, AST* field_list);
 
-
-AST* make_symbol(const char* type, const char* name);
+AST* ast_merge_specifier_qualifier(AST* me, AST* other, enum Types qualifier);
 
 
 

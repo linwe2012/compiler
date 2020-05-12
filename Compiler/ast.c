@@ -3,6 +3,8 @@
 #include <assert.h>
 #include "types.h"
 #include "context.h"
+#include <stdio.h>
+#include <inttypes.h>
 
 #define NEW_AST(type, name) \
 	type* name = (type*) malloc (sizeof(type)); \
@@ -48,13 +50,75 @@ AST* ast_append(AST* leader, AST* follower)
 	return leader;
 }
 
-AST* make_number_int32(char* c)
+AST* make_identifier(const char* c)
+{
+	NEW_AST(IdentifierExpr, ast);
+	ast->name = c;
+	ast->val = NULL;
+	return SUPER(ast);
+}
+
+AST* make_identifier_with_constant_val(const char* c, AST* constant_val)
+{
+	NEW_AST(IdentifierExpr, ast);
+	ast->name = c;
+	ast->val = constant_val;
+	return SUPER(ast);
+}
+
+int str_begin_with(const char* a, const char* prefix)
+{
+	while (*a && *prefix)
+	{
+		if (*a != *prefix) break;
+		++a;
+		++prefix;
+	}
+
+	return *a == *prefix;
+}
+
+
+
+AST* make_number_int(char* c, enum Types type)
 {
 	NEW_AST(NumberExpr, ast);
-	ast->number_type = TP_INT32;
-	ast->i32 = atoi(c);
+	ast->number_type = type;
 
-	free(c);
+	int is_unsign = type & TP_UNSIGNED;
+	int is_hex = str_begin_with(c, "0x");
+	int is_oct = str_begin_with(c, "0");
+	if (is_hex) is_oct = 0;
+
+#define INT_TYPE_LIST(V)\
+V(8, "hh") \
+V(16, "h") \
+V(32, "l") \
+V(64, "ll") 
+	switch (type & TP_CLEAR_SIGNFLAGS)
+	{
+#define TYPE_CASE(bits, scn) \
+	case TP_INT##bits: {\
+		if (is_unsign)\
+		{\
+			if (is_hex) sscanf(c, "%" scn "ux", &(ast->ui##bits));\
+			else if (is_oct) sscanf(c, "%" scn "uo", &(ast->ui##bits));\
+			else sscanf(c, "%" scn "u", &(ast->ui##bits));\
+		}\
+		else {\
+			if (is_hex) sscanf(c, "%" scn "x", &(ast->ui##bits));\
+			else if (is_oct) sscanf(c, "%" scn "o", &(ast->ui##bits));\
+			else sscanf(c, "%" scn "", &(ast->ui##bits));\
+		}\
+	}
+	INT_TYPE_LIST(TYPE_CASE)
+	
+#undef TYPE_CASE
+#undef INT_TYPE_LIST
+	default:
+		break;
+	}
+
 	return SUPER(ast);
 }
 
@@ -66,7 +130,6 @@ AST* make_string(char* c)
 
 	return SUPER(ast);
 }
-
 
 AST* make_number_float(const char* c, int bits)
 {
@@ -83,13 +146,7 @@ AST* make_number_float(const char* c, int bits)
 	return SUPER(ast);
 }
 
-AST* make_identifier(const char* c)
-{
-	log_error(NULL, "id, %s", c);
-	// printf("No %s");
-	//TODO
-	return NULL;
-}
+/*
 
 Symbol* sym_get_type(const char* n)
 {
@@ -113,72 +170,7 @@ FunctionDefinition* sym_get_function(const char* return_type, const char* name, 
 	def->params = args;
 	//TODO
 	return def;
-}
-
-
-AST* make_block(AST* first_child)
-{
-	NEW_AST(BlockExpr, ast);
-
-	ast->first_child = first_child;
-
-	return SUPER(ast);
-}
-
-AST* make_function_call(const char* function_name, AST* params)
-{
-	NEW_AST(FunctionCallExpr, ast);
-
-	ast->function_name = function_name;
-	ast->params = params;
-
-	return SUPER(ast);
-}
-
-AST* make_function(const char* return_type, const char* name, AST* arg_list)
-{
-
-	NEW_AST(FunctionExpr, func);
-
-	func->ref = sym_get_function(return_type, name, arg_list);
-
-	return SUPER(func);
-}
-
-AST* make_function_body(AST* ast, AST* body)
-{
-	CAST(FunctionExpr, func, ast);
-	func->ref->body = body;
-
-	return ast;
-}
-
-AST* make_return(AST* exp)
-{
-	NEW_AST(ReturnStatement, ast);
-	ast->return_val = exp;
-
-	return SUPER(ast);
-}
-
-AST* make_empty()
-{
-	NEW_AST(EmptyExpr, ast);
-	ast->error = NULL;
-	return SUPER(ast);
-}
-
-AST* make_error(char* message)
-{
-	NEW_AST(EmptyExpr, ast);
-	ast->error = message;
-	return SUPER(ast);
-}
-
-void* ast_destroy(AST* rhs)
-{
-
-}
+}*/
 
 AST* make_unary_expr(enum Operators unary_op, AST* rhs)
 {
@@ -242,14 +234,14 @@ AST* make_unary_expr(enum Operators unary_op, AST* rhs)
 			num->super.sym_type = &SymbolType_UINT64;
 			num->number_type = TP_INT64 | TP_UNSIGNED;
 			num->ui64 = rhs->sym_type->type.aligned_size;
-			other = SUPER(num); 
+			other = SUPER(num);
 		}
-		
+
 		break;
 	}
 	case OP_CAST:
 		break;
-	
+
 	default:
 		break;
 	}
@@ -270,7 +262,7 @@ AST* make_unary_expr(enum Operators unary_op, AST* rhs)
 
 	ast->op = unary_op;
 	ast->rhs = rhs;
-	
+
 	return SUPER(ast);
 }
 
@@ -298,32 +290,202 @@ AST* make_trinary_expr(enum Operators triary_op, AST* cond, AST* lhs, AST* rhs)
 	return SUPER(ast);
 }
 
+
+AST* make_block(AST* first_child)
+{
+	NEW_AST(BlockExpr, ast);
+
+	ast->first_child = first_child;
+
+	return SUPER(ast);
+}
+
+AST* make_label(char* name, AST* statement)
+{
+	NEW_AST(LabelStmt, ast);
+	ast->label = name;
+	ast->target = statement;
+}
+
+AST* make_label_case(AST* constant, AST* statements)
+{
+	switch (10)
+	{
+		char c = 10;
+		++constant;
+	case 2:
+		++constant;
+		++statements;
+		++c;
+	default:
+		break;
+	}
+}
+
+AST* make_empty()
+{
+	NEW_AST(EmptyExpr, ast);
+	ast->error = NULL;
+	return SUPER(ast);
+}
+
+AST* make_error(char* message)
+{
+	NEW_AST(EmptyExpr, ast);
+	ast->error = message;
+	return SUPER(ast);
+}
+
+
+
+
+
 int ast_type_neq(AST* node, ASTType type)
 {
-
 	return !(node->type == type);
 }
 
-// 函数指针类型
-AST* make_type_function_ptr(AST* return_type, AST* declarator, AST* param_list)
-{
-	CAST(TypenameExpr, ret, return_type);
-	CAST(DeclaratorExpr, decl, declarator);
-
-	NEW_STRUCT(Symbol * sym);
-
-
-}
 
 //
-// flags: 是否是 struct, 
-AST* make_type(enum Types flags, enum SymbolAttributes attributes, int indirections, const char* name)
+AST* make_function_call(const char* function_name, AST* params)
+{
+	NEW_AST(FunctionCallExpr, ast);
+
+	ast->function_name = function_name;
+	ast->params = params;
+
+	return SUPER(ast);
+}
+
+AST* make_function(const char* return_type, const char* name, AST* arg_list)
+{
+
+	NEW_AST(FunctionExpr, func);
+
+	func->ref = sym_get_function(return_type, name, arg_list);
+
+	return SUPER(func);
+}
+
+AST* make_function_body(AST* ast, AST* body)
+{
+	CAST(FunctionExpr, func, ast);
+	func->ref->body = body;
+
+	return ast;
+}
+
+AST* make_return(AST* exp)
+{
+	NEW_AST(ReturnStatement, ast);
+	ast->return_val = exp;
+
+	return SUPER(ast);
+}
+
+void* ast_destroy(AST* rhs)
 {
 
 }
 
-// union/struct
-AST* make_aggregate_declare()
+Value request_label(Context* ctx)
 {
 
+}
+
+
+Value handle_AST(Context* ctx, SwitchCaseStmt* ast)
+{
+
+}
+
+struct ListItem
+{
+	struct ListItem* next;
+	Value val;
+};
+struct List
+{
+	struct ListItem* head;
+	struct ListItem* tail;
+};
+
+void list_init(struct List* list)
+{
+	list->head = list->tail = NULL;
+}
+
+void list_append(struct List* list, Value val)
+{
+	if (list->head == NULL)
+	{
+		list->head = list->tail = malloc(sizeof(Value));
+		list->head->next = NULL;
+		list->head->val = val;
+	}
+
+	else {
+		list->tail->next = malloc(sizeof(Value));
+		list->tail = list->tail->next;
+		list->tail->next = NULL;
+		list->tail->val = val;
+	}
+}
+
+void list_destroy(struct List* list)
+{
+	struct ListItem* item = list->head;
+	struct ListItem* next;
+	while (item)
+	{
+		next = item->next;
+		free(item);
+		item = next;
+	}
+}
+
+Value handle_SwitchCaseStmt(Context*ctx, SwitchCaseStmt* ast)
+{
+	Value val = handle_AST(ctx, ast->cases);
+	Value exit = request_label(ctx);
+	struct List list;
+	
+	FOR_EACH(ast->switch_value, stmt)
+	{
+		while (stmt && stmt->type != AST_LabelStmt)
+		{
+			stmt = stmt->next;
+		}
+		LabelStmt* label = (LabelStmt*)stmt;
+		if (!label->condition)
+		{
+			continue;
+		}
+		
+		Value cond = handle_AST(ctx, label->condition);
+		Value case_label = request_label(ctx);
+
+		list_append(&list, case_label);
+
+		ctx->gen->cmp_(val, cond);
+		ctx->gen->je_(exit);
+	}
+
+	FOR_EACH(ast->switch_value, stmt)
+	{
+		while (stmt && stmt->type != AST_LabelStmt)
+		{
+			stmt = stmt->next;
+		}
+		LabelStmt* label = (LabelStmt*)stmt;
+		if (!label->condition)
+		{
+			continue;
+		}
+
+		Value cond = handle_AST(ctx, label->condition);
+		
+	}
+
+	list_destroy(&list);
 }

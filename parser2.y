@@ -21,7 +21,7 @@ AST* parser_result = NULL;
 %token <str> PTR_OP INC_OP DEC_OP LEFT_OP RIGHT_OP LE_OP GE_OP EQ_OP NE_OP
 %token <str> AND_OP OR_OP MUL_ASSIGN DIV_ASSIGN MOD_ASSIGN ADD_ASSIGN
 %token <str> SUB_ASSIGN LEFT_ASSIGN RIGHT_ASSIGN AND_ASSIGN
-%token <str> XOR_ASSIGN OR_ASSIGN
+%token <str> XOR_ASSIGN OR_ASSIGN TYPE_NAME
 
 %token <str> TYPEDEF EXTERN STATIC AUTO REGISTER INLINE RESTRICT
 %token <str> CHAR SHORT INT LONG SIGNED UNSIGNED FLOAT DOUBLE CONST VOLATILE VOID INT64
@@ -39,11 +39,6 @@ AST* parser_result = NULL;
 %start translation_unit
 
 %type <type> type_qualifier type_qualifier_list function_specifier attribute_specifier
-%type <type> storage_class_specifier struct_or_union
-%type <val> pointer direct_declarator declarator type_specifier init_declarator_list
-%type <val> declaration_specifiers declaration
-%type <val> parameter_list parameter_declaration
-%type <val> enum_specifier enumerator_list  enumerator
 
 %%
 // defination part
@@ -53,214 +48,114 @@ translation unit
     ;
 
 external_declaration
-    : function_definition
+    : function_defination
     | declaration
     ;
 
-/*
-function_definition
-    : declaration_specifiers declarator declaration_list compound_statement
-	| declaration_specifiers declarator compound_statement
-	;
-*/
-
-function_definition
-	: declaration_specifiers declarator compound_statement
-	;
-
-// declaration part
-declaration
-    : declaration_specifiers attribute_specifier  init_declarator_list ';' { $$ = make_declaration($1, $2, $3); }
-    | declaration_specifiers init_declarator_list ';'                      { $$ = make_declaration($1, ATTR_NONE, $2); }
+function_defination
+    : declarator declaration_list compound_statement
+    | declarator compound_statement
     ;
 
 declaration_specifiers
-    : type_specifier                                   { $$ = $1; }
-    | type_specifier declaration_specifiers            { $$ = make_type_specifier_extend($1, $2, ATTR_NONE); }
-    | storage_class_specifier declaration_specifiers   { $$ = make_type_specifier_extend($2, NULL, $1); }
-	| storage_class_specifier                          { $$ = make_type_specifier_extend($2, NULL, $1); }
+    : type_specifier
+    | type_specifier declaration_specifiers
+    | storage_class_specifier declaration_specifiers
     ;
 
-attribute_specifier
-	: MS_CDECL      { $$ = ATTR_CDECL; }
-	| MS_STDCALL    { $$ = ATTR_STDCALL; }
-	;
-
-init_declarator_list
-    : init_declarator                           { $$ = $1; }
-    | init_declarator ',' init_declarator_list  { $$ = ast_append($1, $3); }
-	;
-
-init_declarator
-	: declarator                  { $$ = $1 }
-	| declarator '=' initializer  { $$ = make_declarator_with_init($1, $2); }
-	;
-
 storage_class_specifier
-	: TYPEDEF     { $$ = ATTR_TYPEDEF; }
-	| EXTERN      { $$ = ATTR_EXTERN; }
-	| STATIC      { $$ = ATTR_STATIC; }
-	| AUTO        { $$ = ATTR_AUTO; }
-	| REGISTER    { $$ = ATTR_REGISTER; }
+	: TYPEDEF
+	| EXTERN
+	| STATIC
+	| AUTO
+	| REGISTER
 	;
 
 type_specifier
-	: VOID         { $$ = make_type_specifier(TP_VOID); }
-	| CHAR         { $$ = make_type_specifier(TP_INT8); }
-	| SHORT        { $$ = make_type_specifier(TP_INT16); }
-	| INT          { $$ = make_type_specifier(TP_INT32); }
-	| LONG         { $$ = make_type_specifier(TP_INT32); }
-	| FLOAT        { $$ = make_type_specifier(TP_FLOAT32); }
-	| DOUBLE       { $$ = make_type_specifier(TP_FLOAT64); }
-	| INT64        { $$ = make_type_specifier(TP_INT64); }
-	| SIGNED       { $$ = make_type_specifier(TP_SIGNED); }
-	| UNSIGNED     { $$ = make_type_specifier(TP_UNSIGNED); }
-	| struct_or_union_specifier { $$ = $1; }
-	| enum_specifier            { $$ = $1; }
-	| IDENTIFIER                { $$ = make_type_specifier_from_id($1); }
+	: VOID
+	| CHAR
+	| SHORT
+	| INT
+	| LONG
+	| FLOAT
+	| DOUBLE
+	| INT64
+	| SIGNED
+	| UNSIGNED
+	| struct_or_union_specifier
+	| enum_specifier
+	| TYPE_NAME
 	;
 
-type_qualifier
-    : CONST         { $$ = TP_CONST; }
-    | VOLATILE      { $$ = TP_VOLATILE; }
-    | RESTRICT      { $$ = TP_RESTRICT; }
-    ;
-
 declarator
-    : pointer direct_declarator { $$ = make_declarator($1, $2); }
-    | direct_declarator         { $$ = $1; }
-    ;
-
-direct_declarator
-    : IDENTIFIER                     { $$ = makr_init_direct_declarator($1); }
-	| '(' declarator ')'             { $$ = $2; }
-    | direct_declarator '(' ')'      { $$ = make_extent_direct_declarator($1, TP_FUNC, NULL); }
-    | direct_declarator '(' parameter_list ')'      { $$ = make_extent_direct_declarator($1, TP_FUNC, $3); }
-    | direct_declarator '[' ']'                     { $$ = make_extent_direct_declarator($1, TP_ARRAY, NULL); }
-    | direct_declarator '[' constant_expression ']' { $$ = make_extent_direct_declarator($1, TP_ARRAY, $3); }
+    : pointer direct_declarator {}
+    | direct_declarator
     ;
 
 pointer
-    : '*'                             { $$ = make_ptr(TP_INCOMPLETE, NULL); }
-	| '*' type_qualifier_list         { $$ = make_ptr($2, NULL); }
-	| '*' pointer                     { $$ = make_ptr(TP_INCOMPLETE, $2); }
-	| '*' type_qualifier_list pointer { $$ = make_ptr($2, $3); }
+    : '*'
+	| '*' type_qualifier
+	| '*' pointer
+	| '*' type_qualifier_list
+    ;
+
+direct_declarator
+    : IDENTIFIER
+    : direct_declarator '(' ')'
+    | direct_declarator '(' parameter_list ')'
+    | direct_declarator '[' ']'
+    | direct_declarator '[' constant_expression ']'
     ;
 
 parameter_list
-    : parameter_declaration                     { $$ = $1; }
-    | parameter_declaration ',' parameter_list  { $$ = ast_append($1, $2); }
+    : parameter_declaration
+    | parameter_list ',' parameter_declaration
+    ;
+
+parameter_declaration
+    :  declaration_specifiers declarator
+
+declaration
+    : declaration_specifiers attribute_specifier  init_declarator_list ';'
+    | declaration_specifiers init_declarator_list ';'
     ;
 
 type_qualifier_list
     : type_qualifier                     { $$ = $1; }
 	| type_qualifier_list type_qualifier { $$ = ast_merge_type_qualifier($1, $2); }
 
-enum_specifier
-	: ENUM '{' enumerator_list '}'              { $$ = make_enum_define(NULL, $3); }
-	| ENUM IDENTIFIER '{' enumerator_list '}'   { $$ = make_enum_define($2, $4); }
-	| ENUM IDENTIFIER                           { $$ = make_enum_define($2, NULL); }
+type_qualifier
+    : CONST         { $$ = TP_CONST; }
+    | VOLATILE      { $$ = TP_VOLATILE; }
+    | RESTRICT      { $$ = TP_RESTRICT; }
+    ;
+	
+function_specifier
+    : INLINE        { $$ = ATTR_INLINE; }
+	
+attribute_specifier
+	: MS_CDECL      { $$ = ATTR_CDECL; }
+	| MS_STDCALL    { $$ = ATTR_STDCALL; }
 	;
 
-enumerator_list
-	: enumerator                         { $$ = $1; }
-	| enumerator ',' enumerator_list     { $$ = ast_append($1, $2); }
-	;
+init_declarator_list
+    : init_declarator
+    | init_declarator_list ',' init_declarator;
 
-enumerator
-	: IDENTIFIER                         { $$ = make_identifier($1); }
-	| IDENTIFIER '=' constant_expression { $$ = make_identifier_with_constant_val($1, $3);  }
-
-struct_or_union_specifier
-	: struct_or_union '{' struct_declaration_list '}'                { $$ = make_struct_or_union_define($1, NULL, $3);  }
-	| struct_or_union IDENTIFIER '{' struct_declaration_list '}'     { $$ = make_struct_or_union_define($1, $2, $4);  }
-	| struct_or_union IDENTIFIER                                     { $$ = make_struct_or_union_define($1, $2, NULL);  }
-	;
-
-struct_or_union
-	: STRUCT         { $$ = TP_STRUCT; }
-	| UNION          { $$ = TP_UNION; }
-	;
-
-struct_declaration_list
-	: struct_declaration                           { $$ = $1; }
-	| struct_declaration struct_declaration_list   { $$ = ast_append($1, $2) }
-	;
-
-struct_declaration
-	: specifier_qualifier_list struct_declarator_list ';'  
-	;
-
-specifier_qualifier_list
-	: type_specifier                             { $$ =$1; }
-	| type_specifier specifier_qualifier_list    { $$ = ast_merge_specifier_qualifier($2, $1, TP_INCOMPLETE); }
-	| type_qualifier                             { $$ = ast_merge_specifier_qualifier(NULL,NULL, $1); }
-	| type_qualifier specifier_qualifier_list    { $$ = ast_merge_specifier_qualifier($1, NULL, $1); }
-	;
-
-struct_declarator_list
-	: struct_declarator                       
-	| struct-declarator_list ',' struct_declarator
-	;
-
-struct_declarator
+init_declarator
 	: declarator
-	| ':' constant_expression
-	| declarator ':' constant_expression
-	;
-
-parameter_declaration
-    : declaration_specifiers declarator
-	| declaration_specifiers abstract_declarator 
-	| declaration_specifiers
-	;
-
-/* Obsolete-style declarator 
-identifier_list
-	: IDENTIFIER
-	| identifier_list ',' IDENTIFIER
-	;
-*/
-
-abstract_declarator
-	: pointer
-	| direct_abstract_declarator
-	| pointer direct_abstract_declarator
-	;
-
-direct_abstract_declarator
-	: '(' abstract_declarator ')'
-	| direct_abstract_declarator '[' ']'
-	| direct_abstract_declarator '[' constant_expression ']'
-	| direct_abstract_declarator '(' parameter_type_list ')'
-	| '(' parameter_type_list ')'
+	| declarator '=' initializer
 	;
 
 initializer
     : assignment_expression
     | '{' initializer_list '}'
-	| '{' initializer_list ',' '}'
     ;
 
 initializer_list
     : initializer
     | initializer_list, initializer
     ;
-/*
-type_name
-	: type_specifier
-	| type_specifier pointer 
-	;
-*/
-
-type_name
-	: specifier_qualifier_list
-	| specifier_qualifier_list abstract_declarator
-	;
-
-function_specifier
-    : INLINE        { $$ = ATTR_INLINE; }
-	;
 
 // statement part
 
@@ -349,10 +244,6 @@ assignment_operator
 	| OR_ASSIGN
 	;
 
-constant_expression
-	: conditional_expression
-	;
-
 conditional_expression
 	: logical_or_expression
 	| logical_or_expression '?' expression ':' conditional_expression
@@ -430,8 +321,34 @@ unary_expression
 	| SIZEOF '(' type_name ')'
 	;
 
+type_name
+	: 
+	| type_specifier
+	| type_specifier pointer 
+	;
 
+pointer
+	: '*'
+	| '*' pointer
+	|
 
+type_specifier
+	: VOID
+	| CHAR
+	| SHORT
+	| INT
+	| LONG
+	| FLOAT
+	| DOUBLE
+	| SIGNED
+	| UNSIGNED
+	| BOOL
+	| COMPLEX
+	| IMAGINARY
+	| struct_or_union_specifier
+	| enum_specifier
+	| TYPE_NAME
+	;
 
 unary_operator
 	: '&'

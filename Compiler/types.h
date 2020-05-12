@@ -2,11 +2,12 @@
 #define CC_TYPES_H
 enum SymbolAttributes
 {
+	ATTR_NONE,
 	ATTR_REGISTER,
 	ATTR_AUTO,
 	ATTR_EXTERN,
 	ATTR_STATIC,
-	// ATTR_TYPEDEF,
+	ATTR_TYPEDEF,
 	
 	ATTR_INLINE = 0x0100,
 	ATTR_STDCALL = 0x0200,
@@ -180,6 +181,8 @@ enum Operators
 	OP_PREFIX = 0x010000,
 	OP_POSTFIX = 0x020000,
 };
+
+
 
 
 enum JumpType

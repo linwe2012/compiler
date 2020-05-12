@@ -3,7 +3,7 @@
 #include "hashtable.h"
 #include "types.h"
 
-
+#include "gen.h"
 struct Context
 {
 	// #include "xxx/yyy.h"
@@ -19,6 +19,8 @@ struct Context
 	struct SymbolTable* variables; // enum & ids
 	struct SymbolTable* types;
 	struct SymbolTable* enums;
+
+	struct Gen* gen;
 	
 	struct AST* current;
 	struct {
