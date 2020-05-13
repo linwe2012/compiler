@@ -157,7 +157,7 @@ enum Operators
 	OP_ASSIGN_MOD,  // %=
 	OP_ASSIGN_AND,  // &=
 	OP_ASSIGN_XOR,  // ^=
-
+	OR_ASSIGN_OR,   // |=
 	// Logical
 	// --------------------
 	OP_EQUAL,       // ==
