@@ -13,9 +13,9 @@
 	V(IdentifierExpr) \
     V(NumberExpr)   \
 	V(SymbolExpr)   \
-	V(FunctionExpr) \
 	V(OperatorExpr) \
 	V(LabelStmt) \
+	V(JumpStmt) \
 
 #define AST_AUX_NODE_LIST(V)\
 	V(EmptyExpr) \
@@ -57,6 +57,8 @@ typedef struct FunctionDefinition
 	const char* name;
 	AST* body;
 	const char* return_type;
+	int64_t evaluated_value;
+
 } FunctionDefinition;
 
 //
@@ -208,34 +210,6 @@ struct IdentifierExpr
 	AST* val;
 };
 
-
-
-
-// x
-/*
-struct SymbolExpr
-{
-	AST super;
-	Symbol* type;
-	Symbol* name;
-};
-*/
-
-struct SymbolExpr
-{
-	AST super;
-	Symbol* ref;
-};
-
-
-
-struct FunctionExpr
-{
-	AST super;
-	FunctionDefinition* ref;
-};
-
-
 // Auxiliary AST Nodes
 // ================================
 // 辅助 AST 节点, 便于 yacc 调用时生成,
@@ -265,7 +239,7 @@ struct IfStmt
 struct LoopStmt
 {
 	AST super;
-
+	enum LoopType loop_type;
 	AST* enter; // 进入循环前执行的代码
 	AST* condition; // 循环条件
 	AST* step; // 每一步要做的操作
@@ -282,24 +256,10 @@ struct SwitchCaseStmt
 struct DeclaratorExpr
 {
 	AST super;
-	int indirection;
 	char* name;
+	Symbol* sym;
 };
 
-struct TypenameExpr
-{
-	AST super;
-	enum SymbolAttributes attr;
-	enum Types type;
-	char* name;
-};
-
-struct DeclarationExpr
-{
-	AST super;
-	Symbol* sym_type;
-	AST* declarators;
-};
 
 
 
@@ -399,7 +359,7 @@ int ast_merge_type_qualifier(int a, int b);
 
 // direct_declarator
 //     : IDENTIFIER
-AST* makr_init_direct_declarator(char *);
+AST* makr_init_direct_declarator(char * name);
 // direct_declarator:
 //     : direct_declarator (wrapped)
 //     | direct_declarator [wrapped]
@@ -413,7 +373,7 @@ AST* make_declarator(AST* pointer, AST* direct_declarator);
 // init_declarator:
 //       declarator = initializer
 AST* make_declarator_with_init(AST* declarator, AST* init);
-
+AST* make_declarator_bit_field(AST* declarator, AST* bitfield);
 
 AST* make_type_specifier(enum Types type);
 AST* make_type_specifier_from_id(char*);

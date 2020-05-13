@@ -199,14 +199,14 @@ specifier_qualifier_list
 	;
 
 struct_declarator_list
-	: struct_declarator                       
-	| struct-declarator_list ',' struct_declarator
+	: struct_declarator                                
+	| struct_declarator_list ',' struct_declarator
 	;
 
 struct_declarator
-	: declarator
-	| ':' constant_expression
-	| declarator ':' constant_expression
+	: declarator                            { $$ = $1; }
+	// | ':' constant_expression               
+	| declarator ':' constant_expression    { $$ = make_declarator_bit_field($1, $3); }
 	;
 
 parameter_declaration
@@ -300,9 +300,9 @@ expression_statment
     ;
 
 selection_statement
-	: IF '(' expression ')' statement
-	| IF '(' expression ')' statement ELSE statement
-	| SWITCH '(' expression ')' statement
+	: IF '(' expression ')' statement                  { $$ = make_ifelse($3, $5, NULL); }
+	| IF '(' expression ')' statement ELSE statement   { $$ = make_ifelse($3, $5, $7); }
+	| SWITCH '(' expression ')' statement              { $$ = make_switch($3, $5); }
 	;
 
 

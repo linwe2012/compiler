@@ -46,7 +46,7 @@ int test(){
     constexpr unsigned int x = 0xF0000000;
     constexpr int v = x;
 
-    static char *const (*(*const var)())[10];
+    static char *const (*(*const var)())[10], b;
     auto x = var();
 
     constexpr unsigned n = -123456u;

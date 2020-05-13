@@ -322,6 +322,81 @@ AST* make_label_case(AST* constant, AST* statements)
 	}
 }
 
+AST* make_label_default(AST* statement)
+{
+	NEW_AST(LabelStmt, ast);
+
+	ast->target = statement;
+
+	return SUPER(ast);
+}
+
+AST* make_jump(enum JumpType type, char* name, AST* ret)
+{
+	NEW_AST(JumpStmt, ast);
+
+	ast->type = type;
+	ast->label = name;
+	ast->target = ret;
+
+	return SUPER(ast);
+}
+
+AST* make_loop(AST* condition, AST* before_loop, AST* loop_body, AST* loop_step, enum LoopType loop_type)
+{
+	NEW_AST(LoopStmt, ast);
+	ast->body = loop_body;
+	ast->condition = condition;
+	ast->enter = before_loop;
+	ast->step = loop_step;
+	ast->loop_type = loop_type;
+
+	return SUPER(ast);
+}
+
+AST* make_ifelse(AST* condition, AST* then, AST* otherwise)
+{
+	NEW_AST(IfStmt, ast);
+	ast->condition = condition;
+	ast->then = then;
+	ast->otherwise = otherwise;
+	return SUPER(ast);
+}
+
+AST* make_switch(AST* condition, AST* body)
+{
+	NEW_AST(SwitchCaseStmt, ast);
+	ast->cases = body;
+	ast->switch_value = condition;
+	return SUPER(ast);
+}
+
+int ast_merge_type_qualifier(int a, int b)
+{
+	if (a & b)
+	{
+		log_error(NULL, "Duplicated type qualifier");
+	}
+
+	return a | b;
+}
+
+AST* makr_init_direct_declarator(char* name)
+{
+	NEW_AST(DeclaratorExpr, ast);
+	ast->name = name;
+}
+
+AST* make_extent_direct_declarator(AST* direct, enum Types type, AST* wrapped)
+{
+	if (type == TP_ARRAY)
+	{
+
+	}
+}
+
+
+
 AST* make_empty()
 {
 	NEW_AST(EmptyExpr, ast);
