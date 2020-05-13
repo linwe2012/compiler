@@ -2,11 +2,12 @@
 #define CC_TYPES_H
 enum SymbolAttributes
 {
+	ATTR_NONE,
 	ATTR_REGISTER,
 	ATTR_AUTO,
 	ATTR_EXTERN,
 	ATTR_STATIC,
-	// ATTR_TYPEDEF,
+	ATTR_TYPEDEF,
 	
 	ATTR_INLINE = 0x0100,
 	ATTR_STDCALL = 0x0200,
@@ -42,6 +43,7 @@ enum Types
 	// Type qualifier
 	TP_CONST = 0x010000u,
 	TP_VOLATILE = 0x020000u,
+	TP_RESTRICT = 0x040000u, //  TODO: this is not supported
 
 	TP_CLEAR_SIGNFLAGS = ~(TP_UNSIGNED | TP_SIGNED),
 	TP_GET_SIGNFLAGS = (TP_UNSIGNED | TP_SIGNED),
@@ -179,6 +181,8 @@ enum Operators
 	OP_PREFIX = 0x010000,
 	OP_POSTFIX = 0x020000,
 };
+
+
 
 
 enum JumpType

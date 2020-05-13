@@ -11,6 +11,7 @@
 
 #include "parser.h"
 
+#define COPY_STR()             yylval.str = strcpy((char*)malloc(strlen(yytext)+1), yytext)
 
 %}
 
@@ -19,6 +20,8 @@
 oct_int		0[0-7]*
 dec_int		[1-9][0-9]*
 hex_int		0[xX][0-9a-fA-F]+
+
+any_int     {oct_int} | {dec_int} | {hex_int}
 
 identifier	[a-zA-Z_][a-zA-Z0-9_]*
 whitespace	[[:space:]]+
@@ -67,12 +70,21 @@ float		{dec_int}"."[0-9]*
 "register"		{ return(REGISTER); }
 "restrict"		{ return(RESTRICT); }
 
+
+"__cdecl"       { return (MS_CDECL); }  /*  Microsoft extension */
+"__stdcall"       { return (MS_STDCALL); }
+"__inline"       { return (INLINE); }
+"__int8"         { return (CHAR); }
+"__int16"        { return (SHORT); }
+"__int32"        { return (INT); }
+"__int64"        { return (INT64); }
+
 {identifier}    { COPY_STR(); return IDENTIFIER; }
-{dec_int}       { COPY_STR(); return NUM_INT; }
+{any_int}       { COPY_STR(); return NUM_INT; }
 {float}			{ COPY_STR(); return NUM_FLOAT; }
 {float}"f"		{ COPY_STR(); return NUM_FLOAT32; }
 
-/* TODO: °Ë½øÖÆ Ê®Áù½øÖÆ ¿ÆÑ§¼ÆÊý·¨ */
+/* TODO: ï¿½Ë½ï¿½ï¿½ï¿½ Ê®ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Ñ§ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ */
 
 {whitespace}    /* do nothing */
 
