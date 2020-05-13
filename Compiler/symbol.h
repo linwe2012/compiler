@@ -4,6 +4,7 @@
 #include "config.h"
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
 #include "types.h"
 #include "hashtable.h"
 
@@ -48,41 +49,41 @@ struct TypeInfo
 	char* field_name;
 	enum Types type;
 
-	int alignment;
-	int aligned_size;
+	int alignment;  // bytes
+	int aligned_size; // bytes
 	int offset; // 如果是结构体, 距离结构体首部的距离
+	int bitfield_offset; // bit field 距离上一个非bitfield元素的距离
+	int bitfield;        // 
+
+	enum SymbolAttributes qualifiers;
 
 	union
 	{
 		struct StructOrUnion
 		{
 			struct TypeInfo* child;
-		};
+		} struc ;
 
 		struct Pointer
 		{
-			TypeInfo* pointing;
+			struct TypeInfo* pointing;
 			int indirection;
-		};
+		} ptr ;
 
 		struct Array
 		{
 			struct TypeInfo* array_type;
 			uint64_t array_count;
-		};
+		} arr;
 		
 		struct Function
 		{
-			TypeInfo* return_type;
-			TypeInfo* params;
-		};
+			struct TypeInfo* return_type;
+			struct TypeInfo* params;
+		} fn ;
 
 	};
 	
-	
-	int indirection; // 指针的层级, 比如 int*** 的 inderection = 3
-	struct TypeInfo* child;
-
 	struct TypeInfo* prev;
 	struct TypeInfo* next;
 
@@ -160,10 +161,11 @@ int type_add_child(TypeInfo* info, TypeInfo* child)
 
 }
 
-TypeInfo* type_append(TypeInfo* left, TypeInfo* right)
-{
-
-}
+TypeInfo* type_create_array(uint64_t n, enum SymbolAttributes qualifers);
+TypeInfo* type_create_struct();
+TypeInfo* type_create_ptr();
+TypeInfo* type_create_func(struct TypeInfo* params);
+int type_wrap(TypeInfo* parent, TypeInfo* child);
 
 struct SymbolBase
 {
@@ -190,7 +192,7 @@ struct Symbol
 	};
 
 	Symbol* prev;
-	Symbol* next;
+	// Symbol* next;
 	enum SymbolTypes usage;
 };
 STRUCT_TYPE(Symbol)
@@ -205,16 +207,45 @@ struct SymbolTableEntry
 	Symbol* last;
 };
 
+struct SymbolStackInfo
+{
+	Symbol* first;
+	Symbol* last;
+
+	struct SymbolStackInfo* prev;
+	struct SymbolStackInfo* next;
+
+	struct SymbolStackInfo* real_prev;
+	int nest;
+};
+
+// TODO: Use hash table to optimize
 struct SymbolTable
 {
-	struct SymbolTableEntry* stack_bottom;
-	struct SymbolTableEntry* stack_top;
-	struct SymbolTableEntry* global;
+	struct SymbolStackInfo* stack_top;
+	struct SymbolStackInfo* bottom;
+	
+	//struct SymbolStackInfo* global;
 };
+
 STRUCT_TYPE(SymbolTable)
+
+// void symtbl_remove_by_name(const char* name);
+
+// Symbol.name 记录了 name 的信息
+void symtbl_push(SymbolTable* tbl, Symbol* c);
+Symbol* symtbl_find(SymbolTable* tbl, const char* name);
+// 如果进入函数的话, 那么函数只能访问全局变量, 所以要 keep_global_only = true
+void symtbl_enter_scope(SymbolTable* tbl, int keep_global_only);
+void symtbl_leave_scope(SymbolTable* tbl, int free_all_symols);
+
 
 extern Symbol SymbolType_UINT64;
 
 
+extern TypeInfo* type_uint64;
+
+void symbol_init_context(struct Context* context);
+TypeInfo* type_fetch_buildtin(enum Types type);
 
 #endif

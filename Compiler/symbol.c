@@ -5,15 +5,94 @@
 
 STRUCT_TYPE(SymbolTableEntry);
 
-void sym_type_init(SymbolTable* tbl)
+TypeInfo builtins[TP_NUM_BUILTINS + TP_NUM_BUILTIN_INTS];
+
+
+
+void symtbl_init(SymbolTable* tbl)
 {
 
-	NEW_STRUCT(SymbolTableEntry, entry);
-	entry->table = hash_new_strkey(sizeof(struct SymbolTableEntry), 9);
+	NEW_STRUCT(SymbolStackInfo, global);
+	memset(global, 0, sizeof(global));
 
-	tbl->stack_bottom = tbl->stack_top = entry;
+	tbl->bottom = tbl->stack_top = global;
 }
 
+void symtbl_push(SymbolTable* tbl, Symbol* c)
+{
+	// 如果是这个 scope 的第一个元素
+	if (tbl->stack_top->first == NULL)
+	{
+		tbl->stack_top->first = c;
+		if (tbl->stack_top->prev)
+		{
+			c->prev = tbl->stack_top->prev->last;
+		}
+		// 如果是整个文件的第一个元素
+		else {
+			c->prev = NULL;
+		}
+	}
+	else {
+		c->prev = tbl->stack_top->last;
+		tbl->stack_top->last = c;
+	}
+	
+}
+
+Symbol* symtbl_find(SymbolTable* tbl, const char* name)
+{
+	Symbol* top = tbl->stack_top->last;
+	while (top != NULL)
+	{
+		while (!str_equal(top->name, name))
+		{
+			top->prev;
+		}
+	}
+
+	return top;
+}
+
+
+void symtbl_enter_scope(SymbolTable* tbl, int keep_global_only)
+{
+	NEW_STRUCT(SymbolStackInfo, entry);
+	if (keep_global_only)
+	{
+		entry->prev = tbl->bottom;
+	}
+	else{
+		entry->prev = tbl->stack_top;
+	}
+	entry->real_prev = tbl->stack_top;
+	tbl->stack_top->next = entry;
+	entry->next = NULL;
+	entry->nest = tbl->stack_top->nest + 1;
+	tbl->stack_top = entry;
+}
+
+void symtbl_leave_scope(SymbolTable* tbl, int free_all_symols)
+{
+	struct SymbolStackInfo* top = tbl->stack_top;
+	Symbol* cur = top->last;
+	Symbol* prev;
+	if (free_all_symols)
+	{
+		while (cur != top->first)
+		{
+			prev = cur->prev;
+			free(cur);
+			cur = prev;
+		}
+		free(cur);
+	}
+
+	tbl->stack_top = top->real_prev;
+	free(top);
+}
+
+/*
 Symbol* sym_find(Context* ctx, enum SymbolTypes type, const char* str)
 {
 	SymbolTable* tbl;
@@ -61,6 +140,8 @@ void sym_init_type_symbol()
 
 }
 
+*/
+
 
 //TODO
 /*
@@ -103,3 +184,120 @@ void sym_make_alias(Context* ctx, Symbol* sym, const char* alias)
 
 
 }*/
+
+void type_init(TypeInfo* info)
+{
+	memset(info, 0, sizeof(TypeInfo));
+	info->alignment = -1;
+	info->aligned_size = -1;
+	info->offset = -1;
+}
+
+TypeInfo* type_create_array(uint64_t n, enum SymbolAttributes qualifers)
+{
+	NEW_STRUCT(TypeInfo, info);
+	type_init(info);
+
+	info->type = TP_ARRAY;
+	info->arr.array_count = n;
+	info->qualifiers = qualifers;
+
+	return info;
+}
+
+TypeInfo* type_create_struct()
+{
+	NEW_STRUCT(TypeInfo, info);
+	type_init(info);
+
+	info->type = TP_STRUCT;
+
+	return info;
+}
+
+TypeInfo* type_create_ptr()
+{
+	NEW_STRUCT(TypeInfo, info);
+	type_init(info);
+
+	info->type = TP_PTR;
+
+	return info;
+}
+
+TypeInfo* type_create_func(struct TypeInfo* params)
+{
+	NEW_STRUCT(TypeInfo, info);
+	type_init(info);
+
+	info->type = TP_FUNC;
+	info->fn.params = params;
+
+	return info;
+}
+
+int type_wrap(TypeInfo* parent, TypeInfo* child)
+{
+	if (parent->type == TP_FUNC || TP_ARRAY || TP_STRUCT || TP_PTR)
+	{
+		parent->struc.child = child;
+		return 0;
+	}
+
+	return 1;
+}
+
+void symbol_init_context(struct Context* context)
+{
+	enum Types theor = TP_INCOMPLETE;
+	enum TypesHelper offset = 0;
+	const char* prefix = "";
+#define INIT(type__, name__, bits__) \
+	struct TypeInfo type;\
+	type_init(&type);\
+	type.aligned_size = bits__ / 8;\
+	type.alignment = bits__ / 8;\
+\
+	type.type_name = str_concat(prefix, name__);\
+	type.type = theor | TP_##type__;\
+\
+	builtins[offset + TP_##type__] = type;
+
+	INTERNAL_TYPE_LIST_MISC(INIT);
+	INTERNAL_TYPE_LIST_INT(INIT);
+	INTERNAL_TYPE_LIST_FLOAT(INIT);
+
+	theor = TP_UNSIGNED;
+	offset = TP_NUM_BUILTINS;
+	prefix = "unsigned ";
+
+	INTERNAL_TYPE_LIST_INT(INIT);
+
+}
+
+
+TypeInfo* type_fetch_buildtin(enum Types type)
+{
+	int inc = (type & TP_SIGNED) ? 0: TP_NUM_BUILTINS;
+
+	switch (type & TP_CLEAR_SIGNFLAGS)
+	{
+	case TP_INCOMPLETE:
+		break;
+	case TP_VOID:  // fall through
+	case TP_INT8:
+	case TP_INT16:
+	case TP_INT32:
+	case TP_INT64:
+	case TP_INT128:
+		return &builtins[inc + type & TP_CLEAR_SIGNFLAGS];
+	case TP_FLOAT32:
+	case TP_FLOAT64:
+	case TP_FLOAT128:
+		return &builtins[type & TP_CLEAR_SIGNFLAGS];
+	default:
+		break;
+	}
+
+	return NULL;
+}

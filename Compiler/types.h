@@ -50,17 +50,34 @@ enum Types
 	TP_CLEAR_ATTRIBUTEFLAGS = (TP_UNSIGNED - 1)
 };
 
+enum TypesHelper
+{
+	TP_NUM_BUILTINS = TP_FLOAT128,
+	TP_NUM_BUILTIN_INTS = TP_INT128 - 1,
+	TP_NUM_BUILTIN_FLOATS = TP_FLOAT128  - TP_FLOAT32 + 1
+};
 
 // typename, typename in c,  bits
-#define INTERNAL_TYPE_LIST(V)\
+#define INTERNAL_TYPE_LIST_MISC(V) \
+V(VOID, "void", 8)
+
+#define INTERNAL_TYPE_LIST_INT(V)\
 V(INT8, "char", 8)\
 V(INT16, "short", 16)\
 V(INT32, "int", 32) \
 V(INT64, "long long", 64)\
 V(INT128, "__int128", 128) \
+
+
+#define INTERNAL_TYPE_LIST_FLOAT(V)\
 V(FLOAT32, "float", 32)\
 V(FLOAT64, "double", 64)\
 V(FLOAT128, "__float128", 128)
+
+#define INTERNAL_TYPE_LIST(V)\
+INTERNAL_TYPE_LIST_MISC(V)\
+INTERNAL_TYPE_LIST_INT(V)\
+INTERNAL_TYPE_LIST_FLOAT(V)
 
 inline int type_numeric_bytes(enum Types t)
 {
@@ -199,6 +216,8 @@ enum LoopType {
 	LOOP_DOWHILE
 };
 
+
+void type_init(struct Context* context);
 // static const char* const** (*a)(int a);
 
 #endif // !CC_TYPES_H

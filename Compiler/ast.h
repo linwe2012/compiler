@@ -45,20 +45,20 @@ struct AST {
 	enum Types type;
 	Symbol* sym_type;
 	struct AST* prev, * next;
+	
+	uint64_t evaluated_value;
+	int is_evaluated;
 };
 typedef struct AST AST;
 
 
 typedef struct FunctionDefinition
 {
-
 	AST* params;
 	int n_params;
 	const char* name;
 	AST* body;
 	const char* return_type;
-	int64_t evaluated_value;
-
 } FunctionDefinition;
 
 //
@@ -253,15 +253,23 @@ struct SwitchCaseStmt
 	AST* cases;
 };
 
+// type name = init_value;
 struct DeclaratorExpr
 {
 	AST super;
 	char* name;
-	Symbol* sym;
+	TypeInfo* last;
+	TypeInfo* first;
+	AST* init_value;
 };
 
 
+struct TypeSpecifier
+{
+	const char* name;
 
+	TypeInfo* info;
+};
 
 
 #define FORWORD_DECL(x) STRUCT_TYPE(x)
@@ -376,7 +384,7 @@ AST* make_declarator_with_init(AST* declarator, AST* init);
 AST* make_declarator_bit_field(AST* declarator, AST* bitfield);
 
 AST* make_type_specifier(enum Types type);
-AST* make_type_specifier_from_id(char*);
+AST* make_type_specifier_from_id(char* id);
 AST* make_type_specifier_extend(AST* me, AST*other, enum SymbolAttributes storage);
 AST* make_declaration(AST* declaration_specifiers, enum SymbolAttributes attribute_specifier, AST* init_declarator_list);
 

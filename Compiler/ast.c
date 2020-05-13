@@ -39,7 +39,9 @@ void ast_init(AST* ast, ASTType type)
 
 int check_ast(AST* ast)
 {
-	return ast->type >= AST_EmptyExpr && ast->type <= AST_FunctionExpr;
+	// return ast->type >= AST_EmptyExpr && ast->type <= AST_FunctionExpr;
+
+	return 1;
 }
 
 AST* ast_append(AST* leader, AST* follower)
@@ -385,16 +387,79 @@ AST* makr_init_direct_declarator(char* name)
 {
 	NEW_AST(DeclaratorExpr, ast);
 	ast->name = name;
+	ast->last = ast->first = NULL;
+	return SUPER(ast);
 }
 
 AST* make_extent_direct_declarator(AST* direct, enum Types type, AST* wrapped)
 {
+	CAST(DeclaratorExpr, decl, direct);
 	if (type == TP_ARRAY)
 	{
-
+		if (wrapped)
+		{
+			
+			CAST(NumberExpr, number, wrapped);
+			AST* res = make_binary_expr(OP_CAST, make_type_specifier(TP_INT64 | TP_UNSIGNED), wrapped);
+			CAST(NumberExpr, new_num, wrapped);
+			AST* last = type_create_array(new_num->i64, ATTR_NONE);
+			type_wrap(decl->last, last);
+			decl->last = last;
+			ast_destroy(res);
+		}
 	}
+	else // type == TP_FUNC
+	{
+		if (wrapped)
+		{
+
+		}
+		TypeInfo* prev = NULL;
+		TypeInfo* first = NULL;
+		FOR_EACH(wrapped, param)
+		{
+			CAST(DeclaratorExpr, p, param);
+			p->first->field_name = p->name;
+			p->first->prev = prev;
+			if (prev)
+			{
+				prev->next = p->first;
+			}
+			else {
+				first = p->first;
+			}
+			prev = p->first;
+			
+		}
+		TypeInfo* func = type_create_func(first);
+		type_wrap(decl->last, func);
+		decl->last = func;
+	}
+
+	return SUPER(decl);
 }
 
+
+AST* make_declarator(AST* pointer, AST* direct_declarator)
+{
+	CAST(DeclaratorExpr, ptr, pointer);
+	CAST(DeclaratorExpr, decl, direct_declarator);
+
+	type_wrap(decl->last, ptr->first);
+	decl->last = ptr->first;
+
+	free(ptr);
+
+	return direct_declarator;
+}
+
+AST* make_declarator_with_init(AST* declarator, AST* init)
+{
+	CAST(DeclaratorExpr, decl, declarator);
+	decl->init_value = init;
+
+	return SUPER(decl);
+}
 
 
 AST* make_empty()
@@ -412,8 +477,10 @@ AST* make_error(char* message)
 }
 
 
+AST* make_ptr(int type_qualifier_list, AST* pointing)
+{
 
-
+}
 
 int ast_type_neq(AST* node, ASTType type)
 {
@@ -421,7 +488,7 @@ int ast_type_neq(AST* node, ASTType type)
 }
 
 
-//
+/*
 AST* make_function_call(const char* function_name, AST* params)
 {
 	NEW_AST(FunctionCallExpr, ast);
@@ -449,6 +516,7 @@ AST* make_function_body(AST* ast, AST* body)
 
 	return ast;
 }
+*/
 
 AST* make_return(AST* exp)
 {
