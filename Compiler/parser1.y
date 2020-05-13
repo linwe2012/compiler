@@ -33,6 +33,7 @@ AST* parser_result = NULL;
 
 %type <val> primary_expression
 %type <val> postfix_expression
+%type <val> expreesion assignment_expression 
 
 %type <val> statement compound_statement block_item_list block_item labeled_statement expression_statment iteration_statement jump_statement 
 %type <type> assignment_operator
@@ -156,6 +157,9 @@ type_qualifier_list
     : type_qualifier                     { $$ = $1; }
 	| type_qualifier_list type_qualifier { $$ = ast_merge_type_qualifier($1, $2); }
 
+declaration
+    : declaration_specifiers init_declarator_list ';'
+    ;
 enum_specifier
 	: ENUM '{' enumerator_list '}'              { $$ = make_enum_define(NULL, $3); }
 	| ENUM IDENTIFIER '{' enumerator_list '}'   { $$ = make_enum_define($2, $4); }
@@ -326,27 +330,27 @@ jump_statement
 // expression part
 
 expression
-	: assignment_expression
-	| expression ',' assignment_expression
+	: assignment_expression {$$ = $1;}
+	| expression ',' assignment_expression { $$ = ast_append($1, $2);}
 	;
 
 assignment_expression
-	: conditional_expression
-	| unary_expression assignment_operator assignment_expression { $$ = make_binary_expr($2, $1, $2); }
+	: conditional_expression { $$ = $1; }
+	| unary_expression assignment_operator assignment_expression { $$ = make_binary_expr($2, $1, $3); }
 	;
 
 assignment_operator
 	: '='
-	| MUL_ASSIGN { $$ = OP_ASSIGN_MUL; }
-	| DIV_ASSIGN
-	| MOD_ASSIGN
-	| ADD_ASSIGN
-	| SUB_ASSIGN
-	| LEFT_ASSIGN
-	| RIGHT_ASSIGN
-	| AND_ASSIGN
-	| XOR_ASSIGN
-	| OR_ASSIGN
+	| MUL_ASSIGN { $$ = OP_ASSIGN; }
+	| DIV_ASSIGN { $$ = OP_ASSIGN_DIV; }
+	| MOD_ASSIGN { $$ = OP_ASSIGN_MOD; }
+	| ADD_ASSIGN { $$ = OP_ASSIGN_ADD; }
+	| SUB_ASSIGN { $$ = OP_ASSIGN_SUB; }
+	| LEFT_ASSIGN { $$ = OP_ASSIGN_SHL; }
+	| RIGHT_ASSIGN { $$ = OP_ASSIGN_SHR; }
+	| AND_ASSIGN { $$ = OP_ASSIGN_AND; }
+	| XOR_ASSIGN { $$ = OP_ASSIGN_XOR; }
+	| OR_ASSIGN { $$ = OP_ASSIGN_OR; }
 	;
 
 constant_expression
@@ -354,82 +358,87 @@ constant_expression
 	;
 
 conditional_expression
-	: logical_or_expression
-	| logical_or_expression '?' expression ':' conditional_expression
+	: logical_or_expression { $$ = $1; }
+	| logical_or_expression '?' expression ':' conditional_expression { $$ = make_trinary_expr(OP_CONDITIONAL, $1, $3, $5 ); }
 	;
 
 logical_or_expression
-	: logical_and_expression
-	| logical_or_expression OR_OP logical_and_expression
+	: logical_and_expression { $$ = $1; }
+	| logical_or_expression OR_OP logical_and_expression { $$ = make_binary_expr(OP_OR, $1, $3); }
 	;
 
 logical_and_expression
-	: inclusive_or_expression
-	| logical_and_expression AND_OP inclusive_or_expression
+	: inclusive_or_expression { $$ = $1; }
+	| logical_and_expression AND_OP inclusive_or_expression {$$ = make_binary_expr(OP_AND, $1, $3); }
 	;
 
 exclusive_or_expression
-	: and_expression
-	| exclusive_or_expression '^' and_expression
+	: and_expression { $$ = $1; }
+	| exclusive_or_expression '^' and_expression { $$ = make_binary_expr(OP_BIT_XOR, $1, $3); }
 	;
 
 inclusive_or_expression
-	: exclusive_or_expression
-	| inclusive_or_expression '|' exclusive_or_expression
+	: exclusive_or_expression {$$ = $1; }
+	| inclusive_or_expression '|' exclusive_or_expression { $$ = make_binary_expr(OP_BIT_OR, $1, $3); }
 	;
 
 and_expression
-	: equality_expression
-	| and_expression '&' equality_expression
+	: equality_expression { $$ =$1; }
+	| and_expression '&' equality_expression {$$ = make_binary_expr(OP_BIT_AND, $1, $3); }
     ;
 
 equality_expression
-	: relational_expression
-	| equality_expression EQ_OP relational_expression
-	| equality_expression NE_OP relational_expression
+	: relational_expression { $$ = $1; }
+	| equality_expression EQ_OP relational_expression { $$ = make_binary_expr(OP_EQUAL, $1, $3); }
+	| equality_expression NE_OP relational_expression { $$ = make_binary_expr(OP_NOT_EQUAL, $1, $3); }
 	;
 
 relational_expression
-	: shift_expression
-	| relational_expression '<' shift_expression
-	| relational_expression '>' shift_expression
-	| relational_expression LE_OP shift_expression
-	| relational_expression GE_OP shift_expression
+	: shift_expression { $$ = $1; }
+	| relational_expression '<' shift_expression { $$ = make_binary_expr(OP_LESS, $1, $3); }
+	| relational_expression '>' shift_expression { $$ = make_binary_expr(OP_GREATER, $1, $3); }
+	| relational_expression LE_OP shift_expression { $$ = make_binary_expr(OP_LESS_OR_EQUAL, $1, $3); }
+	| relational_expression GE_OP shift_expression { $$ = make_binary_expr(OP_GREATER_OR_EQUAL, $1, $3); }
 	;
 
 shift_expression
-	: additive_expression
-	| shift_expression LEFT_OP additive_expression
-	| shift_expression RIGHT_OP additive_expression
+	: additive_expression { $$ = $1; }
+	| shift_expression LEFT_OP additive_expression { $$ = make_binary_expr(OP_SHIFT_LEFT, $1, $3); }
+	| shift_expression RIGHT_OP additive_expression { $$ = make_binary_expr(OP_SHIFT_RIGHT, $1, $3); }
 	;
 
 additive_expression
-	: multiplicative_expression
-	| additive_expression '+' multiplicative_expression
-	| additive_expression '-' multiplicative_expression
+	: multiplicative_expression { $$ = $1; }
+	| additive_expression '+' multiplicative_expression { $$ = make_binary_expr(OP_ADD, $1, $3); }
+	| additive_expression '-' multiplicative_expression { $$ = make_binary_expr(OP_SUB, $1, $3); }
 	;
 
 multiplicative_expression
-	: cast_expression
-	| multiplicative_expression '*' cast_expression
-	| multiplicative_expression '/' cast_expression
-	| multiplicative_expression '%' cast_expression
+	: cast_expression { $$ = $1; }
+	| multiplicative_expression '*' cast_expression { $$ = make_binary_expr(OP_MUL, $1, $3); }
+	| multiplicative_expression '/' cast_expression { $$ = make_binary_expr(OP_DIV, $1, $3); }
+	| multiplicative_expression '%' cast_expression { $$ = make_binary_expr(OP_MOD, $1, $3); }
 	;
 
 cast_expression
-	: unary_expression
-	| '(' type_name ')' cast_expression
+	: unary_expression { $$ = $1; }
+	| '(' type_name ')' cast_expression { $$ = make_binary_expr(OP_CAST, $2, $4);}
 	;
 
 unary_expression
-	: postfix_expression
-	| INC_OP unary_expression
-	| DEC_OP unary_expression
-	| unary_operator cast_expression
-	| SIZEOF unary_expression
-	| SIZEOF '(' type_name ')'
+	: postfix_expression { $$ = $1; }
+	| INC_OP unary_expression { $$ = make_unary_expr(OP_INC, $2); }
+	| DEC_OP unary_expression { $$ = make_unary_expr(OP_DEC, $2); }
+	| unary_operator cast_expression { $$ = make_unary_expr($1, $2); }
+	| SIZEOF unary_expression { $$ = make_unary_expr(OP_SIZEOF, $2); }
+	| SIZEOF '(' type_name ')' { $$ = make_unary_expr(OP_SIZEOF, $3); }
 	;
 
+type_name
+	: 
+	| type_specifier { $$ = $1; }
+	| type_specifier pointer 
+	;
 
 
 
@@ -443,19 +452,19 @@ unary_operator
 	;
 
 postfix_expression
-	: primary_expression                     { $$ = $1 }
-	| postfix_expression '[' expression ']'  { $$ = make_binary_expr($1, OP_ARRAY_ACCESS, $3) }
-	| postfix_expression '(' ')'             {  }
-	| postfix_expression '.' IDENTIFIER
-	| postfix_expression PTR_OP IDENTIFIER
-	| postfix_expression INC_OP
-	| postfix_expression DEC_OP
+	: primary_expression { $$ = $1; }
+	| postfix_expression '[' expression ']'  { $$ = make_binary_expr(OP_ARRAY_ACCESS, $1, $3); }
+	| postfix_expression '(' ')'             
+	| postfix_expression '.' IDENTIFIER { $$ = make_binary_expr(OP_STACK_ACCESS, $1, $3); }
+	| postfix_expression PTR_OP IDENTIFIER { $$ = make_binary_expr(OP_PTR_ACCESS, $1, $3); }
+	| postfix_expression INC_OP { $$ = make_unary_expr(OP_INC, $1); }
+	| postfix_expression DEC_OP { $$ = make_unary_expr(OP_DEC, $1); }
 	;
 
 primary_expression
 	: IDENTIFIER
 	| CONSTANT
 	| STRING_LITERAL
-	| '(' expression ')' 
+	| '(' expression ')'  { $$ = $2; }
 	;
 
