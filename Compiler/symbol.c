@@ -215,11 +215,11 @@ TypeInfo* type_create_struct()
 	return info;
 }
 
-TypeInfo* type_create_ptr()
+TypeInfo* type_create_ptr(enum SymbolAttributes qualifers)
 {
 	NEW_STRUCT(TypeInfo, info);
 	type_init(info);
-
+	info->qualifiers = qualifers;
 	info->type = TP_PTR;
 
 	return info;
@@ -301,3 +301,14 @@ TypeInfo* type_fetch_buildtin(enum Types type)
 
 	return NULL;
 }
+
+Symbol* symbol_create_label(char* name, uint64_t label, int resolved)
+{
+	NEW_STRUCT(Symbol, sym);
+	sym->label->label_id = label;
+	sym->label->name = name;
+	sym->prev = 0;
+	sym->usage = Symbol_LabelInfo;
+	sym->label->resolved = resolved;
+}
+

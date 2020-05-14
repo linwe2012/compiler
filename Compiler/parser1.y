@@ -223,7 +223,7 @@ struct_declarator
 	;
 
 parameter_declaration
-    : declaration_specifiers declarator
+    : declaration_specifiers declarator                { $$ =  }
 	| declaration_specifiers abstract_declarator 
 	| declaration_specifiers
 	;
@@ -288,7 +288,7 @@ statement
 
 compound_statement
     : '{' '}'                         { $$ = make_empty(); }
-    | '{' block_item_list '}'         { $$ = make_block($2); }
+    | '{' { ast_notify_enter_block(); } block_item_list '}'         { $$ = make_block($2); }
     ;
 
 block_item_list
@@ -302,9 +302,9 @@ block_item
     ;
 
 labeled_statement
-	: IDENTIFIER ':' statement                { $$ = make_label($1, $3); }
-	| CASE constant_expression ':' statement  { $$ = make_label_case($2, $4); }
-	| DEFAULT ':' statement                   { $$ = make_label_default($3); }
+	: IDENTIFIER { notify_label($1); } ':' statement                { $$ = make_label($1, $3); }
+	| CASE    { notify_label(NULL); } constant_expression ':' statement  { $$ = make_label_case($2, $4); }
+	| DEFAULT { notify_label(NULL); } ':' statement                   { $$ = make_label_default($3); }
 	;
 
 expression_statement
@@ -320,12 +320,12 @@ selection_statement
 
 
 iteration_statement
-	: WHILE '(' expression ')' statement                                         { $$ = make_loop($3, NULL, $5, NULL, LOOP_WHILE); }
-	| DO statement WHILE '(' expression ')' ';'                                  { $$ = make_loop($5, NULL, $2, NULL, LOOP_DOWHILE); }
-	| FOR '(' expression_statement expression_statement ')' statement            { $$ = make_loop($4, $3, $6, NULL, LOOP_FOR); }
-	| FOR '(' expression_statement expression_statement expression ')' statement { $$ = make_loop($4, $3, $7, $5, LOOP_FOR); }
-	| FOR '(' declaration expression_statement ')' statement                     { $$ = make_loop($4, $3, $6, NULL, LOOP_FOR); }
-	| FOR '(' declaration expression_statement expression ')' statement          { $$ = make_loop($4, $3, $7, $5, LOOP_FOR); }
+	: WHILE { notify_loop(LOOP_WHILE); } '(' expression ')' statement                                         { $$ = make_loop($3, NULL, $5, NULL); }
+	| DO    { notify_loop(LOOP_DOWHILE); }   statement WHILE '(' expression ')' ';'                                  { $$ = make_loop($5, NULL, $2, NULL); }
+	| FOR   { notify_loop(LOOP_FOR); } '(' expression_statement expression_statement ')' statement            { $$ = make_loop($4, $3, $6, NULL); }
+	| FOR   { notify_loop(LOOP_FOR); } '(' expression_statement expression_statement expression ')' statement { $$ = make_loop($4, $3, $7, $5); }
+	| FOR   { notify_loop(LOOP_FOR); } '(' declaration expression_statement ')' statement                     { $$ = make_loop($4, $3, $6, NULL); }
+	| FOR   { notify_loop(LOOP_FOR); } '(' declaration expression_statement expression ')' statement          { $$ = make_loop($4, $3, $7, $5); }
 	;
 
 jump_statement
