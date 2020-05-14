@@ -434,14 +434,6 @@ unary_expression
 	| SIZEOF '(' type_name ')' { $$ = make_unary_expr(OP_SIZEOF, $3); }
 	;
 
-type_name
-	: 
-	| type_specifier { $$ = $1; }
-	| type_specifier pointer 
-	;
-
-
-
 unary_operator
 	: '&'
 	| '*'
