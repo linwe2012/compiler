@@ -2,7 +2,7 @@
 #include "ast.h"
 #include "lexer.h"
 #include "parser.h"
-
+#include "context.h"
 #include "x86_64-asm.h"
 
 #include <windows.h>   // WinApi header
@@ -39,8 +39,10 @@ int main()
 	}
 	AST* ast = make_block(parser_result);// yylval.val;
 	x64_asm_init(&asm_ctx);
+	Context ctx;
 
 	x64_visit_ast(&asm_ctx, ast);
+	symbol_init_context(&ctx);
 	printf("done");
 	return res;
 }

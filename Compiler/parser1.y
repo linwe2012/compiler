@@ -33,7 +33,7 @@ AST* parser_result = NULL;
 
 %type <val> primary_expression
 %type <val> postfix_expression
-%type <val> expreesion assignment_expression 
+%type <val> expression assignment_expression 
 
 %type <val> statement compound_statement block_item_list block_item labeled_statement expression_statment iteration_statement jump_statement 
 %type <type> assignment_operator
@@ -41,14 +41,16 @@ AST* parser_result = NULL;
 
 %type <type> type_qualifier type_qualifier_list function_specifier attribute_specifier
 %type <type> storage_class_specifier struct_or_union
-%type <val> pointer direct_declarator declarator type_specifier init_declarator_list
+%type <val> pointer direct_declarator declarator type_specifier init_declarator_list init_declarator
 %type <val> declaration_specifiers declaration
 %type <val> parameter_list parameter_declaration
 %type <val> enum_specifier enumerator_list  enumerator
+%type <val> additive_expression
+
 
 %%
 // defination part
-translation unit 
+translation_unit 
     : external_declaration
     | translation_unit external_declaration
     ;
@@ -203,14 +205,14 @@ specifier_qualifier_list
 	;
 
 struct_declarator_list
-	: struct_declarator                       
-	| struct-declarator_list ',' struct_declarator
+	: struct_declarator                                
+	| struct_declarator_list ',' struct_declarator
 	;
 
 struct_declarator
-	: declarator
-	| ':' constant_expression
-	| declarator ':' constant_expression
+	: declarator                            { $$ = $1; }
+	// | ':' constant_expression               
+	| declarator ':' constant_expression    { $$ = make_declarator_bit_field($1, $3); }
 	;
 
 parameter_declaration
@@ -248,7 +250,7 @@ initializer
 
 initializer_list
     : initializer
-    | initializer_list, initializer
+    | initializer_list ',' initializer
     ;
 /*
 type_name
@@ -304,9 +306,9 @@ expression_statment
     ;
 
 selection_statement
-	: IF '(' expression ')' statement
-	| IF '(' expression ')' statement ELSE statement
-	| SWITCH '(' expression ')' statement
+	: IF '(' expression ')' statement                  { $$ = make_ifelse($3, $5, NULL); }
+	| IF '(' expression ')' statement ELSE statement   { $$ = make_ifelse($3, $5, $7); }
+	| SWITCH '(' expression ')' statement              { $$ = make_switch($3, $5); }
 	;
 
 
