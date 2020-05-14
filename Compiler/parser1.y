@@ -38,7 +38,7 @@ AST* parser_result = NULL;
 %type <val> equality_expression relational_expression shift_expression additive_expression
 %type <val> multiplicative_expression cast_expression unary_expression 
 
-%type <type> assignment_operator unary_operator
+%type <type> assignment_operator unary_operator 
 
 %type <val> statement compound_statement block_item_list block_item selection_statement labeled_statement expression_statement iteration_statement jump_statement 
 
@@ -53,7 +53,7 @@ AST* parser_result = NULL;
 %type <val> declaration_specifiers declaration
 %type <val> parameter_list parameter_declaration
 %type <val> enum_specifier enumerator_list  enumerator
-
+%type <val> abstract_declarator direct_abstract_declarator
 
 %%
 // defination part
@@ -247,8 +247,8 @@ direct_abstract_declarator
 	: '(' abstract_declarator ')'                                { $$ = $2; }
 	| direct_abstract_declarator '[' ']'                         { $$ = make_extent_direct_declarator($1, TP_ARRAY, NULL); }
 	| direct_abstract_declarator '[' constant_expression ']'     { $$ = make_extent_direct_declarator($1, TP_ARRAY, $3); }
-	| direct_abstract_declarator '(' parameter_list ')'     { $$ = make_extent_direct_declarator($1, TP_FUNC, $3); }
-	| '(' parameter_list ')'                                { $$ = make_extent_direct_declarator($1, TP_FUNC, $3); }
+	| direct_abstract_declarator '(' parameter_list ')'      { $$ = make_extent_direct_declarator($1, TP_FUNC, $3); }
+	| '(' parameter_list ')'                                 { $$ = make_extent_direct_declarator(NULL, TP_FUNC, $2); }
 	;
 
 initializer
@@ -290,7 +290,7 @@ statement
 
 compound_statement
     : '{' '}'                         { $$ = make_empty(); }
-    | '{' { ast_notify_enter_block(); } block_item_list '}'         { $$ = make_block($2); }
+    | '{' { ast_notify_enter_block(); } block_item_list '}'         { $$ = make_block($3); }
     ;
 
 block_item_list
@@ -304,9 +304,9 @@ block_item
     ;
 
 labeled_statement
-	: IDENTIFIER { notify_label($1); } ':' statement                { $$ = make_label($1, $3); }
-	| CASE    { notify_label(NULL); } constant_expression ':' statement  { $$ = make_label_case($2, $4); }
-	| DEFAULT { notify_label(NULL); } ':' statement                   { $$ = make_label_default($3); }
+	: IDENTIFIER { notify_label($1); } ':' statement                { $$ = make_label($1, $4); }
+	| CASE    { notify_label(NULL); } constant_expression ':' statement  { $$ = make_label_case($3, $5); }
+	| DEFAULT { notify_label(NULL); } ':' statement                   { $$ = make_label_default($4); }
 	;
 
 expression_statement
@@ -322,12 +322,12 @@ selection_statement
 
 
 iteration_statement
-	: WHILE { notify_loop(LOOP_WHILE); } '(' expression ')' statement                                         { $$ = make_loop($3, NULL, $5, NULL); }
-	| DO    { notify_loop(LOOP_DOWHILE); }   statement WHILE '(' expression ')' ';'                                  { $$ = make_loop($5, NULL, $2, NULL); }
-	| FOR   { notify_loop(LOOP_FOR); } '(' expression_statement expression_statement ')' statement            { $$ = make_loop($4, $3, $6, NULL); }
-	| FOR   { notify_loop(LOOP_FOR); } '(' expression_statement expression_statement expression ')' statement { $$ = make_loop($4, $3, $7, $5); }
-	| FOR   { notify_loop(LOOP_FOR); } '(' declaration expression_statement ')' statement                     { $$ = make_loop($4, $3, $6, NULL); }
-	| FOR   { notify_loop(LOOP_FOR); } '(' declaration expression_statement expression ')' statement          { $$ = make_loop($4, $3, $7, $5); }
+	: WHILE { notify_loop(LOOP_WHILE); } '(' expression ')' statement                                         { $$ = make_loop($4, NULL, $6, NULL); }
+	| DO    { notify_loop(LOOP_DOWHILE); }   statement WHILE '(' expression ')' ';'                           { $$ = make_loop($6, NULL, $3, NULL); }
+	| FOR   { notify_loop(LOOP_FOR); } '(' expression_statement expression_statement ')' statement            { $$ = make_loop($5, $4, $7, NULL); }
+	| FOR   { notify_loop(LOOP_FOR); } '(' expression_statement expression_statement expression ')' statement { $$ = make_loop($5, $4, $8, $6); }
+	| FOR   { notify_loop(LOOP_FOR); } '(' declaration expression_statement ')' statement                     { $$ = make_loop($5, $4, $7, NULL); }
+	| FOR   { notify_loop(LOOP_FOR); } '(' declaration expression_statement expression ')' statement          { $$ = make_loop($5, $4, $8, $6); }
 	;
 
 jump_statement
