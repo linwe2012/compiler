@@ -109,6 +109,15 @@ struct FunctionInfo
 };
 STRUCT_TYPE(FunctionInfo)
 
+struct LabelInfo
+{
+	char* name;
+	uint64_t label_id;
+	int resolved; // 当 goto 定义在 label: 之前的时候, 会产生一个 unresolved label
+};
+STRUCT_TYPE(LabelInfo)
+
+
 TypeInfo* type_access(TypeInfo* info, const char* name)
 {
 	
@@ -163,7 +172,7 @@ int type_add_child(TypeInfo* info, TypeInfo* child)
 
 TypeInfo* type_create_array(uint64_t n, enum SymbolAttributes qualifers);
 TypeInfo* type_create_struct();
-TypeInfo* type_create_ptr();
+TypeInfo* type_create_ptr(enum SymbolAttributes qualifers);
 TypeInfo* type_create_func(struct TypeInfo* params);
 int type_wrap(TypeInfo* parent, TypeInfo* child);
 
@@ -176,7 +185,8 @@ enum SymbolTypes
 {
 	Symbol_TypeInfo,
 	Symbol_VariableInfo,
-	Symbol_FunctionInfo
+	Symbol_FunctionInfo,
+	Symbol_LabelInfo
 };
 struct Symbol
 {
@@ -189,6 +199,7 @@ struct Symbol
 		TypeInfo type;
 		VariableInfo var;
 		FunctionInfo func;
+		LabelInfo* label;
 	};
 
 	Symbol* prev;
@@ -197,15 +208,6 @@ struct Symbol
 };
 STRUCT_TYPE(Symbol)
 
-struct SymbolTableEntry
-{
-	HashTable* table;
-	struct SymbolTableEntry* prev;
-	struct SymbolTableEntry* next;
-	int hide_bottom;
-	Symbol* first;
-	Symbol* last;
-};
 
 struct SymbolStackInfo
 {
@@ -247,5 +249,6 @@ extern TypeInfo* type_uint64;
 
 void symbol_init_context(struct Context* context);
 TypeInfo* type_fetch_buildtin(enum Types type);
+Symbol* symbol_create_label(char* name, uint64_t label, int resolved);
 
 #endif

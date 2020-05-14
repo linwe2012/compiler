@@ -5,6 +5,7 @@
 #include "context.h"
 #include <stdio.h>
 #include <inttypes.h>
+#include "utils.h"
 
 #define NEW_AST(type, name) \
 	type* name = (type*) malloc (sizeof(type)); \
@@ -26,8 +27,96 @@
 #define FOR_EACH(ast__, iterator__) \
 	for(AST* iterator__ = ast__; iterator__ != NULL; iterator__ = iterator__->next)
 
+struct ASTListItem
+{
+	AST* ast;
+	
+
+	struct ASTList* prev;
+	struct ASTList* next;
+};
+
+
+struct ASTList
+{
+	struct ASTListItem* first;
+	struct ASTListItem* last;
+};
+
+
+struct ASTData
+{
+	// 统计最近的可 break 的 AST
+	struct ASTList breakable;
+	struct ASTList* pending_labels;
+	Symbol* current_function;
+	uint64_t label_id;
+};
+
+#define AST_DATA(name) struct ASTData* name = (struct ASTData*)ctx->ast_data
 
 Context* ctx;
+
+struct AST* astlist_pop(struct ASTList* target)
+{
+	struct ASTListItem* item = target->last;
+	if (item == NULL)
+	{
+		target->last = target->first = NULL;
+		return NULL;
+	}
+	else {
+		target->last = target->last->prev;
+		if (target->last == NULL)
+		{
+			target->last = target->first = NULL;
+		}
+	}
+	AST* ast = item->ast;
+	free(item);
+	return ast;
+}
+
+struct AST* astlist_back(struct ASTList* target)
+{
+	struct ASTListItem* item = target->last;
+	if (item == NULL)
+	{
+		return NULL;
+	}
+	return item->ast;
+}
+
+struct ASTListItem* astlist_push(struct ASTList* target, AST* ast)
+{
+	NEW_STRUCT(ASTListItem, item);
+	item->ast = ast;
+	item->prev = target->last;
+	item->next = NULL;
+	target->last->next = item;
+	target->last = item;
+	if (target->first == NULL)
+	{
+		target->first = item;
+	}
+}
+
+
+void ast_init_context(Context* _ctx)
+{
+	ctx = _ctx;
+	NEW_STRUCT(ASTData, data);
+	ctx->ast_data = data;
+	data->breakable.first = NULL;
+	data->breakable.last = NULL;
+	data->label_id = 0;
+}
+
+uint64_t next_label()
+{
+	AST_DATA(data);
+	return data->label_id++;
+}
 
 
 void ast_init(AST* ast, ASTType type)
@@ -148,32 +237,6 @@ AST* make_number_float(const char* c, int bits)
 	return SUPER(ast);
 }
 
-/*
-
-Symbol* sym_get_type(const char* n)
-{
-	//TODO
-	Symbol* sym = (Symbol*)malloc(sizeof(Symbol));
-	sym->name = n;
-	return sym;
-}
-
-Symbol* sym_get_identifier(const char* n)
-{
-	//TODO
-	return sym_get_type(n);
-}
-
-FunctionDefinition* sym_get_function(const char* return_type, const char* name, AST* args)
-{
-	FunctionDefinition* def = (FunctionDefinition*)malloc(sizeof(FunctionDefinition));
-	def->body = NULL;
-	def->name = name;
-	def->params = args;
-	//TODO
-	return def;
-}*/
-
 AST* make_unary_expr(enum Operators unary_op, AST* rhs)
 {
 	NEW_AST(OperatorExpr, ast);
@@ -268,6 +331,7 @@ AST* make_unary_expr(enum Operators unary_op, AST* rhs)
 	return SUPER(ast);
 }
 
+
 AST* make_binary_expr(enum Operators binary_op, AST* lhs, AST* rhs)
 {
 	NEW_AST(OperatorExpr, ast);
@@ -298,55 +362,201 @@ AST* make_block(AST* first_child)
 	NEW_AST(BlockExpr, ast);
 
 	ast->first_child = first_child;
+	ctx_leave_block_scope(ctx, 0);
 
 	return SUPER(ast);
+}
+
+void ast_notify_enter_block() {
+	ctx_enter_block_scope(ctx);
+}
+
+void notify_label(char* name)
+{
+	// 如果是 label:
+	if (name != NULL)
+	{
+		// label 是否被 goto 定义了, 或者是否重复定义
+		Symbol* sym = symtbl_find(ctx->labels, name);
+		if (sym != NULL)
+		{
+			if (sym->label->resolved) {
+				log_error(NULL, "duplicated defintion of label: %s", name);
+			}
+			else {
+				sym->label->resolved = 1;
+			}
+			return;
+		}
+	}
+
+	Symbol* sym = symbol_create_label(name, next_label(), 1);
+	NEW_AST(LabelStmt, ast);
+	AST_DATA(data);
+	ast->ref = sym;
+	if (name)
+	{
+		symtbl_push(ctx->labels, sym);
+	}
+	astlist_push(&data->pending_labels, SUPER(ast));
 }
 
 AST* make_label(char* name, AST* statement)
 {
-	NEW_AST(LabelStmt, ast);
-	ast->label = name;
+	AST_DATA(data);
+	struct AST* item = astlist_pop(&data->pending_labels);
+	CAST(LabelStmt, ast, item);
 	ast->target = statement;
+	
+	return SUPER(ast);
 }
 
 AST* make_label_case(AST* constant, AST* statements)
 {
-	switch (10)
-	{
-		char c = 10;
-		++constant;
-	case 2:
-		++constant;
-		++statements;
-		++c;
-	default:
-		break;
-	}
+	AST_DATA(data);
+	struct AST* item = astlist_pop(&data->pending_labels);
+	CAST(LabelStmt, ast, item);
+	
+	ast->target = statements;
+	ast->condition = constant;
+	return SUPER(ast);
 }
 
 AST* make_label_default(AST* statement)
 {
-	NEW_AST(LabelStmt, ast);
+	AST_DATA(data);
+	struct AST* item = astlist_pop(&data->pending_labels);
+	CAST(LabelStmt, ast, item);
 
 	ast->target = statement;
 
 	return SUPER(ast);
 }
 
+AST* make_jump_goto(char* name)
+{
+	AST_DATA(data);
+	NEW_AST(JumpStmt, ast);
+	ast->ref = symtbl_find(ctx->labels, name);
+	ast->type = JUMP_GOTO;
+	ast->target = NULL;
+	if (ast->ref == NULL)
+	{
+		ast->ref = symbol_create_label(name, next_label(), 0);
+		symtbl_push(ctx->labels, ast->ref);
+	}
+	return ast;
+}
+
+AST* make_jump_cont_or_break(enum JumpType type)
+{
+	AST_DATA(data);
+	struct ASTListItem* item = data->breakable.last;
+
+	if (type == JUMP_CONTINUE)
+	{
+		while (item)
+		{
+			if (item->ast->type == AST_LoopStmt)
+			{
+				break;
+			}
+			item = item->prev;
+		}
+	}
+
+	if (item == NULL)
+	{
+		log_error(NULL, "continue or break must be in a loop or switch case");
+	}
+
+	NEW_AST(JumpStmt, ast);
+	ast->target = NULL;
+	ast->type = type;
+
+	if (item->ast->type == AST_LoopStmt)
+	{
+		CAST(LoopStmt, loop, item->ast);
+		uint64_t id;
+		
+		if (type == JUMP_CONTINUE)
+		{
+			id = loop->step_label;
+		}
+		else {
+			id = loop->exit_label;
+		}
+
+		ast->ref = symbol_create_label(NULL, id, 1);
+	}
+	else {
+		CAST(SwitchCaseStmt, sc, item->ast);
+		ast->ref = symbol_create_label(NULL, sc->exit_label, 1);
+	}
+	
+	return ast;
+}
+
 AST* make_jump(enum JumpType type, char* name, AST* ret)
 {
-	NEW_AST(JumpStmt, ast);
+	AST_DATA(data);
 
-	ast->type = type;
-	ast->label = name;
-	ast->target = ret;
+	switch (type)
+	{
+	case JUMP_GOTO:
+		return make_jump_goto(name);
+	case JUMP_CONTINUE: // fall through
+	case JUMP_BREAK:
+		return make_jump_cont_or_break(type);
+	case JUMP_RET:
+		if (!data->current_function)
+		{
+			make_error("must return within the function");
+		}
+		else {
+			NEW_AST(JumpStmt, ast);
+			ast->type = type;
+			ast->target = ret;
+			ast->ref = data->current_function;
+			return SUPER(ast);
+		}
 
-	return SUPER(ast);
+		break;
+	default:
+		break;
+	}
+
+	return make_error("Internal error");
+}
+
+void notify_loop(enum LoopType type)
+{
+	AST_DATA(data);
+	NEW_AST(LoopStmt, ast);
+	ast->exit_label = next_label();
+	ast->cond_label = next_label();
+	ast->loop_type = type;
+	if (type == LOOP_FOR)
+	{
+		ast->step_label = next_label();
+	}
+	else {
+		ast->step_label = ast->cond_label;
+	}
+	astlist_push(&data->breakable, SUPER(ast));
 }
 
 AST* make_loop(AST* condition, AST* before_loop, AST* loop_body, AST* loop_step, enum LoopType loop_type)
 {
-	NEW_AST(LoopStmt, ast);
+	AST_DATA(data);
+	struct AST* item = astlist_pop(&data->breakable);
+	if (item == NULL)
+	{
+		log_internal_error(item, "corrupted ast data");
+	}
+
+	CAST(LoopStmt, ast, item);
+
 	ast->body = loop_body;
 	ast->condition = condition;
 	ast->enter = before_loop;
@@ -355,6 +565,8 @@ AST* make_loop(AST* condition, AST* before_loop, AST* loop_body, AST* loop_step,
 
 	return SUPER(ast);
 }
+
+
 
 AST* make_ifelse(AST* condition, AST* then, AST* otherwise)
 {
@@ -388,6 +600,8 @@ AST* makr_init_direct_declarator(char* name)
 	NEW_AST(DeclaratorExpr, ast);
 	ast->name = name;
 	ast->last = ast->first = NULL;
+	ast->init_value = NULL;
+	
 	return SUPER(ast);
 }
 
@@ -410,10 +624,7 @@ AST* make_extent_direct_declarator(AST* direct, enum Types type, AST* wrapped)
 	}
 	else // type == TP_FUNC
 	{
-		if (wrapped)
-		{
-
-		}
+		
 		TypeInfo* prev = NULL;
 		TypeInfo* first = NULL;
 		FOR_EACH(wrapped, param)
@@ -432,7 +643,15 @@ AST* make_extent_direct_declarator(AST* direct, enum Types type, AST* wrapped)
 			
 		}
 		TypeInfo* func = type_create_func(first);
-		type_wrap(decl->last, func);
+
+		if (decl->last == NULL)
+		{
+			decl->last = decl->first = func;
+		}
+		else {
+			type_wrap(decl->last, func);
+		}
+		
 		decl->last = func;
 	}
 
@@ -445,8 +664,16 @@ AST* make_declarator(AST* pointer, AST* direct_declarator)
 	CAST(DeclaratorExpr, ptr, pointer);
 	CAST(DeclaratorExpr, decl, direct_declarator);
 
-	type_wrap(decl->last, ptr->first);
-	decl->last = ptr->first;
+	if (decl->last != NULL)
+	{
+		type_wrap(decl->last, ptr->first);
+	}
+	else
+	{
+		decl->last = ptr->first;
+	}
+	
+	decl->last = ptr->last;
 
 	free(ptr);
 
@@ -462,6 +689,33 @@ AST* make_declarator_with_init(AST* declarator, AST* init)
 }
 
 
+AST* make_ptr(int type_qualifier_list, AST* pointing)
+{
+	TypeInfo* type = type_create_ptr(type_qualifier_list);
+	
+	if (pointing == NULL)
+	{
+		NEW_AST(DeclaratorExpr, ast);
+		ast->first = ast->last = type;
+		return ast;
+	}
+	else {
+		CAST(DeclaratorExpr, decl, pointing);
+		type_wrap(decl->last, type);
+		decl->last = type;
+		
+	}
+	return pointing;
+}
+
+
+
+
+int ast_type_neq(AST* node, ASTType type)
+{
+	return !(node->type == type);
+}
+
 AST* make_empty()
 {
 	NEW_AST(EmptyExpr, ast);
@@ -475,18 +729,6 @@ AST* make_error(char* message)
 	ast->error = message;
 	return SUPER(ast);
 }
-
-
-AST* make_ptr(int type_qualifier_list, AST* pointing)
-{
-
-}
-
-int ast_type_neq(AST* node, ASTType type)
-{
-	return !(node->type == type);
-}
-
 
 /*
 AST* make_function_call(const char* function_name, AST* params)
@@ -518,13 +760,6 @@ AST* make_function_body(AST* ast, AST* body)
 }
 */
 
-AST* make_return(AST* exp)
-{
-	NEW_AST(ReturnStatement, ast);
-	ast->return_val = exp;
-
-	return SUPER(ast);
-}
 
 void* ast_destroy(AST* rhs)
 {

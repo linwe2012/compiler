@@ -7,7 +7,6 @@
 
 #define AST_NODE_LIST(V) \
 	V(BlockExpr) \
-	V(ReturnStatement) \
 	V(ListExpr) \
 	V(FunctionCallExpr)\
 	V(IdentifierExpr) \
@@ -51,7 +50,7 @@ struct AST {
 };
 typedef struct AST AST;
 
-
+/*
 typedef struct FunctionDefinition
 {
 	AST* params;
@@ -60,8 +59,9 @@ typedef struct FunctionDefinition
 	AST* body;
 	const char* return_type;
 } FunctionDefinition;
-
-//
+*/
+// 
+// 用大括号包围的语句会进入一个新的 scope
 // { first_child; second; ... }
 // 
 struct BlockExpr
@@ -69,13 +69,6 @@ struct BlockExpr
 	AST super;
 
 	AST* first_child;
-};
-
-struct ReturnStatement
-{
-	AST super;
-
-	AST* return_val;
 };
 
 
@@ -156,8 +149,6 @@ struct FunctionCallExpr
 };
 
 
-
-
 // goto label;
 // continue;
 // break;
@@ -166,7 +157,7 @@ struct JumpStmt
 	AST super;
 	enum JumpType type;
 	AST* target;
-	const char* label;
+	Symbol* ref;
 };
 
 
@@ -175,9 +166,10 @@ struct JumpStmt
 struct LabelStmt
 {
 	AST super;
-	const char* label;
 	AST* target;
 	AST* condition; // < swtich case 中的 condition
+
+	Symbol* ref;
 };
 
 
@@ -210,10 +202,7 @@ struct IdentifierExpr
 	AST* val;
 };
 
-// Auxiliary AST Nodes
-// ================================
-// 辅助 AST 节点, 便于 yacc 调用时生成,
-// 不会交给代码生成器, 会被翻译成其他的节点
+
 
 // 方便 yacc
 // 如果在解析出错的时候也返回 empry
@@ -244,6 +233,10 @@ struct LoopStmt
 	AST* condition; // 循环条件
 	AST* step; // 每一步要做的操作
 	AST* body;
+
+	uint64_t cond_label;
+	uint64_t exit_label;
+	uint64_t step_label;
 };
 
 struct SwitchCaseStmt
@@ -251,6 +244,7 @@ struct SwitchCaseStmt
 	AST super;
 	AST* switch_value;
 	AST* cases;
+	Symbol* exit_label;
 };
 
 // type name = init_value;
@@ -264,10 +258,13 @@ struct DeclaratorExpr
 };
 
 
+// Auxiliary AST Nodes
+// ================================
+// 辅助 AST 节点, 便于 yacc 调用时生成,
+
 struct TypeSpecifier
 {
 	const char* name;
-
 	TypeInfo* info;
 };
 
@@ -282,6 +279,9 @@ void ast_init(AST* ast, ASTType type);
 
 // argument-expression-list
 AST* ast_append(AST* leader, AST* follower);
+
+AST* make_empty();
+
 
 // Expressions
 // =======================================
@@ -311,14 +311,17 @@ AST* make_unary_expr(enum Operators unary_op, AST* rhs);
 AST* make_binary_expr(enum Operators binary_op, AST* lhs, AST* rhs);
 AST* make_trinary_expr(enum Operators triary_op, AST* cond, AST* lhs, AST* rhs);
 
-const int i = 0x22lu;
+
+
 // Statements
 // ======================================
 AST* make_block(AST* statements);
+void ast_notify_enter_block();
 
 AST* make_label(char* name, AST* statement);
 AST* make_label_case(AST* constant, AST* statements);
 AST* make_label_default(AST* statements);
+void notify_label(char* name);
 
 // goto name
 // continue
@@ -330,10 +333,12 @@ AST* make_jump(enum JumpType type, char* name, AST* ret);
 // for(before_loop; condition; loop_step) loop_body;
 // do loop_body while(condition)
 AST* make_loop(AST* condition, AST* before_loop, AST* loop_body, AST* loop_step, enum LoopType loop_type);
+void notify_loop(enum LoopType type);
 
 // if(condition) then else otherwise
 AST* make_ifelse(AST* condition, AST* then, AST* otherwise);
 
+// switch ( condition ) { body }
 AST* make_switch(AST* condition, AST* body);
 
 
@@ -344,13 +349,8 @@ AST* make_switch(AST* condition, AST* body);
 // type 是 TP_STRUCT/TP_UNION/TP_ENUM 等, 那么 struct/union/enum的名字作为 name
 // type 是 TP_INCOMPLETE, 说明是用户自定义的类型 (通过 typedef)
 // name 会被 AST 接管(由AST负责释放)
-AST* make_type(enum SymbolAttributes attr, enum Types type, const char* name);
+// AST* make_type(enum SymbolAttributes attr, enum Types type, const char* name);
 
-// typedef target new_name
-AST* make_typedef(AST* target, const char* new_name);
-
-// attr 是 __cdecl, __stdcall, inline
-AST* make_type_add_attr(AST*target, enum SymbolAttributes attr);
 
 
 
@@ -384,10 +384,12 @@ AST* make_declarator_with_init(AST* declarator, AST* init);
 AST* make_declarator_bit_field(AST* declarator, AST* bitfield);
 
 AST* make_type_specifier(enum Types type);
+
 AST* make_type_specifier_from_id(char* id);
 AST* make_type_specifier_extend(AST* me, AST*other, enum SymbolAttributes storage);
 AST* make_declaration(AST* declaration_specifiers, enum SymbolAttributes attribute_specifier, AST* init_declarator_list);
 
+// attr 是 __cdecl, __stdcall, inline
 
 // enum_define:
 //     enum identifier { enum_list }
@@ -401,6 +403,7 @@ AST* ast_merge_specifier_qualifier(AST* me, AST* other, enum Types qualifier);
 
 
 
+/*
 AST* make_function_call(const char* function_name, AST* params);
 
 AST* make_function(const char* return_type, const char* name, AST* arg_list);
@@ -408,10 +411,9 @@ AST* make_function(const char* return_type, const char* name, AST* arg_list);
 AST* make_function_body(AST* function_ast_node, AST* body);
 
 AST* make_return(AST* exp);
+*/
 
-AST* make_empty();
 
-FunctionDefinition* sym_get_function(const char* return_type, const char* name, AST* args);
 
 #define TYPECHECK(x) inline int is_##x(AST* ast) { return ast->type == AST_##x; }
 
