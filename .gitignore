@@ -13,3 +13,5 @@
 **/lexer.c
 
 3rdparty/bin
+
+**/parser.output

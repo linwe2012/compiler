@@ -364,15 +364,15 @@ postfix_expression
 	| postfix_expression '[' expression ']'  { $$ = make_binary_expr($1, OP_ARRAY_ACCESS, $3) }
 	| postfix_expression '(' ')'             {  }
 	| postfix_expression '.' IDENTIFIER
-	| postfix_expression PTR_OP IDENTIFIER
-	| postfix_expression INC_OP
-	| postfix_expression DEC_OP
+	| postfix_expression PTR_OP IDENTIFIER   { $$ = make_unary_expr(OP_POSTFIX_INC, $1); }
+	| postfix_expression INC_OP              { $$ = make_unary_expr(OP_POSTFIX_INC, $1); }
+	| postfix_expression DEC_OP              { $$ = make_unary_expr(OP_POSTFIX_DEC, $1); }
 	;
 
 primary_expression
-	: IDENTIFIER
-	| CONSTANT
-	| STRING_LITERAL
-	| '(' expression ')' 
+	: IDENTIFIER         { $$ = make_identifier($1); }
+	| CONSTANT            
+	| STRING_LITERAL     { $$ = make_string($1); }  
+	| '(' expression ')' { $$ = make_list_expr($2); }
 	;
 
