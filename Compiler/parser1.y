@@ -58,13 +58,13 @@ AST* parser_result = NULL;
 %%
 // defination part
 translation_unit 
-    : external_declaration
-    | translation_unit external_declaration
+    : external_declaration                      { $$ = $1; }
+    | external_declaration translation_unit     { $$ = ast_append($1, $2); }
     ;
 
 external_declaration
-    : function_definition
-    | declaration
+    : function_definition      { $$ = $1; }
+    | declaration              { $$ = $1; }
     ;
 
 /*
@@ -75,12 +75,12 @@ function_definition
 */
 
 function_definition
-	: declaration_specifiers declarator compound_statement
+	: declaration_specifiers declarator compound_statement                { $$ = make_declare_function($1, $2, $3); }
 	;
 
 // declaration part
 declaration
-    : declaration_specifiers attribute_specifier init_declarator_list ';' { $$ = make_declaration($1, $2, $3); }
+    : declaration_specifiers attribute_specifier init_declarator_list ';'  { $$ = make_declaration($1, $2, $3); }
     | declaration_specifiers init_declarator_list ';'                      { $$ = make_declaration($1, ATTR_NONE, $2); }
     ;
 
@@ -166,9 +166,7 @@ type_qualifier_list
     : type_qualifier                     { $$ = $1; }
 	| type_qualifier_list type_qualifier { $$ = ast_merge_type_qualifier($1, $2); }
 
-declaration
-    : declaration_specifiers init_declarator_list ';'
-    ;
+
 enum_specifier
 	: ENUM '{' enumerator_list '}'              { $$ = make_enum_define(NULL, $3); }
 	| ENUM IDENTIFIER '{' enumerator_list '}'   { $$ = make_enum_define($2, $4); }
@@ -201,7 +199,7 @@ struct_declaration_list
 	;
 
 struct_declaration
-	: specifier_qualifier_list struct_declarator_list ';'  
+	: specifier_qualifier_list struct_declarator_list ';'  { $$ = make_struct_field_declaration($1, $2); }
 	;
 
 specifier_qualifier_list
@@ -212,8 +210,8 @@ specifier_qualifier_list
 	;
 
 struct_declarator_list
-	: struct_declarator                                
-	| struct_declarator_list ',' struct_declarator
+	: struct_declarator                                { $$ = $1; }
+	| struct_declarator',' struct_declarator_list        { $$ = ast_append($1, $3); }
 	;
 
 struct_declarator
@@ -223,9 +221,9 @@ struct_declarator
 	;
 
 parameter_declaration
-    : declaration_specifiers declarator                { $$ =  }
-	| declaration_specifiers abstract_declarator 
-	| declaration_specifiers
+    : declaration_specifiers declarator                { $$ = make_parameter_declaration($1, $2); }
+	| declaration_specifiers abstract_declarator       { $$ = make_parameter_declaration($1, $2); }
+	| declaration_specifiers                           { $$ = make_parameter_declaration($1, NULL); }
 	;
 
 /* Obsolete-style declarator 
@@ -351,8 +349,8 @@ assignment_expression
 	;
 
 assignment_operator
-	: '='
-	| MUL_ASSIGN { $$ = OP_ASSIGN; }
+	: '='        { $$ = OP_ASSIGN; }
+	| MUL_ASSIGN { $$ = OP_ASSIGN_MUL; }
 	| DIV_ASSIGN { $$ = OP_ASSIGN_DIV; }
 	| MOD_ASSIGN { $$ = OP_ASSIGN_MOD; }
 	| ADD_ASSIGN { $$ = OP_ASSIGN_ADD; }
@@ -365,7 +363,7 @@ assignment_operator
 	;
 
 constant_expression
-	: conditional_expression
+	: conditional_expression { $$ = $1; }
 	;
 
 conditional_expression
@@ -446,28 +444,33 @@ unary_expression
 	;
 
 unary_operator
-	: '&' { return OP_ADDRESS; }
-	| '*' { return OP_POINTER; }
-	| '+' { return OP_POSITIVE; }
-	| '-' { return OP_NEGATICE; }
-	| '~' { return OP_COMPLEMENT; }
-	| '!' { reutrn OP_NOT; }
+	: '&' { $$ = OP_ADDRESS; }
+	| '*' { $$ = OP_POINTER; }
+	| '+' { $$ = OP_POSITIVE; }
+	| '-' { $$ = OP_NEGATICE; }
+	| '~' { $$ = OP_COMPLEMENT; }
+	| '!' { $$ = OP_NOT; }
 	;
+
+argument_expression_list
+	: assignment_expression                              { $$ = $1; }
+	| assignment_expression ',' argument_expression_list { $$ = ast_append($1, $3); }
 
 postfix_expression
 	: primary_expression { $$ = $1; }
 	| postfix_expression '[' expression ']'  { $$ = make_binary_expr(OP_ARRAY_ACCESS, $1, $3); }
-	| postfix_expression '(' ')'             
+	| postfix_expression '(' ')'                            { $$ = make_function_call($1, NULL); }
+	| postfix_expression '(' argument_expression_list ')'   { $$ = make_function_call($1, $3); }
 	| postfix_expression '.' IDENTIFIER { $$ = make_binary_expr(OP_STACK_ACCESS, $1, $3); }
 	| postfix_expression PTR_OP IDENTIFIER { $$ = make_binary_expr(OP_PTR_ACCESS, $1, $3); }
-	| postfix_expression INC_OP { $$ = make_unary_expr(OP_INC, $1); }
-	| postfix_expression DEC_OP { $$ = make_unary_expr(OP_DEC, $1); }
+	| postfix_expression INC_OP { $$ = make_unary_expr(OP_POSTFIX_INC, $1); }
+	| postfix_expression DEC_OP { $$ = make_unary_expr(OP_POSTFIX_INC, $1); }
 	;
 
 primary_expression
 	: IDENTIFIER
 	| CONSTANT
-	| STRING_LITERAL
-	| '(' expression ')'  { $$ = $2; }
+	| STRING_LITERAL      { $$ = make_string($1); }  
+	| '(' expression ')'  { $$ = make_list_expr($2); }
 	;
 

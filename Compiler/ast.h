@@ -74,6 +74,11 @@ struct BlockExpr
 	AST* first_child;
 };
 
+struct FunctionDefinitionStmt
+{
+	AST* name;
+	AST* declarator;
+};
 
 //
 // OperationExpr
@@ -326,7 +331,7 @@ AST* make_unary_expr(enum Operators unary_op, AST* rhs);
 AST* make_binary_expr(enum Operators binary_op, AST* lhs, AST* rhs);
 AST* make_trinary_expr(enum Operators triary_op, AST* cond, AST* lhs, AST* rhs);
 
-
+AST* make_list_expr(AST* child);
 
 // Statements
 // ======================================
@@ -356,8 +361,9 @@ AST* make_ifelse(AST* condition, AST* then, AST* otherwise);
 // switch ( condition ) { body }
 AST* make_switch(AST* condition, AST* body);
 
-
-
+AST* make_parameter_declaration(AST* declaration_specifiers, AST* declarator);
+AST* make_struct_field_declaration(AST* specifier_qualifier, AST* struct_declarator);
+AST* make_define_function(AST* declaration_specifiers, AST* declarator, AST* compound_statement);
 
 // attr 是 register/auto/extern/static
 // type 是 TP_VOID ~ TP_FLOAT128 等数字类型的时候, name = NULL
@@ -419,8 +425,10 @@ AST* ast_merge_specifier_qualifier(AST* me, AST* other, enum Types qualifier);
 
 AST* make_initializer_list(AST* list);
 
+
+AST* make_function_call(AST* postfix_expression, AST* params);
 /*
-AST* make_function_call(const char* function_name, AST* params);
+
 
 AST* make_function(const char* return_type, const char* name, AST* arg_list);
 
