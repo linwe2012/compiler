@@ -46,7 +46,7 @@ AST* parser_result = NULL;
 
 %type <type> type_name type_qualifier type_qualifier_list attribute_specifier
 %type <type> storage_class_specifier struct_or_union
-%type <val> struct_or_union_specifier struct_declaration_list struct_declaration struct_declarator
+%type <val> struct_or_union_specifier struct_declaration_list struct_declaration struct_declarator struct_declarator_list
 %type <val> specifier_qualifier_list
 %type <val> pointer direct_declarator declarator type_specifier init_declarator_list init_declarator 
 %type <val> initializer initializer_list
@@ -54,7 +54,7 @@ AST* parser_result = NULL;
 %type <val> parameter_list parameter_declaration
 %type <val> enum_specifier enumerator_list  enumerator
 %type <val> abstract_declarator direct_abstract_declarator
-
+%type <val> external_declaration translation_unit argument_expression_list function_definition
 %%
 // defination part
 translation_unit 
@@ -267,8 +267,8 @@ type_name
 */
 
 type_name
-	: specifier_qualifier_list
-	| specifier_qualifier_list abstract_declarator
+	: specifier_qualifier_list                      { $$ = make_type_declarator($1, NULL); }
+	| specifier_qualifier_list abstract_declarator  { $$ = make_type_declarator($1, $2); }
 	;
 /*
 function_specifier
@@ -471,8 +471,8 @@ postfix_expression
 	;
 
 primary_expression
-	: IDENTIFIER
-	| CONSTANT
+	: IDENTIFIER          { $$ = make_identifier($1); }
+	// | CONSTANT <-- 这是啥
 	| STRING_LITERAL      { $$ = make_string($1); }  
 	| '(' expression ')'  { $$ = make_list_expr($2); }
 	;

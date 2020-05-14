@@ -427,6 +427,7 @@ AST* make_initializer_list(AST* list);
 
 
 AST* make_function_call(AST* postfix_expression, AST* params);
+AST* make_type_declarator(AST* specifier_qualifier, AST* declarator);
 /*
 
 
