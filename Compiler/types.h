@@ -8,10 +8,14 @@ enum SymbolAttributes
 	ATTR_EXTERN,
 	ATTR_STATIC,
 	ATTR_TYPEDEF,
+
+	
 	
 	ATTR_INLINE = 0x0100,
 	ATTR_STDCALL = 0x0200,
 	ATTR_CDECL = 0x0400,
+
+	ATTR_MASK_STORAGE = ATTR_INLINE -1,
 	
 };
 
@@ -39,11 +43,13 @@ enum Types
 	TP_SIGNED = 0x002000u,
 	TP_ARRAY = 0x004000u,
 	TP_BITFIELD = 0x008000u,
+	
 
 	// Type qualifier
 	TP_CONST = 0x010000u,
 	TP_VOLATILE = 0x020000u,
 	TP_RESTRICT = 0x040000u, //  TODO: this is not supported
+	TP_LONG_FLAG = 0x080000u,
 
 	TP_CLEAR_SIGNFLAGS = ~(TP_UNSIGNED | TP_SIGNED),
 	TP_GET_SIGNFLAGS = (TP_UNSIGNED | TP_SIGNED),
@@ -110,6 +116,18 @@ inline enum Types type_integer_promote(enum Types t)
 {
 	if ((t & TP_CLEAR_SIGNFLAGS) < TP_INT32) return TP_INT32 | (t & TP_GET_SIGNFLAGS);
 	return t;
+}
+
+// int, int -> int
+// int, int64 -> int64
+// double, int -> double
+// int, float -> float
+inline enum Types type_numeric_promote(enum Types t1, enum Types t2)
+{
+	enum Types t1_ = t1 & TP_CLEAR_ATTRIBUTEFLAGS;
+	enum Types t2_ = t2 & TP_CLEAR_ATTRIBUTEFLAGS;
+
+
 }
 
 // referenced here:

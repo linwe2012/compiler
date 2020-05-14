@@ -7,6 +7,7 @@ int str_equal(const char* a, const char* b)
 
 char* str_concat(const char* a, const char* b)
 {
+
 	int la = strlen(a);
 	int lb = strlen(b);
 	int sz = la + lb + 1;

@@ -112,7 +112,7 @@ type_specifier
 	| CHAR         { $$ = make_type_specifier(TP_INT8); }
 	| SHORT        { $$ = make_type_specifier(TP_INT16); }
 	| INT          { $$ = make_type_specifier(TP_INT32); }
-	| LONG         { $$ = make_type_specifier(TP_INT32); }
+	| LONG         { $$ = make_type_specifier(TP_INT32 | TP_LONG_FLAG); }
 	| FLOAT        { $$ = make_type_specifier(TP_FLOAT32); }
 	| DOUBLE       { $$ = make_type_specifier(TP_FLOAT64); }
 	| INT64        { $$ = make_type_specifier(TP_INT64); }
@@ -228,29 +228,31 @@ identifier_list
 	;
 */
 
+// https://docs.microsoft.com/en-us/cpp/c-language/c-abstract-declarators?view=vs-2019
+// An abstract declarator is a declarator without an identifier, consisting of one or more pointer, array, or function modifiers
 abstract_declarator
-	: pointer
-	| direct_abstract_declarator
-	| pointer direct_abstract_declarator
+	: pointer                               { $$ = $1; }
+	| direct_abstract_declarator            { $$ = $1; }
+	| pointer direct_abstract_declarator    { $$ = make_declaration($1, $2);  }
 	;
 
 direct_abstract_declarator
-	: '(' abstract_declarator ')'
-	| direct_abstract_declarator '[' ']'
-	| direct_abstract_declarator '[' constant_expression ']'
-	| direct_abstract_declarator '(' parameter_type_list ')'
-	| '(' parameter_type_list ')'
+	: '(' abstract_declarator ')'                                { $$ = $2; }
+	| direct_abstract_declarator '[' ']'                         { $$ = make_extent_direct_declarator($1, TP_ARRAY, NULL); }
+	| direct_abstract_declarator '[' constant_expression ']'     { $$ = make_extent_direct_declarator($1, TP_ARRAY, $3); }
+	| direct_abstract_declarator '(' parameter_type_list ')'     { $$ = make_extent_direct_declarator($1, TP_FUNC, $3); }
+	| '(' parameter_type_list ')'                                { $$ = make_extent_direct_declarator($1, TP_FUNC, $3); }
 	;
 
 initializer
-    : assignment_expression
-    | '{' initializer_list '}'
-	| '{' initializer_list ',' '}'
+    : assignment_expression         { $$ = $1; }
+    | '{' initializer_list '}'      { $$ = make_initializer_list($2); }
+	| '{' initializer_list ',' '}'  { $$ = make_initializer_list($2); }
     ;
 
 initializer_list
-    : initializer
-    | initializer_list ',' initializer
+    : initializer                         { $$ = $1; }
+    | initializer ',' initializer_list    { $$ = ast_append($1, $3); }
     ;
 /*
 type_name

@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include "config.h"
 #include "symbol.h"
+#include "types.h"
 
 #define AST_NODE_LIST(V) \
 	V(BlockExpr) \
@@ -15,6 +16,7 @@
 	V(OperatorExpr) \
 	V(LabelStmt) \
 	V(JumpStmt) \
+	V(InitilizerListExpr)
 
 #define AST_AUX_NODE_LIST(V)\
 	V(EmptyExpr) \
@@ -22,7 +24,8 @@
 	V(LoopStmt)\
 	V(IfStmt) \
 	V(SwitchCaseStmt)\
-	V(DeclaratorExpr)
+	V(DeclaratorExpr)\
+	V(TypeSpecifier) \
 
 
 typedef enum ASTType {
@@ -45,8 +48,8 @@ struct AST {
 	Symbol* sym_type;
 	struct AST* prev, * next;
 	
-	uint64_t evaluated_value;
-	int is_evaluated;
+	//uint64_t evaluated_value;
+	//int is_evaluated;
 };
 typedef struct AST AST;
 
@@ -248,6 +251,8 @@ struct SwitchCaseStmt
 };
 
 // type name = init_value;
+// init_value 可能是 算数表达式
+//   也可能是初始化语句
 struct DeclaratorExpr
 {
 	AST super;
@@ -255,8 +260,15 @@ struct DeclaratorExpr
 	TypeInfo* last;
 	TypeInfo* first;
 	AST* init_value;
+	enum SymbolAttributes attributes;
 };
 
+
+struct InitilizerListExpr
+{
+	AST super;
+	AST* list;
+};
 
 // Auxiliary AST Nodes
 // ================================
@@ -264,8 +276,11 @@ struct DeclaratorExpr
 
 struct TypeSpecifier
 {
+	AST super;
 	const char* name;
 	TypeInfo* info;
+	enum Type type;
+	enum SymbolAttributes attributes;
 };
 
 
@@ -368,6 +383,7 @@ int ast_merge_type_qualifier(int a, int b);
 // direct_declarator
 //     : IDENTIFIER
 AST* makr_init_direct_declarator(char * name);
+
 // direct_declarator:
 //     : direct_declarator (wrapped)
 //     | direct_declarator [wrapped]
@@ -401,7 +417,7 @@ AST* make_struct_or_union_define(enum Types type, char* identifier, AST* field_l
 
 AST* ast_merge_specifier_qualifier(AST* me, AST* other, enum Types qualifier);
 
-
+AST* make_initializer_list(AST* list);
 
 /*
 AST* make_function_call(const char* function_name, AST* params);

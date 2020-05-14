@@ -605,11 +605,14 @@ AST* makr_init_direct_declarator(char* name)
 	return SUPER(ast);
 }
 
+
 AST* make_extent_direct_declarator(AST* direct, enum Types type, AST* wrapped)
 {
-	CAST(DeclaratorExpr, decl, direct);
+	DeclaratorExpr* res;
+
 	if (type == TP_ARRAY)
 	{
+		CAST(DeclaratorExpr, decl, direct);
 		if (wrapped)
 		{
 			
@@ -621,12 +624,16 @@ AST* make_extent_direct_declarator(AST* direct, enum Types type, AST* wrapped)
 			decl->last = last;
 			ast_destroy(res);
 		}
+		res = decl;
 	}
 	else // type == TP_FUNC
 	{
 		
+
 		TypeInfo* prev = NULL;
 		TypeInfo* first = NULL;
+
+		// 把 AST 链表串联成 TypeInfo* 链表
 		FOR_EACH(wrapped, param)
 		{
 			CAST(DeclaratorExpr, p, param);
@@ -640,22 +647,38 @@ AST* make_extent_direct_declarator(AST* direct, enum Types type, AST* wrapped)
 				first = p->first;
 			}
 			prev = p->first;
-			
+
 		}
 		TypeInfo* func = type_create_func(first);
 
-		if (decl->last == NULL)
+		// 如果不是 abstract declarator
+		if (direct != NULL)
 		{
-			decl->last = decl->first = func;
+			CAST(DeclaratorExpr, decl, direct);
+			
+
+			if (decl->last == NULL)
+			{
+				decl->last = decl->first = func;
+			}
+			else {
+				type_wrap(decl->last, func);
+			}
+
+			decl->last = func;
+			res = decl;
 		}
 		else {
-			type_wrap(decl->last, func);
+			NEW_AST(DeclaratorExpr, decl);
+			decl->attributes = ATTR_NONE;
+			decl->first = decl->last = func;
+			decl->init_value = NULL;
+			decl->name = NULL;
+			res = decl;
 		}
-		
-		decl->last = func;
 	}
 
-	return SUPER(decl);
+	return SUPER(res);
 }
 
 
@@ -689,6 +712,8 @@ AST* make_declarator_with_init(AST* declarator, AST* init)
 }
 
 
+
+
 AST* make_ptr(int type_qualifier_list, AST* pointing)
 {
 	TypeInfo* type = type_create_ptr(type_qualifier_list);
@@ -708,8 +733,109 @@ AST* make_ptr(int type_qualifier_list, AST* pointing)
 	return pointing;
 }
 
+AST* make_type_specifier(enum Types type)
+{
+	NEW_AST(TypeSpecifier, ast);
+	ast->info = NULL;
+	ast->type = type;
+	ast->attributes = ATTR_NONE;
+	return ast;
+}
+
+int ast_merge_storage_specifiers(int a, int b)
+{
+	
+	int la = a & ATTR_MASK_STORAGE;
+	int lb = b & ATTR_MASK_STORAGE;
+
+	if (la && lb)
+	{
+		log_error(NULL, "duplicated storage specifiers");
+		return a;
+	}
+
+	return a | b;
+}
+
+AST* make_type_specifier_extend(AST* me, AST* other, enum SymbolAttributes storage)
+{
+	CAST(TypeSpecifier, spec1, me);
+	if (other)
+	{
+		CAST(TypeSpecifier, spec2, other);
+		// 两个 struct 的声明
+		if (spec1->info && spec2->info)
+		{
+			log_error(me, "Duplicated type specifier");
+			ast_destroy(other);
+			return me;
+		}
+
+		
+
+		enum Types st = spec1->type | spec2->type;
+		
+		// 两个都是 原始类型的声明
+		if (st)
+		{
+	
+			// int 和 struct 同时声明的情况
+			if (spec1->info || spec2->info)
+			{
+				log_error(me, "Duplicated type specifier");
+				ast_destroy(other);
+				return me;
+			}
+
+#define both_have_flags(flag) (spec1->type & (flag)) && (spec2->type & (flag))
+			if (both_have_flags(TP_SIGNED | TP_UNSIGNED))
+			{
+				log_error(me, "Duplicated signed/unsigned specifier");
+			}
+			
+			// long long
+			if (both_have_flags(TP_LONG_FLAG))
+			{
+				spec1->type = TP_INT64;
+			}
+
+			// 如果是 int float 这样的类型声明
+			else if (both_have_flags(TP_CLEAR_ATTRIBUTEFLAGS))
+			{
+				log_error(me, "Duplicated type specifier");
+				ast_destroy(other);
+				return me;
+			}
+#undef both_have_flags
+			else {
+				spec1->type = spec1->type | spec2->type;
+				
+				spec1->attributes = ast_merge_storage_specifiers(spec1->attributes, spec2->attributes);
+			}
+		}
+	}
+	else {
+		spec1->attributes = ast_merge_storage_specifiers(spec1->attributes, storage);
+	}
+}
 
 
+
+AST* make_type_specifier_from_id(char* id)
+{
+	Symbol* sym = symtbl_find(ctx->types, id);
+	if (sym == NULL)
+	{
+		log_error(NULL, "Undeclared type name");
+		return NULL;
+	}
+	NEW_AST(TypeSpecifier, ast);
+	ast->type = TP_INCOMPLETE;
+	ast->name = id;
+	ast->info = &sym->type;
+	ast->attributes = ATTR_NONE;
+	return ast;
+}
 
 int ast_type_neq(AST* node, ASTType type)
 {
@@ -762,11 +888,6 @@ AST* make_function_body(AST* ast, AST* body)
 
 
 void* ast_destroy(AST* rhs)
-{
-
-}
-
-Value request_label(Context* ctx)
 {
 
 }
