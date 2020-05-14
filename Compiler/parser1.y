@@ -33,19 +33,26 @@ AST* parser_result = NULL;
 
 %type <val> primary_expression
 %type <val> postfix_expression
-%type <val> expression assignment_expression 
+%type <val> expression assignment_expression constant_expression conditional_expression 
+%type <val> and_expression  logical_and_expression logical_or_expression exclusive_or_expression inclusive_or_expression
+%type <val> equality_expression relational_expression shift_expression additive_expression
+%type <val> multiplicative_expression cast_expression unary_expression 
 
-%type <val> statement compound_statement block_item_list block_item labeled_statement expression_statment iteration_statement jump_statement 
-%type <type> assignment_operator
+%type <type> assignment_operator unary_operator
+
+%type <val> statement compound_statement block_item_list block_item selection_statement labeled_statement expression_statement iteration_statement jump_statement 
+
 %start translation_unit
 
-%type <type> type_qualifier type_qualifier_list function_specifier attribute_specifier
+%type <type> type_name type_qualifier type_qualifier_list attribute_specifier
 %type <type> storage_class_specifier struct_or_union
-%type <val> pointer direct_declarator declarator type_specifier init_declarator_list init_declarator
+%type <val> struct_or_union_specifier struct_declaration_list struct_declaration struct_declarator
+%type <val> specifier_qualifier_list
+%type <val> pointer direct_declarator declarator type_specifier init_declarator_list init_declarator 
+%type <val> initializer initializer_list
 %type <val> declaration_specifiers declaration
 %type <val> parameter_list parameter_declaration
 %type <val> enum_specifier enumerator_list  enumerator
-%type <val> additive_expression
 
 
 %%
@@ -73,7 +80,7 @@ function_definition
 
 // declaration part
 declaration
-    : declaration_specifiers attribute_specifier  init_declarator_list ';' { $$ = make_declaration($1, $2, $3); }
+    : declaration_specifiers attribute_specifier init_declarator_list ';' { $$ = make_declaration($1, $2, $3); }
     | declaration_specifiers init_declarator_list ';'                      { $$ = make_declaration($1, ATTR_NONE, $2); }
     ;
 
@@ -81,7 +88,7 @@ declaration_specifiers
     : type_specifier                                   { $$ = $1; }
     | type_specifier declaration_specifiers            { $$ = make_type_specifier_extend($1, $2, ATTR_NONE); }
     | storage_class_specifier declaration_specifiers   { $$ = make_type_specifier_extend($2, NULL, $1); }
-	| storage_class_specifier                          { $$ = make_type_specifier_extend($2, NULL, $1); }
+	| storage_class_specifier                          { $$ = make_type_specifier_extend(NULL, NULL, $1); }
     ;
 
 attribute_specifier
@@ -96,7 +103,7 @@ init_declarator_list
 
 init_declarator
 	: declarator                  { $$ = $1 }
-	| declarator '=' initializer  { $$ = make_declarator_with_init($1, $2); }
+	| declarator '=' initializer  { $$ = make_declarator_with_init($1, $3); }
 	;
 
 storage_class_specifier
@@ -152,7 +159,7 @@ pointer
 
 parameter_list
     : parameter_declaration                     { $$ = $1; }
-    | parameter_declaration ',' parameter_list  { $$ = ast_append($1, $2); }
+    | parameter_declaration ',' parameter_list  { $$ = ast_append($1, $3); }
     ;
 
 type_qualifier_list
@@ -170,7 +177,7 @@ enum_specifier
 
 enumerator_list
 	: enumerator                         { $$ = $1; }
-	| enumerator ',' enumerator_list     { $$ = ast_append($1, $2); }
+	| enumerator ',' enumerator_list     { $$ = ast_append($1, $3); }
 	;
 
 enumerator
@@ -238,8 +245,8 @@ direct_abstract_declarator
 	: '(' abstract_declarator ')'
 	| direct_abstract_declarator '[' ']'
 	| direct_abstract_declarator '[' constant_expression ']'
-	| direct_abstract_declarator '(' parameter_type_list ')'
-	| '(' parameter_type_list ')'
+	| direct_abstract_declarator '(' parameter_list ')'
+	| '(' parameter_list ')'
 	;
 
 initializer
@@ -263,19 +270,19 @@ type_name
 	: specifier_qualifier_list
 	| specifier_qualifier_list abstract_declarator
 	;
-
+/*
 function_specifier
     : INLINE        { $$ = ATTR_INLINE; }
 	;
-
+*/
 // statement part
 
 statement
     : labeled_statement    { $$ = $1; }
     | compound_statement   { $$ = $1; }
-    | expression_statment  { $$ = $1; }
-    | selection_statment   { $$ = $1; }
-    | iteration statement  { $$ = $1; }
+    | expression_statement  { $$ = $1; }
+    | selection_statement   { $$ = $1; }
+    | iteration_statement  { $$ = $1; }
     | jump_statement       { $$ = $1; }
     ;
 
@@ -300,9 +307,9 @@ labeled_statement
 	| DEFAULT ':' statement                   { $$ = make_label_default($3); }
 	;
 
-expression_statment
+expression_statement
     : ';'                                     { $$ = make_empty(); }
-    expression ';'                            { $$ = $1; }
+    | expression ';'                            { $$ = $1; }
     ;
 
 selection_statement
@@ -333,7 +340,7 @@ jump_statement
 
 expression
 	: assignment_expression {$$ = $1;}
-	| expression ',' assignment_expression { $$ = ast_append($1, $2);}
+	| expression ',' assignment_expression { $$ = ast_append($1, $3);}
 	;
 
 assignment_expression
@@ -437,12 +444,12 @@ unary_expression
 	;
 
 unary_operator
-	: '&'
-	| '*'
-	| '+'
-	| '-'
-	| '~'
-	| '!'
+	: '&' { return OP_ADDRESS; }
+	| '*' { return OP_POINTER; }
+	| '+' { return OP_POSITIVE; }
+	| '-' { return OP_NEGATICE; }
+	| '~' { return OP_COMPLEMENT; }
+	| '!' { reutrn OP_NOT; }
 	;
 
 postfix_expression
