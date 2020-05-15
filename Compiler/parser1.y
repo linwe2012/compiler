@@ -22,6 +22,7 @@ AST* parser_result = NULL;
 %token <str> AND_OP OR_OP MUL_ASSIGN DIV_ASSIGN MOD_ASSIGN ADD_ASSIGN
 %token <str> SUB_ASSIGN LEFT_ASSIGN RIGHT_ASSIGN AND_ASSIGN
 %token <str> XOR_ASSIGN OR_ASSIGN
+%token <str> TYPE_NAME
 
 %token <str> TYPEDEF EXTERN STATIC AUTO REGISTER INLINE RESTRICT
 %token <str> CHAR SHORT INT LONG SIGNED UNSIGNED FLOAT DOUBLE CONST VOLATILE VOID INT64
@@ -127,7 +128,7 @@ type_specifier
 	| UNSIGNED     { $$ = make_type_specifier(TP_UNSIGNED); }
 	| struct_or_union_specifier { $$ = $1; }
 	| enum_specifier            { $$ = $1; }
-	| IDENTIFIER                { $$ = make_type_specifier_from_id($1); }
+	| TYPE_NAME               { $$ = make_type_specifier_from_id($1); }
 	;
 
 type_qualifier
@@ -471,7 +472,7 @@ postfix_expression
 	;
 
 primary_expression
-	: IDENTIFIER          { $$ = make_identifier($1); }
+	: IDENTIFIER       { $$ = make_identifier($1); }
 	// | CONSTANT <-- 这是啥
 	| STRING_LITERAL      { $$ = make_string($1); }  
 	| '(' expression ')'  { $$ = make_list_expr($2); }
