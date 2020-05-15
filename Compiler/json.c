@@ -204,6 +204,7 @@ void _write_LabelStmt(LabelStmt* stmt) {
         _write_ast(stmt->condition);
     }
     // 需要打印target吗？还是说target只是AST分析中的辅助信息
+    // leon> 要的
     // if (stmt->target) {
     //     fputs(",\n", s_fp);
     //     _write_ast(stmt->target);
