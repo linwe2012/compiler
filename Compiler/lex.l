@@ -79,12 +79,11 @@ float		{dec_int}"."[0-9]*
 "__int32"        { return (INT); }
 "__int64"        { return (INT64); }
 
-{identifier}    { COPY_STR(); return IDENTIFIER; }
-{any_int}       { COPY_STR(); return NUM_INT; }
-{float}			{ COPY_STR(); return NUM_FLOAT; }
-{float}"f"		{ COPY_STR(); return NUM_FLOAT32; }
-
-/* TODO: �˽��� ʮ������ ��ѧ������ */
+{identifier}    	{ COPY_STR(); return IDENTIFIER; }
+\"(\\.|[^\\"\n])*\"	{ COPY_STR(); return(STRING_LITERAL); }
+{any_int}       	{ COPY_STR(); return CONSTANT; }
+{float}				{ COPY_STR(); return CONSTANT; }
+{float}"f"			{ COPY_STR(); return CONSTANT; }
 
 {whitespace}    /* do nothing */
 
