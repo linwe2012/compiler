@@ -8,19 +8,8 @@
 #include "types.h"
 #include "hashtable.h"
 
-inline int type_is_number(int type)
-{
-	int x = (type & (0x0010 - 1));
-	return (x >= TP_INT8) && (x <= TP_FLOAT128);
-}
 
-inline int type_native_alignment(int type)
-{
-	int x = (type & (0x0010 - 1));
-	return (x >= TP_INT8) && (x <= TP_FLOAT128);
-}
 
-int type_number_size(int type);
 
 /*
 struct TypeAlias
@@ -96,7 +85,9 @@ struct VariableInfo
 {
 	char* name;
 	enum SymbolAttributes attributes;
-	TypeInfo* type;
+	Symbol* type;
+	int is_constant;
+	union ConstantValue const_val;
 };
 STRUCT_TYPE(VariableInfo)
 
@@ -117,64 +108,6 @@ struct LabelInfo
 };
 STRUCT_TYPE(LabelInfo)
 
-
-TypeInfo* type_access(TypeInfo* info, const char* name)
-{
-	
-}
-
-#define max(x, y) ((x) > (y) ? (x) : (y))
-
-int type_add_child(TypeInfo* info, TypeInfo* child)
-{
-	TypeInfo* move = child;
-	int max_aligned_size = 0;
-	int max_alignment = 0;
-	while (move)
-	{
-		max_aligned_size = max(move->aligned_size, max_aligned_size);
-		max_alignment = max(move->alignment, max_alignment);
-	}
-
-	if (info->type & TP_UNION)
-	{
-		move->offset = 0;
-		info->aligned_size = max_aligned_size;
-		info->alignment = max_alignment;
-	}
-	else if (info->type & TP_STRUCT)
-	{
-		int size = 0;
-		move = child;
-		while (move)
-		{
-			if (size != 0)
-			{
-				size = (size / move->alignment + 1) * move->alignment;
-			}
-			
-			move->offset = size;
-			size += move->alignment;
-		}
-
-
-		info->aligned_size = size;
-		info->alignment = max_alignment;
-	}
-	else if (info->type & TP_ENUM)
-	{
-
-	}
-	
-
-
-}
-
-TypeInfo* type_create_array(uint64_t n, enum SymbolAttributes qualifers);
-TypeInfo* type_create_struct();
-TypeInfo* type_create_ptr(enum SymbolAttributes qualifers);
-TypeInfo* type_create_func(struct TypeInfo* params);
-int type_wrap(TypeInfo* parent, TypeInfo* child);
 
 struct SymbolBase
 {
@@ -232,8 +165,11 @@ struct SymbolTable
 
 STRUCT_TYPE(SymbolTable)
 
-// void symtbl_remove_by_name(const char* name);
 
+void symbol_init_context(struct Context* context);
+
+// 符号表相关函数
+// ================================
 // Symbol.name 记录了 name 的信息
 void symtbl_push(SymbolTable* tbl, Symbol* c);
 Symbol* symtbl_find(SymbolTable* tbl, const char* name);
@@ -241,14 +177,40 @@ Symbol* symtbl_find(SymbolTable* tbl, const char* name);
 void symtbl_enter_scope(SymbolTable* tbl, int keep_global_only);
 void symtbl_leave_scope(SymbolTable* tbl, int free_all_symols);
 
-
-extern Symbol SymbolType_UINT64;
-
-
-extern TypeInfo* type_uint64;
-
-void symbol_init_context(struct Context* context);
+// 符号创建函数
+// ================================
 TypeInfo* type_fetch_buildtin(enum Types type);
 Symbol* symbol_create_label(char* name, uint64_t label, int resolved);
+Symbol* symbol_create_constant(Symbol* enum_sym, char* name, union ConstantValue val);
+Symbol* symbol_create_enum(char* name);
+
+
+// 类型管理 & 创建
+// ================================
+TypeInfo* type_create_array(uint64_t n, enum SymbolAttributes qualifers);
+TypeInfo* type_create_struct();
+TypeInfo* type_create_ptr(enum SymbolAttributes qualifers);
+TypeInfo* type_create_func(struct TypeInfo* params);
+
+int type_wrap(TypeInfo* parent, TypeInfo* child);
+
+
+// 类型工具
+// ================================
+
+// 把一个任意的 numeric 类型 cast 成别的 numeric 类型
+union ConstantValue constant_cast(enum Types from, enum Types to, union ConstantValue src);
+
+inline int type_is_number(int type)
+{
+	int x = (type & (0x0010 - 1));
+	return (x >= TP_INT8) && (x <= TP_FLOAT128);
+}
+
+inline int type_native_alignment(int type)
+{
+	int x = (type & (0x0010 - 1));
+	return (x >= TP_INT8) && (x <= TP_FLOAT128);
+}
 
 #endif

@@ -5,8 +5,8 @@
 
 STRUCT_TYPE(SymbolTableEntry);
 
-TypeInfo builtins[TP_NUM_BUILTINS + TP_NUM_BUILTIN_INTS];
-
+TypeInfo builtins[TP_NUM_BUILTINS + TP_NUM_BUILTIN_INTS + 1];
+#define max(x, y) ((x) > (y) ? (x) : (y))
 
 
 void symtbl_init(SymbolTable* tbl)
@@ -91,6 +91,8 @@ void symtbl_leave_scope(SymbolTable* tbl, int free_all_symols)
 	tbl->stack_top = top->real_prev;
 	free(top);
 }
+
+
 
 /*
 Symbol* sym_find(Context* ctx, enum SymbolTypes type, const char* str)
@@ -268,7 +270,7 @@ void symbol_init_context(struct Context* context)
 	INTERNAL_TYPE_LIST_FLOAT(INIT);
 
 	theor = TP_UNSIGNED;
-	offset = TP_NUM_BUILTINS;
+	offset = TP_NUM_BUILTINS + 1;
 	prefix = "unsigned ";
 
 	INTERNAL_TYPE_LIST_INT(INIT);
@@ -302,13 +304,146 @@ TypeInfo* type_fetch_buildtin(enum Types type)
 	return NULL;
 }
 
-Symbol* symbol_create_label(char* name, uint64_t label, int resolved)
+Symbol* new_symbol(char* name, enum SymbolTypes type)
 {
 	NEW_STRUCT(Symbol, sym);
-	sym->label->label_id = label;
-	sym->label->name = name;
-	sym->prev = 0;
-	sym->usage = Symbol_LabelInfo;
-	sym->label->resolved = resolved;
+	memset(sym, 0, sizeof(Symbol));
+
+	sym->name = name;
+	sym->usage = type;
+
+	return sym;
 }
 
+
+Symbol* symbol_create_label(char* name, uint64_t label, int resolved)
+{
+	Symbol* sym = new_symbol(name, Symbol_LabelInfo);
+
+	sym->label->label_id = label;
+	sym->label->resolved = resolved;
+
+	return sym;
+}
+
+Symbol* symbol_create_constant(Symbol* enum_sym, char* name, union ConstantValue val)
+{
+	Symbol* sym = new_symbol(name, Symbol_VariableInfo);
+	sym->var.attributes = ATTR_NONE;
+	sym->var.const_val = val;
+	sym->var.is_constant = 1;
+
+	sym->var.type = enum_sym;
+
+	return sym;
+;}
+
+Symbol* symbol_create_enum(const char* name)
+{
+	Symbol* sym = new_symbol(name, Symbol_TypeInfo);
+
+	sym->type.alignment = 8;
+	sym->type.aligned_size = 8;
+	
+	return sym;
+}
+
+
+union ConstantValue constant_cast(enum Types from, enum Types to, union ConstantValue src)
+{
+	union ConstantValue res;
+	int error = 0;
+
+	from &= ~TP_SIGNED;
+	to &= ~TP_SIGNED;
+	
+#define INNER_SWICTH(type, name, bits, type_name, prefix)\
+	case TP_##type: res.prefix##bits = data; break;
+
+#define INNER_SWICTH_UNSIGNED(type, name, bits, type_name, prefix)\
+	case TP_##type | TP_UNSIGNED: res.prefix##bits = data; break;
+
+#define INNER_CASES \
+	INTERNAL_TYPE_LIST_INT_2(INNER_SWICTH) \
+	INTERNAL_TYPE_LIST_INT_2(INNER_SWICTH_UNSIGNED) \
+	INTERNAL_TYPE_LIST_FLOAT_2(INNER_SWICTH) \
+
+#define OUTER_SWICTH(type, name, bits, type_name, prefix)\
+	case TP_##type: \
+	{   type_name data = src.prefix##bits; \
+		switch (to){\
+		INNER_CASES \
+		default:\
+		error = 1;\
+		break;\
+		}\
+	}
+
+#define OUTER_SWICTH_UNSIGNED(type, name, bits, type_name, prefix)\
+	case TP_##type | TP_UNSIGNED: \
+	{   unsigned type_name data = src.u##prefix##bits; \
+		switch (to){\
+		INNER_CASES \
+		default:\
+		error = 1;\
+		break;\
+		}\
+	}
+
+	switch (from){
+
+		INTERNAL_TYPE_LIST_INT(OUTER_SWICTH)
+		INTERNAL_TYPE_LIST_INT(OUTER_SWICTH_UNSIGNED)
+		INTERNAL_TYPE_LIST_FLOAT(OUTER_SWICTH)
+		default:
+			error = 1;
+			break;
+	}
+	return res;
+}
+
+
+int type_add_child(TypeInfo* info, TypeInfo* child)
+{
+	TypeInfo* move = child;
+	int max_aligned_size = 0;
+	int max_alignment = 0;
+	while (move)
+	{
+		max_aligned_size = max(move->aligned_size, max_aligned_size);
+		max_alignment = max(move->alignment, max_alignment);
+	}
+
+	if (info->type & TP_UNION)
+	{
+		move->offset = 0;
+		info->aligned_size = max_aligned_size;
+		info->alignment = max_alignment;
+	}
+	else if (info->type & TP_STRUCT)
+	{
+		int size = 0;
+		move = child;
+		while (move)
+		{
+			if (size != 0)
+			{
+				size = (size / move->alignment + 1) * move->alignment;
+			}
+
+			move->offset = size;
+			size += move->alignment;
+		}
+
+
+		info->aligned_size = size;
+		info->alignment = max_alignment;
+	}
+	else if (info->type & TP_ENUM)
+	{
+
+	}
+
+
+
+}

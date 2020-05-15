@@ -20,8 +20,10 @@ void yyerror(char const* s) {
 	
 }
 
+
 int main()
 {
+
 #ifdef CC_DEBUG
 	parser_set_debug(0);
 #endif

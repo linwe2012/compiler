@@ -159,6 +159,7 @@ pointer
 
 parameter_list
     : parameter_declaration                     { $$ = $1; }
+	| ELLIPSIS                                  { $$ = make_paramter_ellipse(); }
     | parameter_declaration ',' parameter_list  { $$ = ast_append($1, $3); }
     ;
 

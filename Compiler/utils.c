@@ -18,3 +18,4 @@ char* str_concat(const char* a, const char* b)
 	
 	return res;
 }
+

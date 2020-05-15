@@ -27,6 +27,16 @@
 #define FOR_EACH(ast__, iterator__) \
 	for(AST* iterator__ = ast__; iterator__ != NULL; iterator__ = iterator__->next)
 
+#define IF_TRY_CAST(type_name__, var__, raw__) \
+if (raw__->type == AST_##type_name__) \
+{ CAST(type_name__, var__, raw__); 
+
+#define ELSEIF_TRY_CAST(type_name__, var__, raw__) \
+}else if (raw__->type == AST_##type_name__) \
+{ CAST(type_name__, var__, raw__); 
+
+#define FINALLY_TRY_CAST } else
+
 struct ASTListItem
 {
 	AST* ast;
@@ -240,7 +250,7 @@ AST* make_number_float(const char* c, int bits)
 AST* make_unary_expr(enum Operators unary_op, AST* rhs)
 {
 	NEW_AST(OperatorExpr, ast);
-	enum Types type = rhs->sym_type->type.type;
+	//enum Types type = rhs->sym_type->type.type;
 	const char* err_msg = NULL;
 	AST* other;
 
@@ -265,6 +275,7 @@ AST* make_unary_expr(enum Operators unary_op, AST* rhs)
 	case OP_NOT:
 		break;
 	case OP_POSITIVE: // fall through
+		/*
 	case OP_NEGATIVE:
 		if (type_is_arithmetic(type))
 		{
@@ -296,14 +307,14 @@ AST* make_unary_expr(enum Operators unary_op, AST* rhs)
 		}
 		else {
 			NEW_AST(NumberExpr, num);
-			num->super.sym_type = &SymbolType_UINT64;
+			//num->super.sym_type = type_fetch_buildtin(TP_INT64 | TP_UNSIGNED);
 			num->number_type = TP_INT64 | TP_UNSIGNED;
-			num->ui64 = rhs->sym_type->type.aligned_size;
+			//num->ui64 = rhs->sym_type->type.aligned_size;
 			other = SUPER(num);
 		}
 
 		break;
-	}
+	}*/
 	case OP_CAST:
 		break;
 
@@ -943,6 +954,39 @@ void list_destroy(struct List* list)
 	}
 }
 
+AST* make_enum_define(char* identifier, AST* enum_list)
+{
+	char* name = str_concat("enum ", identifier);
+	Symbol* sym = symtbl_find(ctx->types, name);
+	if (sym != NULL)
+	{
+		log_error(enum_list, "Enum already declared");
+		return make_empty();
+	}
+
+	TypeInfo* enum_type = symbol_create_enum(identifier);
+	union ConstantValue val;
+	
+	FOR_EACH(enum_list, iden)
+	{
+		IF_TRY_CAST(IdentifierExpr, id, iden) {
+			
+		}
+		ELSEIF_TRY_CAST(OperatorExpr, op, iden) {
+
+		}
+		FINALLY_TRY_CAST{
+
+		}
+	
+		
+
+	}
+
+}
+
+
+/*
 Value handle_SwitchCaseStmt(Context*ctx, SwitchCaseStmt* ast)
 {
 	Value val = handle_AST(ctx, ast->cases);
@@ -987,4 +1031,4 @@ Value handle_SwitchCaseStmt(Context*ctx, SwitchCaseStmt* ast)
 	}
 
 	list_destroy(&list);
-}
+}*/

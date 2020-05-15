@@ -44,12 +44,8 @@ struct ASTVPTR
 
 struct AST {
 	ASTType type;
-	enum Types type;
-	Symbol* sym_type;
+	TypeInfo* type;
 	struct AST* prev, * next;
-	
-	//uint64_t evaluated_value;
-	//int is_evaluated;
 };
 typedef struct AST AST;
 
@@ -428,6 +424,8 @@ AST* make_initializer_list(AST* list);
 
 AST* make_function_call(AST* postfix_expression, AST* params);
 AST* make_type_declarator(AST* specifier_qualifier, AST* declarator);
+AST* make_paramter_ellipse();
+
 /*
 
 

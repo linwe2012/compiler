@@ -33,6 +33,8 @@ enum Types
 	TP_FLOAT64, // double
 	TP_FLOAT128,
 
+	TP_ELLIPSIS, // ... <- 函数调用的时候
+
 	TP_STRUCT = 0x0010u,
 	TP_UNION = 0x0020u,
 	TP_ENUM = 0x0040u,
@@ -63,31 +65,72 @@ enum TypesHelper
 	TP_NUM_BUILTIN_FLOATS = TP_FLOAT128  - TP_FLOAT32 + 1
 };
 
+typedef double __float128;
+typedef int64_t int128_t;
+typedef uint64_t uint128_t;
+
 // typename, typename in c,  bits
 #define INTERNAL_TYPE_LIST_MISC(V) \
-V(VOID, "void", 8)
+V(VOID, "void", 8, void, v ) \
+V(ELLIPSIS, "...", 8, ellipse, e )
 
 #define INTERNAL_TYPE_LIST_INT(V)\
-V(INT8, "char", 8)\
-V(INT16, "short", 16)\
-V(INT32, "int", 32) \
-V(INT64, "long long", 64)\
-V(INT128, "__int128", 128) \
+V(INT8, "char", 8, char, i )\
+V(INT16, "short", 16, short, i)\
+V(INT32, "int", 32, int, i) \
+V(INT64, "long long", 64, long long, i)\
+V(INT128, "__int128", 128, long long, i) \
+
 
 
 #define INTERNAL_TYPE_LIST_FLOAT(V)\
-V(FLOAT32, "float", 32)\
-V(FLOAT64, "double", 64)\
-V(FLOAT128, "__float128", 128)
+V(FLOAT32, "float", 32, float, f )\
+V(FLOAT64, "double", 64, double, f )\
+V(FLOAT128, "__float128", 128, __float128, f )
+
+#define INTERNAL_TYPE_LIST_INT_2(V)\
+V(INT8, "char", 8, char, i )\
+V(INT16, "short", 16, short, i)\
+V(INT32, "int", 32, int, i) \
+V(INT64, "long long", 64, long long, i)\
+V(INT128, "__int128", 128, long long, i) \
+
+#define INTERNAL_TYPE_LIST_FLOAT_2(V)\
+V(FLOAT32, "float", 32, float, f )\
+V(FLOAT64, "double", 64, double, f )\
+V(FLOAT128, "__float128", 128, __float128, f )
+
 
 #define INTERNAL_TYPE_LIST(V)\
 INTERNAL_TYPE_LIST_MISC(V)\
 INTERNAL_TYPE_LIST_INT(V)\
 INTERNAL_TYPE_LIST_FLOAT(V)
 
+
+union ConstantValue
+{
+	int8_t i8;
+	uint8_t ui8;
+	int16_t i16;
+	uint16_t ui16;
+	int32_t i32;
+	uint32_t ui32;
+	int64_t i64;
+	uint64_t ui64;
+	int128_t i128;
+	uint128_t ui128;
+
+	float f32;
+	double f64;
+	__float128 f128;
+	char* str;
+};
+
+
+
 inline int type_numeric_bytes(enum Types t)
 {
-#define TYPE_BYTES(t, cstr, bits) case TP_##t: return bits / 8;
+#define TYPE_BYTES(t, cstr, bits, ...) case TP_##t: return bits / 8;
 	switch (t)
 	{
 		INTERNAL_TYPE_LIST(TYPE_BYTES)

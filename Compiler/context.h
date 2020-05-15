@@ -30,12 +30,5 @@ struct Context
 };
 STRUCT_TYPE(Context)
 
-void enter_scope(Context* ctx);
-void leave_scope(Context* ctx);
-
-int sym_add(Context* ctx);
-int sym_remove(Context* ctx);
-Symbol* sym_find(Context* ctx, enum SymbolTypes type, const char* str);
-
 void ctx_enter_block_scope(Context* ctx);
 void ctx_leave_block_scope(Context* ctx, int free_all_symbols);
