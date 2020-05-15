@@ -1,0 +1,105 @@
+{
+    "name": "+",
+    "children": [
+        {
+            "name": "*",
+            "children": [
+                {
+                    "name": "^",
+                    "children": [
+                        {
+                            "name": "11"
+                        },
+                        {
+                            "name": "109"
+                        },
+                        {
+                            "name": "-8"
+                        },
+                        {
+                            "name": "a"
+                        }
+                    ]
+                },
+                {
+                    "name": "append",
+                    "children": [
+                        {
+                            "name": "n"
+                        },
+                        {
+                            "name": "a"
+                        },
+                        {
+                            "name": "k"
+                        },
+                        {
+                            "name": "19"
+                        },
+                        {
+                            "name": "j"
+                        }
+                    ]
+                },
+                {
+                    "name": "optimization",
+                    "children": [
+                        {
+                            "name": "AspectRatioBanker"
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "*",
+            "children": [
+                {
+                    "name": "^",
+                    "children": [
+                        {
+                            "name": "11"
+                        },
+                        {
+                            "name": "109"
+                        },
+                        {
+                            "name": "-8"
+                        },
+                        {
+                            "name": "a"
+                        }
+                    ]
+                },
+                {
+                    "name": "append",
+                    "children": [
+                        {
+                            "name": "n"
+                        },
+                        {
+                            "name": "a"
+                        },
+                        {
+                            "name": "k"
+                        },
+                        {
+                            "name": "19"
+                        },
+                        {
+                            "name": "j"
+                        }
+                    ]
+                },
+                {
+                    "name": "optimization",
+                    "children": [
+                        {
+                            "name": "AspectRatioBanker"
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

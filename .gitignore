@@ -1,6 +1,7 @@
 
 # VS缓存
 .vs
+.vscode
 
 # 生成文件
 **/Debug
@@ -13,5 +14,6 @@
 **/lexer.c
 
 3rdparty/bin
+3rdparty/d3/data.json
 
 **/parser.output
