@@ -40,7 +40,7 @@ if (raw__->type == AST_##type_name__) \
 struct ASTListItem
 {
 	AST* ast;
-	
+
 
 	struct ASTList* prev;
 	struct ASTList* next;
@@ -212,8 +212,8 @@ V(64, "ll")
 			else sscanf(c, "%" scn "", &(ast->ui##bits));\
 		}\
 	}
-	INT_TYPE_LIST(TYPE_CASE)
-	
+		INT_TYPE_LIST(TYPE_CASE)
+
 #undef TYPE_CASE
 #undef INT_TYPE_LIST
 	default:
@@ -246,25 +246,72 @@ AST* make_number_float(const char* c, int bits)
 	}
 	return SUPER(ast);
 }
+void add_constant_value(NumberExpr* ast, NumberExpr* num, int value, const char* err_msg)
+{
+	// 由于unsigned占字节一样，因此就不判断是否unsigned了 
+	if (num->number_type & TP_INT8)
+	{
+		ast->i8 = num->i8 + value;
+	}
+	else if (num->number_type & TP_INT16)
+	{
+		ast->i16 = num->i16 + value;
+	}
+	else if (num->number_type & TP_INT32)
+	{
+		ast->i32 = num->i32 + value;
+	}
+	else if (num->number_type & TP_INT64)
+	{
+		ast->i64 = num->i64 + value;
+	}
+	else if (num->number_type & TP_FLOAT32)
+	{
+		ast->f32 = num->f32 + value;
+	}
+	else if (num->number_type & TP_FLOAT64)
+	{
+		ast->f64 = num->f64 + value;
+	}
+	else
+	{
+		err_msg = "This type can not use this operation";
+	}
+}
+
 
 AST* make_unary_expr(enum Operators unary_op, AST* rhs)
 {
-	NEW_AST(OperatorExpr, ast);
+	NEW_AST(NumberExpr, ast);
+
+	//NEW_AST(OperatorExpr, ast);
 	//enum Types type = rhs->sym_type->type.type;
 	const char* err_msg = NULL;
 	AST* other;
-
+	enum Types type;
 	switch (unary_op)
 	{
 	case OP_INC:
+		CAST(NumberExpr, number, rhs);
+		ast->number_type = number->number_type;
+		add_constant_value(ast, number, 1, err_msg);
 		break;
 	case OP_DEC:
+		CAST(NumberExpr, number, rhs);
+		ast->number_type = number->number_type;
+		add_constant_value(ast, number, -1, err_msg);
 		break;
 	case OP_UNARY_STACK_ACCESS:
 		break;
 	case OP_POSTFIX_INC:
+		CAST(NumberExpr, number, rhs);
+		ast->number_type = number->number_type;
+		add_constant_value(ast, number, 1, err_msg);
 		break;
 	case OP_POSTFIX_DEC:
+		CAST(NumberExpr, number, rhs);
+		ast->number_type = number->number_type;
+		add_constant_value(ast, number, -1, err_msg);
 		break;
 	case OP_POINTER:
 		break;
@@ -275,6 +322,10 @@ AST* make_unary_expr(enum Operators unary_op, AST* rhs)
 	case OP_NOT:
 		break;
 	case OP_POSITIVE: // fall through
+		CAST(NumberExpr, number, rhs);
+		ast->number_type = number->number_type;
+		ast->f64 = number->f64;
+		break;
 		/*
 	case OP_NEGATIVE:
 		if (type_is_arithmetic(type))
@@ -336,11 +387,12 @@ AST* make_unary_expr(enum Operators unary_op, AST* rhs)
 		return other;
 	}
 
-	ast->op = unary_op;
-	ast->rhs = rhs;
+	//ast->op = unary_op;
+	//ast->rhs = rhs;
 
 	return SUPER(ast);
 }
+
 
 
 AST* make_binary_expr(enum Operators binary_op, AST* lhs, AST* rhs)
@@ -418,7 +470,7 @@ AST* make_label(char* name, AST* statement)
 	struct AST* item = astlist_pop(&data->pending_labels);
 	CAST(LabelStmt, ast, item);
 	ast->target = statement;
-	
+
 	return SUPER(ast);
 }
 
@@ -427,7 +479,7 @@ AST* make_label_case(AST* constant, AST* statements)
 	AST_DATA(data);
 	struct AST* item = astlist_pop(&data->pending_labels);
 	CAST(LabelStmt, ast, item);
-	
+
 	ast->target = statements;
 	ast->condition = constant;
 	return SUPER(ast);
@@ -489,7 +541,7 @@ AST* make_jump_cont_or_break(enum JumpType type)
 	{
 		CAST(LoopStmt, loop, item->ast);
 		uint64_t id;
-		
+
 		if (type == JUMP_CONTINUE)
 		{
 			id = loop->step_label;
@@ -504,7 +556,7 @@ AST* make_jump_cont_or_break(enum JumpType type)
 		CAST(SwitchCaseStmt, sc, item->ast);
 		ast->ref = symbol_create_label(NULL, sc->exit_label, 1);
 	}
-	
+
 	return ast;
 }
 
@@ -612,7 +664,7 @@ AST* makr_init_direct_declarator(char* name)
 	ast->name = name;
 	ast->last = ast->first = NULL;
 	ast->init_value = NULL;
-	
+
 	return SUPER(ast);
 }
 
@@ -626,7 +678,7 @@ AST* make_extent_direct_declarator(AST* direct, enum Types type, AST* wrapped)
 		CAST(DeclaratorExpr, decl, direct);
 		if (wrapped)
 		{
-			
+
 			CAST(NumberExpr, number, wrapped);
 			AST* res = make_binary_expr(OP_CAST, make_type_specifier(TP_INT64 | TP_UNSIGNED), wrapped);
 			CAST(NumberExpr, new_num, wrapped);
@@ -639,7 +691,7 @@ AST* make_extent_direct_declarator(AST* direct, enum Types type, AST* wrapped)
 	}
 	else // type == TP_FUNC
 	{
-		
+
 
 		TypeInfo* prev = NULL;
 		TypeInfo* first = NULL;
@@ -666,7 +718,7 @@ AST* make_extent_direct_declarator(AST* direct, enum Types type, AST* wrapped)
 		if (direct != NULL)
 		{
 			CAST(DeclaratorExpr, decl, direct);
-			
+
 
 			if (decl->last == NULL)
 			{
@@ -706,7 +758,7 @@ AST* make_declarator(AST* pointer, AST* direct_declarator)
 	{
 		decl->last = ptr->first;
 	}
-	
+
 	decl->last = ptr->last;
 
 	free(ptr);
@@ -728,7 +780,7 @@ AST* make_declarator_with_init(AST* declarator, AST* init)
 AST* make_ptr(int type_qualifier_list, AST* pointing)
 {
 	TypeInfo* type = type_create_ptr(type_qualifier_list);
-	
+
 	if (pointing == NULL)
 	{
 		NEW_AST(DeclaratorExpr, ast);
@@ -739,7 +791,7 @@ AST* make_ptr(int type_qualifier_list, AST* pointing)
 		CAST(DeclaratorExpr, decl, pointing);
 		type_wrap(decl->last, type);
 		decl->last = type;
-		
+
 	}
 	return pointing;
 }
@@ -755,7 +807,7 @@ AST* make_type_specifier(enum Types type)
 
 int ast_merge_storage_specifiers(int a, int b)
 {
-	
+
 	int la = a & ATTR_MASK_STORAGE;
 	int lb = b & ATTR_MASK_STORAGE;
 
@@ -782,14 +834,14 @@ AST* make_type_specifier_extend(AST* me, AST* other, enum SymbolAttributes stora
 			return me;
 		}
 
-		
+
 
 		enum Types st = spec1->type | spec2->type;
-		
+
 		// 两个都是 原始类型的声明
 		if (st)
 		{
-	
+
 			// int 和 struct 同时声明的情况
 			if (spec1->info || spec2->info)
 			{
@@ -803,7 +855,7 @@ AST* make_type_specifier_extend(AST* me, AST* other, enum SymbolAttributes stora
 			{
 				log_error(me, "Duplicated signed/unsigned specifier");
 			}
-			
+
 			// long long
 			if (both_have_flags(TP_LONG_FLAG))
 			{
@@ -820,7 +872,7 @@ AST* make_type_specifier_extend(AST* me, AST* other, enum SymbolAttributes stora
 #undef both_have_flags
 			else {
 				spec1->type = spec1->type | spec2->type;
-				
+
 				spec1->attributes = ast_merge_storage_specifiers(spec1->attributes, spec2->attributes);
 			}
 		}
@@ -966,11 +1018,11 @@ AST* make_enum_define(char* identifier, AST* enum_list)
 
 	TypeInfo* enum_type = symbol_create_enum(identifier);
 	union ConstantValue val;
-	
+
 	FOR_EACH(enum_list, iden)
 	{
 		IF_TRY_CAST(IdentifierExpr, id, iden) {
-			
+
 		}
 		ELSEIF_TRY_CAST(OperatorExpr, op, iden) {
 
@@ -978,8 +1030,8 @@ AST* make_enum_define(char* identifier, AST* enum_list)
 		FINALLY_TRY_CAST{
 
 		}
-	
-		
+
+
 
 	}
 
@@ -992,7 +1044,7 @@ Value handle_SwitchCaseStmt(Context*ctx, SwitchCaseStmt* ast)
 	Value val = handle_AST(ctx, ast->cases);
 	Value exit = request_label(ctx);
 	struct List list;
-	
+
 	FOR_EACH(ast->switch_value, stmt)
 	{
 		while (stmt && stmt->type != AST_LabelStmt)
@@ -1004,7 +1056,7 @@ Value handle_SwitchCaseStmt(Context*ctx, SwitchCaseStmt* ast)
 		{
 			continue;
 		}
-		
+
 		Value cond = handle_AST(ctx, label->condition);
 		Value case_label = request_label(ctx);
 
@@ -1027,7 +1079,7 @@ Value handle_SwitchCaseStmt(Context*ctx, SwitchCaseStmt* ast)
 		}
 
 		Value cond = handle_AST(ctx, label->condition);
-		
+
 	}
 
 	list_destroy(&list);
