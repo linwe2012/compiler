@@ -246,10 +246,10 @@ AST* make_number_float(const char* c, int bits)
 	}
 	return SUPER(ast);
 }
-void add_constant_value(NumberExpr* ast, NumberExpr* num, int value, const char* err_msg)
+void add_or_dec_one(OperatorExpr* ast, OperatorExpr* num, int value, const char* err_msg)
 {
 	// 由于unsigned占字节一样，因此就不判断是否unsigned了 
-	if (num->number_type & TP_INT8)
+	/*if (num->number_type & TP_INT8)
 	{
 		ast->i8 = num->i8 + value;
 	}
@@ -261,17 +261,17 @@ void add_constant_value(NumberExpr* ast, NumberExpr* num, int value, const char*
 	{
 		ast->i32 = num->i32 + value;
 	}
-	else if (num->number_type & TP_INT64)
-	{
-		ast->i64 = num->i64 + value;
-	}
 	else if (num->number_type & TP_FLOAT32)
 	{
 		ast->f32 = num->f32 + value;
-	}
-	else if (num->number_type & TP_FLOAT64)
+	}*/
+	if (num->number_type & TP_FLOAT64)
 	{
 		ast->f64 = num->f64 + value;
+	}
+	else if (num->number_type & TP_INT64)
+	{
+		ast->i64 = num->i64 + value;
 	}
 	else
 	{
@@ -282,53 +282,72 @@ void add_constant_value(NumberExpr* ast, NumberExpr* num, int value, const char*
 
 AST* make_unary_expr(enum Operators unary_op, AST* rhs)
 {
-	NEW_AST(NumberExpr, ast);
-
-	//NEW_AST(OperatorExpr, ast);
+	//NEW_AST(NumberExpr, ast);
+	NEW_AST(OperatorExpr, ast);
+	CAST(OperatorExpr, number, rhs);
+	ast->rhs = rhs;
+	ast->op = unary_op;
 	//enum Types type = rhs->sym_type->type.type;
 	const char* err_msg = NULL;
 	AST* other;
-	enum Types type;
+	enum Types type = number->number_type;
 	switch (unary_op)
 	{
 	case OP_INC:
-		CAST(NumberExpr, number, rhs);
-		ast->number_type = number->number_type;
-		add_constant_value(ast, number, 1, err_msg);
+		SET_TYPE(ast, type);
+		add_or_dec_one(ast, number, 1, err_msg);
 		break;
 	case OP_DEC:
-		CAST(NumberExpr, number, rhs);
-		ast->number_type = number->number_type;
-		add_constant_value(ast, number, -1, err_msg);
+		SET_TYPE(ast, type);
+		add_or_dec_one(ast, number, -1, err_msg);
 		break;
 	case OP_UNARY_STACK_ACCESS:
+		//TODO：这个是unary吗
 		break;
 	case OP_POSTFIX_INC:
-		CAST(NumberExpr, number, rhs);
-		ast->number_type = number->number_type;
-		add_constant_value(ast, number, 1, err_msg);
+		SET_TYPE(ast, type);
+		add_or_dec_one(ast, number, 1, err_msg);
 		break;
 	case OP_POSTFIX_DEC:
-		CAST(NumberExpr, number, rhs);
-		ast->number_type = number->number_type;
-		add_constant_value(ast, number, -1, err_msg);
+		SET_TYPE(ast, type);
+		add_or_dec_one(ast, number, -1, err_msg);
 		break;
 	case OP_POINTER:
+		//TODO: 查询value
 		break;
 	case OP_ADDRESS:
+		//TODO: 查询address
 		break;
 	case OP_COMPLEMENT:
+		if (type & TP_INT64)
+		{
+			SET_TYPE(ast, type);
+			ast->i64 = ~number->i64;
+			ast->number_type = type;
+		}
+		else
+		{
+			err_msg = "this type of value can't use \"~\" operation";
+		}
 		break;
 	case OP_NOT:
+		if (type & TP_INT64)
+		{
+			SET_TYPE(ast, type);
+			ast->i64 = !number->i64;
+			ast->number_type = type;
+		}
+		else
+		{
+			err_msg = "this type of value can't use \"!\" operation";
+		}
 		break;
 	case OP_POSITIVE: // fall through
-		CAST(NumberExpr, number, rhs);
-		ast->number_type = number->number_type;
-		ast->f64 = number->f64;
+		SET_TYPE(ast, type);
+		ast->f64 = number->f64; //just copy the value mem
 		break;
-		/*
 	case OP_NEGATIVE:
-		if (type_is_arithmetic(type))
+		/*if (type_is_arithmetic(type))
 		{
 			if (type_is_float_point(type))
 			{
@@ -337,9 +356,19 @@ AST* make_unary_expr(enum Operators unary_op, AST* rhs)
 			else {
 				SET_TYPE(ast, type_integer_promote(type));
 			}
+		}*/
+		if (type & TP_INT64)
+		{
+			SET_TYPE(ast, type);
+			ast->i64 = -number->i64;
+		}
+		else if (type & TP_FLOAT64)
+		{
+			SET_TYPE(ast, type);
+			ast->f64 = -number->f64;
 		}
 		else {
-			err_msg = "Expected alrithmetic type";
+			err_msg = "Expected int or float va";
 		}
 		break;
 	case OP_SIZEOF:
@@ -357,18 +386,18 @@ AST* make_unary_expr(enum Operators unary_op, AST* rhs)
 			err_msg = "sizeof operator shall not be applied to a bit-ﬁeld member";
 		}
 		else {
-			NEW_AST(NumberExpr, num);
+			/*NEW_AST(NumberExpr, num);
 			//num->super.sym_type = type_fetch_buildtin(TP_INT64 | TP_UNSIGNED);
 			num->number_type = TP_INT64 | TP_UNSIGNED;
 			//num->ui64 = rhs->sym_type->type.aligned_size;
-			other = SUPER(num);
+			other = SUPER(num);*/
+			ast->number_type = TP_INT64 | TP_UNSIGNED;
+			ast->i64 = 8;
 		}
-
 		break;
-	}*/
+	}
 	case OP_CAST:
 		break;
-
 	default:
 		break;
 	}
@@ -380,12 +409,12 @@ AST* make_unary_expr(enum Operators unary_op, AST* rhs)
 		return make_error(err_msg);
 	}
 
-	if (other)
+	/*if (other)
 	{
 		ast_destroy(rhs);
 		ast_destroy(ast);
 		return other;
-	}
+	}*/
 
 	//ast->op = unary_op;
 	//ast->rhs = rhs;
@@ -393,16 +422,120 @@ AST* make_unary_expr(enum Operators unary_op, AST* rhs)
 	return SUPER(ast);
 }
 
-
+void deal_arithmetic_op_int_value(NumberExpr* ast, enum Operator binary_op, NumberExpr* left_number,
+							 NumberExpr* right_number, const char* err_msg)
+{
+	if (!(left_number->number_type & right_number->number_type * TP_INT64))
+	{
+		err_msg = "Lhs and rhs can't apply to this operation";
+	}
+	else
+	{
+		ast->number_type = TP_INT64;
+		switch (binary_op)
+		{
+		case OP_BIT_AND:
+			ast->i64 = left_number->i64 & right_number->i64;
+			break;
+		case OP_BIT_OR:
+			ast->i64 = left_number->i64 | right_number->i64;
+			break;
+		case OP_BIT_XOR:
+			ast->i64 = left_number->i64 ^ right_number->i64;
+			break;
+		case OP_MUL:
+			ast->i64 = left_number->i64 * right_number->i64;
+			break;
+		case OP_DIV:
+			if (right_number->i64 == 0)
+				err_msg = "Can't divide zero";
+			else
+				ast->i64 = left_number->i64 / right_number->i64;
+			break;
+		case OP_MOD:
+			if (right_number->i64 == 0)
+				err_msg = "Can't mod zero";
+			else
+				ast->i64 = left_number->i64 % right_number->i64;
+			break;
+		case OP_ADD:
+			ast->i64 = left_number->i64 + right_number->i64;
+			break;
+		case OP_SUB:
+			ast->i64 = left_number->i64 - right_number->i64;
+			break;
+		case OP_SHIFT_LEFT:
+			ast->i64 = left_number->i64 << right_number->i64;
+			break;
+		case OP_SHIFT_RIGHT:
+			ast->i64 = left_number->i64 >> right_number->i64;
+			break;
+		default:
+			break;
+		}
+	}
+}
 
 AST* make_binary_expr(enum Operators binary_op, AST* lhs, AST* rhs)
 {
 	NEW_AST(OperatorExpr, ast);
-
+	CAST(OperatorExpr, left_number, rhs);
+	CAST(OperatorExpr, right_number, rhs);
 	ast->op = binary_op;
 	ast->rhs = rhs;
 	ast->lhs = lhs;
+	const char* err_msg = NULL;
+	switch (binary_op)
+	{
+	case OP_BIT_AND:
+		deal_arithmetic_op_int_value(ast, binary_op, left_number, right_number, err_msg);
+		break;
+	case OP_BIT_OR:
+		deal_arithmetic_op_int_value(ast, binary_op, left_number, right_number, err_msg);
+		break;
+	case OP_BIT_XOR:
+		deal_arithmetic_op_int_value(ast, binary_op, left_number, right_number, err_msg);
+		break;
+	case OP_MUL:
+		if (!(type_is_arithmetic(left_number->number_type) && type_is_arithmetic(right_number->number_type)))
+		{
+			err_msg = "lhs and rhs type can't use \"*\" operation";
+		}
+		else
+		{
+			if (left_number->number_type | right_number->number_type | TP_INT64)
+			{
+				ast->number_type = TP_INT64;
+				deal_arithmetic_op_int_value(ast, binary_op, left_number, right_number, err_msg);
+			}
+			else
+			{
+				ast->number_type = TP_FLOAT64;
+				get_binary_op_float_value(ast, binary_op, left_number, right_number, err_msg);
+			}
+		}
+		break;
+	case OP_DIV:
+		if (!(type_is_arithmetic(left_number->number_type) && type_is_arithmetic(right_number->number_type)))
+		{
+			err_msg = "lhs and rhs type can't use \"*\" operation";
+		}
+		else
+		{
+			if (left_number->number_type | right_number->number_type | TP_INT64)
+			{
+				ast->number_type = TP_INT64;
+				deal_arithmetic_op_int_value(ast, binary_op, left_number, right_number, err_msg);
+			}
+			else
+			{
+				ast->number_type = TP_FLOAT64;
+				get_binary_op_float_value(ast, binary_op, left_number, right_number, err_msg);
+			}
+		}
+		break;
 
+	}
 	return SUPER(ast);
 }
 

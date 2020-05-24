@@ -91,6 +91,12 @@ struct OperatorExpr
 	AST* lhs;
 	AST* rhs;
 	AST* cond;
+	enum Types number_type;
+	union
+	{
+		int64_t i64;
+		double f64;
+	};
 };
 
 
