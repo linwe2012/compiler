@@ -246,7 +246,7 @@ AST* make_number_float(const char* c, int bits)
 	}
 	return SUPER(ast);
 }
-void add_or_dec_one(OperatorExpr* ast, OperatorExpr* num, int value, const char* err_msg)
+void add_or_dec_one(OperatorExpr* ast, OperatorExpr* num, int value, const char** err_msg)
 {
 	// 由于unsigned占字节一样，因此就不判断是否unsigned了 
 	/*if (num->number_type & TP_INT8)
@@ -275,7 +275,7 @@ void add_or_dec_one(OperatorExpr* ast, OperatorExpr* num, int value, const char*
 	}
 	else
 	{
-		err_msg = "This type can not use this operation";
+		*err_msg = "This type can not use this operation";
 	}
 }
 
@@ -295,22 +295,22 @@ AST* make_unary_expr(enum Operators unary_op, AST* rhs)
 	{
 	case OP_INC:
 		SET_TYPE(ast, type);
-		add_or_dec_one(ast, number, 1, err_msg);
+		add_or_dec_one(ast, number, 1, &err_msg);
 		break;
 	case OP_DEC:
 		SET_TYPE(ast, type);
-		add_or_dec_one(ast, number, -1, err_msg);
+		add_or_dec_one(ast, number, -1, &err_msg);
 		break;
 	case OP_UNARY_STACK_ACCESS:
 		//TODO：这个是unary吗
 		break;
 	case OP_POSTFIX_INC:
 		SET_TYPE(ast, type);
-		add_or_dec_one(ast, number, 1, err_msg);
+		add_or_dec_one(ast, number, 1, &err_msg);
 		break;
 	case OP_POSTFIX_DEC:
 		SET_TYPE(ast, type);
-		add_or_dec_one(ast, number, -1, err_msg);
+		add_or_dec_one(ast, number, -1, &err_msg);
 		break;
 	case OP_POINTER:
 		//TODO: 查询value
@@ -422,12 +422,13 @@ AST* make_unary_expr(enum Operators unary_op, AST* rhs)
 	return SUPER(ast);
 }
 
-void deal_arithmetic_op_int_value(NumberExpr* ast, enum Operator binary_op, NumberExpr* left_number,
-							 NumberExpr* right_number, const char* err_msg)
+void handle_arithmetic_op_int_value(NumberExpr* ast, enum Operator binary_op, NumberExpr* lhs,
+	NumberExpr* rhs, const char** err_msg)
 {
-	if (!(left_number->number_type & right_number->number_type * TP_INT64))
+	if (!(lhs->number_type & rhs->number_type & TP_INT64))
 	{
-		err_msg = "Lhs and rhs can't apply to this operation";
+		*err_msg = "Lhs and rhs can't apply to this operation";
+		return;
 	}
 	else
 	{
@@ -435,44 +436,175 @@ void deal_arithmetic_op_int_value(NumberExpr* ast, enum Operator binary_op, Numb
 		switch (binary_op)
 		{
 		case OP_BIT_AND:
-			ast->i64 = left_number->i64 & right_number->i64;
+			ast->i64 = lhs->i64 & rhs->i64;
 			break;
 		case OP_BIT_OR:
-			ast->i64 = left_number->i64 | right_number->i64;
+			ast->i64 = lhs->i64 | rhs->i64;
 			break;
 		case OP_BIT_XOR:
-			ast->i64 = left_number->i64 ^ right_number->i64;
+			ast->i64 = lhs->i64 ^ rhs->i64;
 			break;
 		case OP_MUL:
-			ast->i64 = left_number->i64 * right_number->i64;
+			ast->i64 = lhs->i64 * rhs->i64;
 			break;
 		case OP_DIV:
-			if (right_number->i64 == 0)
-				err_msg = "Can't divide zero";
+			if (rhs->i64 == 0)
+				*err_msg = "\"/\" operation Can't divide zero";
 			else
-				ast->i64 = left_number->i64 / right_number->i64;
+				ast->i64 = lhs->i64 / rhs->i64;
 			break;
 		case OP_MOD:
-			if (right_number->i64 == 0)
-				err_msg = "Can't mod zero";
+			if (rhs->i64 == 0)
+				*err_msg = "Can't mod zero";
 			else
-				ast->i64 = left_number->i64 % right_number->i64;
+				ast->i64 = lhs->i64 % rhs->i64;
 			break;
 		case OP_ADD:
-			ast->i64 = left_number->i64 + right_number->i64;
+			ast->i64 = lhs->i64 + rhs->i64;
 			break;
 		case OP_SUB:
-			ast->i64 = left_number->i64 - right_number->i64;
+			ast->i64 = lhs->i64 - rhs->i64;
 			break;
 		case OP_SHIFT_LEFT:
-			ast->i64 = left_number->i64 << right_number->i64;
+			ast->i64 = lhs->i64 << rhs->i64;
 			break;
 		case OP_SHIFT_RIGHT:
-			ast->i64 = left_number->i64 >> right_number->i64;
+			ast->i64 = lhs->i64 >> rhs->i64;
 			break;
 		default:
 			break;
 		}
+	}
+}
+
+void handle_arithmetic_op_float_value(NumberExpr* ast, enum Operator binary_op, NumberExpr* lhs,
+	NumberExpr* rhs, const char** err_msg)
+{
+	if (!(type_is_arithmetic(lhs->number_type) && type_is_arithmetic(rhs->number_type)))
+	{
+		*err_msg = "lhs or rhs is not arhitecture type";
+		return;
+	}
+	double left_number, right_number;
+	ast->number_type = TP_FLOAT64;
+	if (lhs->number_type & TP_FLOAT64)
+		left_number = lhs->f64;
+	else
+		left_number = lhs->i64;
+	if (rhs->number_type & TP_FLOAT64)
+		right_number = rhs->f64;
+	else
+		right_number = rhs->i64;
+	switch (binary_op)
+	{
+	case OP_MUL:
+		ast->f64 = left_number * right_number;
+		break;
+	case OP_DIV:
+		if (right_number == 0)
+			*err_msg = "\"/\" operation Can't divide zero";
+		else ast->f64 = left_number / right_number;
+		break;
+	case OP_ADD:
+		ast->f64 = left_number + right_number;
+		break;
+	case OP_SUB:
+		ast->f64 = left_number - right_number;
+		break;
+	default:
+		break;
+	}
+}
+void handle_assign_op(NumberExpr* lhs, NumberExpr* rhs, const char** err_msg)
+{
+	if (!(type_is_arithmetic(lhs->number_type) && type_is_arithmetic(rhs->number_type)))
+	{
+		*err_msg = "lhs or rhs is not arhitecture type";
+		return;
+	}
+	if (lhs->number_type == TP_INT64)
+	{
+		if (rhs->number_type == TP_INT64)
+			lhs->i64 = rhs->i64;
+		else
+			lhs->i64 = rhs->f64;
+	}
+	else
+	{
+		if (rhs->number_type == TP_INT64)
+			lhs->f64 = rhs->i64;
+		else
+			lhs->f64 = rhs->i64;
+	}
+}
+
+void handle_logical_op(NumberExpr* ast, enum Operator binary_op, NumberExpr* lhs,
+	NumberExpr* rhs, const char** err_msg)
+{
+	if (!(type_is_arithmetic(lhs->number_type) && type_is_arithmetic(rhs->number_type)))
+	{
+		*err_msg = "lhs or rhs is not arhitecture type";
+		return;
+	}
+	double left_number, right_number;
+	if (lhs->number_type & TP_FLOAT64)
+		left_number = lhs->f64;
+	else
+		left_number = lhs->i64;
+	if (rhs->number_type & TP_FLOAT64)
+		right_number = rhs->f64;
+	else
+		right_number = rhs->i64;
+	switch (binary_op)
+	{
+	case OP_EQUAL:
+		ast->number_type = TP_INT64;
+		ast->i64 = (lhs->number_type == rhs->number_type) && ((lhs->f64 == rhs->f64) || (lhs->i64 == rhs->i64));
+		break;
+	case OP_NOT_EQUAL:
+		ast->number_type = TP_INT64;
+		ast->i64 = (lhs->number_type || rhs->number_type) || (lhs->f64 != rhs->f64) || (lhs->i64 != rhs->i64);
+		break;
+	case OP_LESS:
+		ast->number_type = TP_INT64;
+		ast->i64 = left_number < right_number;
+		break;
+	case OP_LESS_OR_EQUAL:
+		ast->number_type = TP_INT64;
+		ast->i64 = left_number <= right_number;
+		break;
+	case OP_GREATER:
+		ast->number_type = TP_INT64;
+		ast->i64 = left_number > right_number;
+		break;
+	case OP_GREATER_OR_EQUAL:
+		ast->number_type = TP_INT64;
+		ast->i64 = left_number >= right_number;
+		break;
+	case OP_AND:
+		if (!(lhs->number_type & rhs->number_type & TP_INT64))
+		{
+			*err_msg = "Lhs and rhs can't apply to this operation";
+		}
+		else
+		{
+			ast->number_type = TP_INT64;
+			ast->i64 = left_number && right_number;
+		}
+		break;
+	case OP_OR:
+		if (!(lhs->number_type & rhs->number_type & TP_INT64))
+		{
+			*err_msg = "Lhs and rhs can't apply to this operation";
+		}
+		else
+		{
+			ast->number_type = TP_INT64;
+			ast->i64 = left_number || right_number;
+		}
+		break;
+	default:
+		break;
 	}
 }
 
@@ -487,54 +619,106 @@ AST* make_binary_expr(enum Operators binary_op, AST* lhs, AST* rhs)
 	const char* err_msg = NULL;
 	switch (binary_op)
 	{
+		// arhitecture
 	case OP_BIT_AND:
-		deal_arithmetic_op_int_value(ast, binary_op, left_number, right_number, err_msg);
+		handle_arithmetic_op_int_value(ast, binary_op, left_number, right_number, &err_msg);
 		break;
 	case OP_BIT_OR:
-		deal_arithmetic_op_int_value(ast, binary_op, left_number, right_number, err_msg);
+		handle_arithmetic_op_int_value(ast, binary_op, left_number, right_number, &err_msg);
 		break;
 	case OP_BIT_XOR:
-		deal_arithmetic_op_int_value(ast, binary_op, left_number, right_number, err_msg);
+		handle_arithmetic_op_int_value(ast, binary_op, left_number, right_number, &err_msg);
 		break;
 	case OP_MUL:
-		if (!(type_is_arithmetic(left_number->number_type) && type_is_arithmetic(right_number->number_type)))
+		if (left_number->number_type & right_number->number_type & TP_INT64)
 		{
-			err_msg = "lhs and rhs type can't use \"*\" operation";
+			handle_arithmetic_op_int_value(ast, binary_op, left_number, right_number, &err_msg);
 		}
 		else
 		{
-			if (left_number->number_type | right_number->number_type | TP_INT64)
-			{
-				ast->number_type = TP_INT64;
-				deal_arithmetic_op_int_value(ast, binary_op, left_number, right_number, err_msg);
-			}
-			else
-			{
-				ast->number_type = TP_FLOAT64;
-				get_binary_op_float_value(ast, binary_op, left_number, right_number, err_msg);
-			}
+			handle_arithmetic_op_float_value(ast, binary_op, left_number, right_number, &err_msg);
 		}
 		break;
 	case OP_DIV:
-		if (!(type_is_arithmetic(left_number->number_type) && type_is_arithmetic(right_number->number_type)))
+		if (left_number->number_type & right_number->number_type & TP_INT64)
 		{
-			err_msg = "lhs and rhs type can't use \"*\" operation";
+			handle_arithmetic_op_int_value(ast, binary_op, left_number, right_number, &err_msg);
 		}
 		else
 		{
-			if (left_number->number_type | right_number->number_type | TP_INT64)
-			{
-				ast->number_type = TP_INT64;
-				deal_arithmetic_op_int_value(ast, binary_op, left_number, right_number, err_msg);
-			}
-			else
-			{
-				ast->number_type = TP_FLOAT64;
-				get_binary_op_float_value(ast, binary_op, left_number, right_number, err_msg);
-			}
+			handle_arithmetic_op_float_value(ast, binary_op, left_number, right_number, &err_msg);
 		}
 		break;
+	case OP_ADD:
+		if (left_number->number_type & right_number->number_type & TP_INT64)
+		{
+			handle_arithmetic_op_int_value(ast, binary_op, left_number, right_number, &err_msg);
+		}
+		else
+		{
+			handle_arithmetic_op_float_value(ast, binary_op, left_number, right_number, &err_msg);
+		}
+		break;
+	case OP_SUB:
+		if (left_number->number_type & right_number->number_type & TP_INT64)
+		{
+			handle_arithmetic_op_int_value(ast, binary_op, left_number, right_number, &err_msg);
+		}
+		else
+		{
+			handle_arithmetic_op_float_value(ast, binary_op, left_number, right_number, &err_msg);
+		}
+		break;
+	case OP_SHIFT_LEFT:
+		handle_arithmetic_op_int_value(ast, binary_op, left_number, right_number, &err_msg);
+		break;
+	case OP_SHIFT_RIGHT:
+		handle_arithmetic_op_int_value(ast, binary_op, left_number, right_number, &err_msg);
+		break;
+		//assignment
+	case OP_ASSIGN:
+		if (!(type_is_arithmetic(left_number->number_type) && type_is_arithmetic(right_number->number_type)))
+		{
+			err_msg = "lhs or rhs is not arhitecture type";
+		}
+		handle_assign_op(left_number, right_number, &err_msg);
+		ast_destroy(ast);
+		break;
+		//其他ASSIGNMENT 暂未实现
+		//logical
+	case OP_EQUAL:
+		handle_logical_op(ast, binary_op, left_number, right_number, &err_msg);
+		break;
+	case OP_NOT_EQUAL:
+		handle_logical_op(ast, binary_op, left_number, right_number, &err_msg);
+		break;
+	case OP_LESS:
+		handle_logical_op(ast, binary_op, left_number, right_number, &err_msg);
+		break;
+	case OP_LESS_OR_EQUAL:
+		handle_logical_op(ast, binary_op, left_number, right_number, &err_msg);
+		break;
+	case OP_GREATER:
+		handle_logical_op(ast, binary_op, left_number, right_number, &err_msg);
+		break;
+	case OP_GREATER_OR_EQUAL:
+		handle_logical_op(ast, binary_op, left_number, right_number, &err_msg);
+		break;
+	case OP_AND:
+		handle_logical_op(ast, binary_op, left_number, right_number, &err_msg);
+		break;
+	case OP_OR:
+		handle_logical_op(ast, binary_op, left_number, right_number, &err_msg);
+		break;
+	default:
+		break;
+	}
 
+	if (err_msg)
+	{
+		ast_destroy(rhs);
+		ast_destroy(ast);
+		return make_error(err_msg);
 	}
 	return SUPER(ast);
 }
