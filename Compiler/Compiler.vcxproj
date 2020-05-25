@@ -178,6 +178,7 @@
     <ClInclude Include="error.h" />
     <ClInclude Include="hashtable.h" />
     <ClInclude Include="gen.h" />
+    <ClInclude Include="json.h" />
     <ClInclude Include="lexer.h" />
     <ClInclude Include="parser.h" />
     <ClInclude Include="symbol.h" />
@@ -190,6 +191,7 @@
     <ClCompile Include="context.c" />
     <ClCompile Include="error.c" />
     <ClCompile Include="hashtable.c" />
+    <ClCompile Include="json.c" />
     <ClCompile Include="lexer.c" />
     <ClCompile Include="main.c" />
     <ClCompile Include="msvc-feature-test.cc" />

@@ -45,21 +45,21 @@ void _write_ast(AST* root) {
 void _write_BlockExpr(BlockExpr* expr) {
     PRINT_NAME(Block);
     fputs(",\n\"children\": [", s_fp);
-    _write_ast((expr->first_child);
+    _write_ast(expr->first_child);
     fputs("]\n", s_fp);
 }
 
 void _write_ListExpr(ListExpr* expr) {
     PRINT_NAME(List);
     fputs(",\n\"children\": [", s_fp);
-    _write_ast((expr->first_child);
+    _write_ast(expr->first_child);
     fputs("]\n", s_fp);
 }
 
 void _write_FunctionCallExpr(FunctionCallExpr* expr) {
     fprintf(s_fp, "\"name\":\"%s()\"", expr->function_name);
     fputs(",\n\"children\": [", s_fp);
-    _write_ast((expr->params);
+    _write_ast(expr->params);
     fputs("]\n", s_fp);
 }
 
@@ -172,7 +172,6 @@ void _write_OperatorExpr(OperatorExpr* expr) {
         PRINT_NAME([]); break;
     case OP_CONDITIONAL:
         PRINT_NAME(?:); break;
-    // TODO 所有的op
     default:
         PRINT_NAME(UNK); break;
     }
@@ -205,10 +204,10 @@ void _write_LabelStmt(LabelStmt* stmt) {
     }
     // 需要打印target吗？还是说target只是AST分析中的辅助信息
     // leon> 要的
-    // if (stmt->target) {
-    //     fputs(",\n", s_fp);
-    //     _write_ast(stmt->target);
-    // }
+    if (stmt->target) {
+        fputs(",\n", s_fp);
+        _write_ast(stmt->target);
+    }
     fputs("]\n", s_fp);
 }
 
@@ -241,6 +240,8 @@ void _write_EmptyExpr(EmptyExpr* expr) {
 }
 
 void _write_TypenameExpr(TypenameExpr* expr) {
+    // 2020-05-25 未定义
+    fprintf(s_fp, "\"name\":\"UNK\"");
 }
 
 void _write_LoopStmt(LoopStmt* stmt) {
@@ -335,5 +336,6 @@ void _write_DeclaratorExpr(DeclaratorExpr* expr) {
 }
 
 void _write_TypeSpecifier(TypeSpecifier* expr) {
+    fprintf(s_fp, "\"name\":\"%s(decl)\"", expr->name);
 }
 
