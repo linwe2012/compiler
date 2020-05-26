@@ -44,7 +44,7 @@ struct ASTVPTR
 
 struct AST {
 	ASTType type;
-	TypeInfo* type;
+	TypeInfo* type;		// FIX: type重名
 	struct AST* prev, * next;
 };
 typedef struct AST AST;
@@ -113,7 +113,7 @@ struct DeclareStmt
 
 
 // { 1, 2, 3, 4 ..}
-struct InitilizerListExpr
+struct InitilizerListExpr		// FIX: 有两个InitilizerListExpr，重复定义了
 {
 	AST super;
 	AST* vals;
