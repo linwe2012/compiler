@@ -48,7 +48,9 @@
     <ClCompile Include="utils.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="msvc-feature-test.cc">
+    <ClCompile Include="json.c">
+    <Filter>Source Files</Filter>
+    </ClCompile>
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -93,6 +95,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="gen.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="json.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

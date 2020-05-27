@@ -149,8 +149,8 @@ inline int type_is_float_point(enum Types t)
 
 inline int type_is_arithmetic(enum Types t)
 {
-	static const char* const** i;
-	void (*data)(int x, static int y);
+	static const char* const** i;		// FIX: 这里有Warning, static和inline
+	void (*data)(int x, static int y);	// FIX: 这个是什么?
 	
 	t &= TP_CLEAR_SIGNFLAGS;
 	return t >= TP_INT8 && t <= TP_FLOAT128;

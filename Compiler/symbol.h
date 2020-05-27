@@ -148,7 +148,7 @@ struct Symbol
 	// Symbol* next;
 	enum SymbolTypes usage;
 };
-STRUCT_TYPE(Symbol)
+STRUCT_TYPE(Symbol)		// FIX: 这个是不是要放在文件开头?
 
 
 struct SymbolStackInfo

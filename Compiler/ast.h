@@ -94,6 +94,12 @@ struct OperatorExpr
 	AST* lhs;
 	AST* rhs;
 	AST* cond;
+	enum Types number_type;
+	union
+	{
+		int64_t i64;
+		double f64;
+	};
 };
 
 
@@ -110,7 +116,7 @@ struct DeclareStmt
 
 
 // { 1, 2, 3, 4 ..}
-struct InitilizerListExpr
+struct InitilizerListExpr		// FIX: 有两个InitilizerListExpr，重复定义了
 {
 	AST super;
 	AST* vals;
@@ -324,7 +330,7 @@ AST* make_identifier_with_constant_val(const char* c, AST* constant_val);
 //    string-literal
 // 常量定义, 注意函数会自动释放内存
 AST* make_number_int(char* c, enum Types type);
-AST* make_number_float(char* c, int bits);
+AST* make_number_float(char* c, int bits);			// FIX: 和ast.c中的函数签名不匹配
 AST* make_string(char* c);
 
 
