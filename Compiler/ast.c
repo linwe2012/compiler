@@ -422,8 +422,7 @@ AST* make_unary_expr(enum Operators unary_op, AST* rhs)
 	return SUPER(ast);
 }
 
-// FIX: 没有enum Operator, 是Operators吗? 这个文件里还有好几个enum Operator
-void handle_arithmetic_op_int_value(NumberExpr* ast, enum Operator binary_op, NumberExpr* lhs,
+void handle_arithmetic_op_int_value(NumberExpr* ast, enum Operators binary_op, NumberExpr* lhs,
 	NumberExpr* rhs, const char** err_msg)
 {
 	if (!(lhs->number_type & rhs->number_type & TP_INT64))
@@ -478,7 +477,7 @@ void handle_arithmetic_op_int_value(NumberExpr* ast, enum Operator binary_op, Nu
 	}
 }
 
-void handle_arithmetic_op_float_value(NumberExpr* ast, enum Operator binary_op, NumberExpr* lhs,
+void handle_arithmetic_op_float_value(NumberExpr* ast, enum Operators binary_op, NumberExpr* lhs,
 	NumberExpr* rhs, const char** err_msg)
 {
 	if (!(type_is_arithmetic(lhs->number_type) && type_is_arithmetic(rhs->number_type)))
@@ -539,7 +538,7 @@ void handle_assign_op(NumberExpr* lhs, NumberExpr* rhs, const char** err_msg)
 	}
 }
 
-void handle_logical_op(NumberExpr* ast, enum Operator binary_op, NumberExpr* lhs,
+void handle_logical_op(NumberExpr* ast, enum Operators binary_op, NumberExpr* lhs,
 	NumberExpr* rhs, const char** err_msg)
 {
 	if (!(type_is_arithmetic(lhs->number_type) && type_is_arithmetic(rhs->number_type)))
