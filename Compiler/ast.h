@@ -286,7 +286,7 @@ struct TypeSpecifier
 	AST super;
 	const char* name;
 	TypeInfo* info;
-	enum Type type;
+	enum Type type;			// FIX: 没有Type, 是Types吗?
 	enum SymbolAttributes attributes;
 };
 
@@ -319,7 +319,7 @@ AST* make_identifier_with_constant_val(const char* c, AST* constant_val);
 //    string-literal
 // 常量定义, 注意函数会自动释放内存
 AST* make_number_int(char* c, enum Types type);
-AST* make_number_float(char* c, int bits);
+AST* make_number_float(char* c, int bits);			// FIX: 和ast.c中的函数签名不匹配
 AST* make_string(char* c);
 
 

@@ -422,6 +422,7 @@ AST* make_unary_expr(enum Operators unary_op, AST* rhs)
 	return SUPER(ast);
 }
 
+// FIX: 没有enum Operator, 是Operators吗? 这个文件里还有好几个enum Operator
 void handle_arithmetic_op_int_value(NumberExpr* ast, enum Operator binary_op, NumberExpr* lhs,
 	NumberExpr* rhs, const char** err_msg)
 {
