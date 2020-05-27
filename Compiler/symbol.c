@@ -187,18 +187,22 @@ void sym_make_alias(Context* ctx, Symbol* sym, const char* alias)
 
 }*/
 
-void type_init(TypeInfo* info)
+void type_info_init(TypeInfo* info)
 {
 	memset(info, 0, sizeof(TypeInfo));
 	info->alignment = -1;
 	info->aligned_size = -1;
 	info->offset = -1;
+	info->bitfield = -1;
+	info->bitfield_offset = -1;
+	info->prev = NULL;
+	info->next = NULL;
 }
 
 TypeInfo* type_create_array(uint64_t n, enum SymbolAttributes qualifers)
 {
 	NEW_STRUCT(TypeInfo, info);
-	type_init(info);
+	type_info_init(info);
 
 	info->type = TP_ARRAY;
 	info->arr.array_count = n;
@@ -207,12 +211,12 @@ TypeInfo* type_create_array(uint64_t n, enum SymbolAttributes qualifers)
 	return info;
 }
 
-TypeInfo* type_create_struct()
+TypeInfo* type_create_struct_or_union(enum Types type)
 {
 	NEW_STRUCT(TypeInfo, info);
-	type_init(info);
+	type_info_init(info);
 
-	info->type = TP_STRUCT;
+	info->type = type;
 
 	return info;
 }
@@ -220,7 +224,7 @@ TypeInfo* type_create_struct()
 TypeInfo* type_create_ptr(enum SymbolAttributes qualifers)
 {
 	NEW_STRUCT(TypeInfo, info);
-	type_init(info);
+	type_info_init(info);
 	info->qualifiers = qualifers;
 	info->type = TP_PTR;
 
@@ -230,12 +234,19 @@ TypeInfo* type_create_ptr(enum SymbolAttributes qualifers)
 TypeInfo* type_create_func(struct TypeInfo* params)
 {
 	NEW_STRUCT(TypeInfo, info);
-	type_init(info);
+	type_info_init(info);
 
 	info->type = TP_FUNC;
 	info->fn.params = params;
 
 	return info;
+}
+
+TypeInfo* create_struct_field(TypeInfo* type_info, enum SymbolAttributes attributes, char* field_name)
+{
+	type_info->struc_field.attrib = attributes;
+	type_info->field_name = field_name;
+	return type_info;
 }
 
 int type_wrap(TypeInfo* parent, TypeInfo* child)
@@ -256,7 +267,7 @@ void symbol_init_context(struct Context* context)
 	const char* prefix = "";
 #define INIT(type__, name__, bits__) \
 	struct TypeInfo type;\
-	type_init(&type);\
+	type_info_init(&type);\
 	type.aligned_size = bits__ / 8;\
 	type.alignment = bits__ / 8;\
 \
@@ -341,13 +352,40 @@ Symbol* symbol_create_constant(Symbol* enum_sym, char* name, union ConstantValue
 Symbol* symbol_create_enum(const char* name)
 {
 	Symbol* sym = new_symbol(name, Symbol_TypeInfo);
+	type_info_init(&(sym->type));
 
+	sym->type.type = TP_ENUM;
 	sym->type.alignment = 8;
 	sym->type.aligned_size = 8;
 	
 	return sym;
 }
 
+Symbol* symbol_create_enum_item(char* name, int64_t val)
+{
+	Symbol* sym = new_symbol(name, Symbol_TypeInfo);
+	type_info_init(&(sym->type));
+
+	sym->type.type = TP_ENUM;
+	sym->type.alignment = 8;
+	sym->type.aligned_size = 8;
+
+	sym->type.enu.val = val;
+
+	return sym;
+}
+
+
+Symbol* symbol_from_type_info(TypeInfo* info)
+{
+	Symbol* sym = new_symbol(info->type_name, Symbol_TypeInfo);
+	sym->type = *info;
+	if (info->next)
+	{
+		info->next->prev = &(sym->type);
+	}
+	return sym;
+}
 
 union ConstantValue constant_cast(enum Types from, enum Types to, union ConstantValue src)
 {
@@ -403,7 +441,10 @@ union ConstantValue constant_cast(enum Types from, enum Types to, union Constant
 }
 
 
-int type_add_child(TypeInfo* info, TypeInfo* child)
+//TODO: Double check 我算的 对不对
+//TODO: 支持 bit field
+
+Symbol* symbol_create_struct_or_union(TypeInfo* info, TypeInfo* child)
 {
 	TypeInfo* move = child;
 	int max_aligned_size = 0;
@@ -439,11 +480,20 @@ int type_add_child(TypeInfo* info, TypeInfo* child)
 		info->aligned_size = size;
 		info->alignment = max_alignment;
 	}
-	else if (info->type & TP_ENUM)
-	{
 
-	}
+	return symbol_from_type_info(info);
+}
 
+TypeInfo* type_create_param_ellipse()
+{
+	NEW_STRUCT(TypeInfo, info);
+	type_info_init(info);
+	info->type = TP_ELLIPSIS;
+	return info;
+}
 
-
+int type_append(TypeInfo* tail, TypeInfo* new_tail)
+{
+	tail->next = new_tail;
+	new_tail->prev = tail;
 }

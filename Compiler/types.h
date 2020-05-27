@@ -17,6 +17,9 @@ enum SymbolAttributes
 
 	ATTR_MASK_STORAGE = ATTR_INLINE -1,
 	
+	ATTR_CONST = 0x010000u,
+	ATTR_VOLATILE = 0x020000u,
+	ATTR_RESTRICT = 0x040000u, //  TODO: this is not supported
 };
 
 enum Types
@@ -48,9 +51,7 @@ enum Types
 	
 
 	// Type qualifier
-	TP_CONST = 0x010000u,
-	TP_VOLATILE = 0x020000u,
-	TP_RESTRICT = 0x040000u, //  TODO: this is not supported
+	
 	TP_LONG_FLAG = 0x080000u,
 
 	TP_CLEAR_SIGNFLAGS = ~(TP_UNSIGNED | TP_SIGNED),

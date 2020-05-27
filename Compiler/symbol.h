@@ -71,6 +71,15 @@ struct TypeInfo
 			struct TypeInfo* params;
 		} fn ;
 
+		struct EnumItem
+		{
+			uint64_t val;
+		} enu;
+
+		struct StructField
+		{
+			enum SymbolAttributes attrib;
+		} struc_field;
 	};
 	
 	struct TypeInfo* prev;
@@ -183,16 +192,23 @@ TypeInfo* type_fetch_buildtin(enum Types type);
 Symbol* symbol_create_label(char* name, uint64_t label, int resolved);
 Symbol* symbol_create_constant(Symbol* enum_sym, char* name, union ConstantValue val);
 Symbol* symbol_create_enum(char* name);
-
+Symbol* symbol_create_enum_item(char* name, int64_t val);
+Symbol* symbol_from_type_info(TypeInfo* info);
+TypeInfo* symbol_create_struct_or_union(TypeInfo* info, TypeInfo* child);
 
 // 类型管理 & 创建
 // ================================
 TypeInfo* type_create_array(uint64_t n, enum SymbolAttributes qualifers);
-TypeInfo* type_create_struct();
+TypeInfo* type_create_struct_or_union(enum Types type);
 TypeInfo* type_create_ptr(enum SymbolAttributes qualifers);
 TypeInfo* type_create_func(struct TypeInfo* params);
+TypeInfo* create_struct_field(TypeInfo* type_info, enum SymbolAttributes attributes, char* field_name);
+
+TypeInfo* type_create_param_ellipse();
+
 
 int type_wrap(TypeInfo* parent, TypeInfo* child);
+int type_append(TypeInfo* tail, TypeInfo* new_tail);
 
 
 // 类型工具
@@ -212,5 +228,7 @@ inline int type_native_alignment(int type)
 	int x = (type & (0x0010 - 1));
 	return (x >= TP_INT8) && (x <= TP_FLOAT128);
 }
+
+
 
 #endif

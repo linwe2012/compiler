@@ -132,9 +132,9 @@ type_specifier
 	;
 
 type_qualifier
-    : CONST         { $$ = TP_CONST; }
-    | VOLATILE      { $$ = TP_VOLATILE; }
-    | RESTRICT      { $$ = TP_RESTRICT; }
+    : CONST         { $$ = ATTR_CONST; }
+    | VOLATILE      { $$ = ATTR_VOLATILE; }
+    | RESTRICT      { $$ = ATTR_RESTRICT; }
     ;
 
 declarator

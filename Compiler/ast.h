@@ -16,7 +16,10 @@
 	V(OperatorExpr) \
 	V(LabelStmt) \
 	V(JumpStmt) \
-	V(InitilizerListExpr)
+	V(InitilizerListExpr)\
+	V(DeclareStmt)\
+	V(EnumDeclareStmt)\
+	V(AggregateDeclareStmt)
 
 #define AST_AUX_NODE_LIST(V)\
 	V(EmptyExpr) \
@@ -44,7 +47,7 @@ struct ASTVPTR
 
 struct AST {
 	ASTType type;
-	TypeInfo* type;
+	// TypeInfo* type;
 	struct AST* prev, * next;
 };
 typedef struct AST AST;
@@ -147,6 +150,7 @@ struct FunctionCallExpr
 {
 	AST super;
 
+	AST* function;
 	AST* params;
 	int n_params;
 	const char* function_name;
@@ -275,12 +279,19 @@ struct InitilizerListExpr
 // ================================
 // 辅助 AST 节点, 便于 yacc 调用时生成,
 
+enum TypeSpecifierFlags
+{
+	TypeSpecifier_None,
+	TypeSpecifier_Unsigned,
+	TypeSpecifier_Signed,
+	TypeSpecifier_Long
+};
 struct TypeSpecifier
 {
 	AST super;
 	const char* name;
 	TypeInfo* info;
-	enum Type type;
+	enum TypeSpecifierFlags flags;
 	enum SymbolAttributes attributes;
 };
 
@@ -297,7 +308,7 @@ void ast_init(AST* ast, ASTType type);
 AST* ast_append(AST* leader, AST* follower);
 
 AST* make_empty();
-
+AST* make_error(char* message);
 
 // Expressions
 // =======================================
@@ -358,7 +369,7 @@ AST* make_ifelse(AST* condition, AST* then, AST* otherwise);
 AST* make_switch(AST* condition, AST* body);
 
 AST* make_parameter_declaration(AST* declaration_specifiers, AST* declarator);
-AST* make_struct_field_declaration(AST* specifier_qualifier, AST* struct_declarator);
+
 AST* make_define_function(AST* declaration_specifiers, AST* declarator, AST* compound_statement);
 
 // attr 是 register/auto/extern/static
@@ -416,6 +427,7 @@ AST* make_enum_define(char* identifier, AST* enum_list);
 // struct_or_union_define:
 //     struct/union identifier { field_list }
 AST* make_struct_or_union_define(enum Types type, char* identifier, AST* field_list);
+AST* make_struct_field_declaration(AST* specifier_qualifier, AST* struct_declarator);
 
 AST* ast_merge_specifier_qualifier(AST* me, AST* other, enum Types qualifier);
 
@@ -425,6 +437,8 @@ AST* make_initializer_list(AST* list);
 AST* make_function_call(AST* postfix_expression, AST* params);
 AST* make_type_declarator(AST* specifier_qualifier, AST* declarator);
 AST* make_paramter_ellipse();
+
+
 
 /*
 
