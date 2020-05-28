@@ -1,0 +1,39 @@
+{
+    "name": "+",
+    "children": [
+        {
+            "name": "*",
+            "children": [
+                {
+                    "name": "cost",
+                    "children": []
+                },
+                {
+                    "name": "gree",
+                    "children": []
+                },
+                {
+                    "name": "azzz",
+                    "children": []
+                }
+            ]
+        },
+        {
+            "name": "*",
+            "children": [
+                {
+                    "name": "^",
+                    "children": []
+                },
+                {
+                    "name": "append",
+                    "children": []
+                },
+                {
+                    "name": "optimization",
+                    "children": []
+                }
+            ]
+        }
+    ]
+}
