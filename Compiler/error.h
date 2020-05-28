@@ -9,6 +9,8 @@ void cc_log_error(const char* file, int line, AST* ast, const char* message, ...
 // TODO
 #define log_error(ast_node, message, ...) cc_log_error( __FILE__, __LINE__, ast_node, message, __VA_ARGS__)
 #define log_warning(ast_node, message, ...) cc_log_error( __FILE__, __LINE__, ast_node, message, __VA_ARGS__)
+
+// 这是内部错误, 相当于 assert 的输出
 #define log_internal_error(ast_node, message, ...) cc_log_error( __FILE__, __LINE__, ast_node, message, __VA_ARGS__)
 
 #include <assert.h>

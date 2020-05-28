@@ -540,4 +540,7 @@ void value_constant_print(FILE* f, enum Types type, union ConstantValue* pval)
 	default:
 		break;
 	}
+
+#undef PRT_CASE
+#undef PRT_CASE_UNSIGNED
 }

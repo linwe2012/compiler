@@ -148,6 +148,7 @@ void ast_init(AST* ast, ASTType type)
 	ast->prev = NULL;
 	ast->next = NULL;
 	ast->type = type;
+	ast->sematic = NULL;
 }
 
 void* ast_destroy(AST* rhs)
@@ -243,13 +244,6 @@ V(64, "lld")
 		break;
 	}
 	
-	// OperatorExpr* op = ast;
-	// printf("\n\nconstant_print: ");
-	// value_constant_print(stdout, op->number_type, 
-	// 	(union ConstantValue*)(&op->_barrier + 1));
-	// printf("\n\n");
-
-
 	return SUPER(ast);
 }
 

@@ -171,6 +171,11 @@ inline enum Types type_numeric_promote(enum Types t1, enum Types t2)
 
 }
 
+#define BINARY_OPERATOR_LIST(V) \
+V(MUL, Mul, *) \
+V(DIV, Div, /) \
+V(MOD, Mod, %)
+
 // referenced here:
 // https://www.tutorialspoint.com/cprogramming/c_operators.htm
 enum Operators

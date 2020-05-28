@@ -54,7 +54,7 @@ struct AST {
 	ASTType type;
 	// TypeInfo* type;
 	struct AST* prev, * next;
-	struct CompileData* compile_data;
+	struct SematicData* sematic;
 };
 typedef struct AST AST;
 
@@ -456,6 +456,7 @@ AST* make_type_declarator(AST* specifier_qualifier, AST* declarator);
 AST* make_paramter_ellipse();
 
 
+void do_eval(AST* ast, struct Context* ctx);
 
 /*
 
