@@ -19,3 +19,10 @@ char* str_concat(const char* a, const char* b)
 	return res;
 }
 
+char* str_dup(const char* c)
+{
+	int la = strlen(c);
+	char* res = malloc(la+1);
+	memcpy(res, c, la + 1);
+	return res;
+}

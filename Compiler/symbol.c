@@ -6,7 +6,11 @@
 STRUCT_TYPE(SymbolTableEntry);
 
 TypeInfo builtins[TP_NUM_BUILTINS + TP_NUM_BUILTIN_INTS + 1];
+
+#ifndef max
 #define max(x, y) ((x) > (y) ? (x) : (y))
+#endif // !max
+
 
 
 void symtbl_init(SymbolTable* tbl)
@@ -211,13 +215,13 @@ TypeInfo* type_create_array(uint64_t n, enum SymbolAttributes qualifers)
 	return info;
 }
 
-TypeInfo* type_create_struct_or_union(enum Types type)
+TypeInfo* type_create_struct_or_union(enum Types type, char* name)
 {
 	NEW_STRUCT(TypeInfo, info);
 	type_info_init(info);
 
 	info->type = type;
-
+	info->type_name = name;
 	return info;
 }
 
@@ -275,7 +279,7 @@ void symbol_init_context(struct Context* context)
 	enum Types theor = TP_INCOMPLETE;
 	enum TypesHelper offset = 0;
 	const char* prefix = "";
-#define INIT(type__, name__, bits__){ \
+#define INIT(type__, name__, bits__, ...){ \
 	struct TypeInfo type;\
 	type_info_init(&type);\
 	type.aligned_size = bits__ / 8;\
@@ -506,4 +510,5 @@ int type_append(TypeInfo* tail, TypeInfo* new_tail)
 {
 	tail->next = new_tail;
 	new_tail->prev = tail;
+	return 0;
 }

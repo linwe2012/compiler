@@ -4,7 +4,7 @@
 #include "parser.h"
 #include "context.h"
 #include "x86_64-asm.h"
-
+#include "json.h"
 extern AST* parser_result;
 
 
@@ -17,7 +17,7 @@ int main()
 	ast_init_context(&ctx);
 
 #ifdef CC_DEBUG
-	parser_set_debug(0);
+	// parser_set_debug(0);
 #endif
 	yyin = fopen("test/mini.c", "rt");
 	int res = yyparse();

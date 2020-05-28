@@ -76,7 +76,7 @@ function_definition
 */
 
 function_definition
-	: declaration_specifiers declarator compound_statement                { $$ = make_declare_function($1, $2, $3); }
+	: declaration_specifiers declarator compound_statement                { $$ = make_define_function($1, $2, $3); }
 	;
 
 // declaration part

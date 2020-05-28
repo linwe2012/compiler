@@ -2,7 +2,7 @@
 #include "hashtable.h"
 #include <string.h>
 
-HashTable* hash_new(int payload_size, int capacity, HashEqual equal, Hasher* hasher)
+HashTable* hash_new(int payload_size, int capacity, HashEqual equal, Hasher hasher)
 {
 	int item_size = payload_size + sizeof(void*);
 	HashTable* tbl = allocate(sizeof(HashTable));
@@ -174,7 +174,7 @@ int hash_impl_strhash(const void* a)
 
 HashTable* hash_new_strkey(int payload_size, int capacity)
 {
-	hash_new(payload_size, capacity, hash_impl_strcmp, hash_impl_strhash);
+	return hash_new(payload_size, capacity, hash_impl_strcmp, hash_impl_strhash);
 }
 
 int hash_remove(HashTable* table, const void* key)

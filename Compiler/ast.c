@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <inttypes.h>
 #include "utils.h"
+#include <llvm-c/Core.h>
 
 #define NEW_AST(type, name) \
 	type* name = (type*) malloc (sizeof(type)); \
@@ -44,8 +45,8 @@ struct ASTListItem
 	AST* ast;
 
 
-	struct ASTList* prev;
-	struct ASTList* next;
+	struct ASTListItem* prev;
+	struct ASTListItem* next;
 };
 
 
@@ -60,7 +61,7 @@ struct ASTData
 {
 	// 统计最近的可 break 的 AST
 	struct ASTList breakable;
-	struct ASTList* pending_labels;
+	struct ASTList pending_labels;
 	Symbol* current_function;
 	uint64_t label_id;
 };
@@ -111,6 +112,7 @@ struct ASTListItem* astlist_push(struct ASTList* target, AST* ast)
 	{
 		target->first = item;
 	}
+	return item;
 }
 
 
@@ -140,7 +142,7 @@ void ast_init(AST* ast, ASTType type)
 
 void* ast_destroy(AST* rhs)
 {
-
+	return NULL;
 }
 
 int check_ast(AST* ast)
@@ -161,7 +163,7 @@ AST* ast_append(AST* leader, AST* follower)
 AST* make_identifier(const char* c)
 {
 	NEW_AST(IdentifierExpr, ast);
-	ast->name = c;
+	ast->name = strdup(c);
 	ast->val = NULL;
 	return SUPER(ast);
 }
@@ -169,7 +171,7 @@ AST* make_identifier(const char* c)
 AST* make_identifier_with_constant_val(const char* c, AST* constant_val)
 {
 	NEW_AST(IdentifierExpr, ast);
-	ast->name = c;
+	ast->name = strdup(c);
 	ast->val = constant_val;
 	return SUPER(ast);
 }
@@ -199,10 +201,10 @@ AST* make_number_int(char* c, enum Types type)
 	if (is_hex) is_oct = 0;
 
 #define INT_TYPE_LIST(V)\
-V(8, "hh") \
-V(16, "h") \
-V(32, "l") \
-V(64, "ll") 
+V(8, "c") \
+V(16, "hd") \
+V(32, "d") \
+V(64, "lld") 
 	switch (type & TP_CLEAR_SIGNFLAGS)
 	{
 #define TYPE_CASE(bits, scn) \
@@ -312,7 +314,7 @@ AST* make_unary_expr(enum Operators unary_op, AST* rhs)
 	ast->op = unary_op;
 	//enum Types type = rhs->sym_type->type.type;
 	const char* err_msg = NULL;
-	AST* other;
+
 	enum Types type = number->number_type;
 	switch (unary_op)
 	{
@@ -428,7 +430,7 @@ AST* make_unary_expr(enum Operators unary_op, AST* rhs)
 	if (err_msg)
 	{
 		ast_destroy(rhs);
-		ast_destroy(ast);
+		ast_destroy(SUPER(ast));
 		return make_error(err_msg);
 	}
 
@@ -848,7 +850,7 @@ AST* make_jump_goto(char* name)
 		ast->ref = symbol_create_label(name, next_label(), 0);
 		symtbl_push(ctx->labels, ast->ref);
 	}
-	return ast;
+	return SUPER(ast);
 }
 
 AST* make_jump_cont_or_break(enum JumpType type)
@@ -897,7 +899,7 @@ AST* make_jump_cont_or_break(enum JumpType type)
 		ast->ref = symbol_create_label(NULL, sc->exit_label, 1);
 	}
 
-	return ast;
+	return SUPER(ast);
 }
 
 AST* make_jump(enum JumpType type, char* name, AST* ret)
@@ -985,6 +987,7 @@ AST* make_switch(AST* condition, AST* body)
 	NEW_AST(SwitchCaseStmt, ast);
 	ast->cases = body;
 	ast->switch_value = condition;
+	ast->exit_label = next_label();
 	return SUPER(ast);
 }
 
@@ -998,10 +1001,10 @@ int ast_merge_type_qualifier(int a, int b)
 	return a | b;
 }
 
-AST* makr_init_direct_declarator(char* name)
+AST* makr_init_direct_declarator(const char* name)
 {
 	NEW_AST(DeclaratorExpr, ast);
-	ast->name = name;
+	ast->name = strdup(name);
 	ast->last = ast->first = NULL;
 	ast->init_value = NULL;
 
@@ -1022,7 +1025,7 @@ AST* make_extent_direct_declarator(AST* direct, enum Types type, AST* wrapped)
 			CAST(NumberExpr, number, wrapped);
 			AST* res = make_binary_expr(OP_CAST, make_type_specifier(TP_INT64 | TP_UNSIGNED), wrapped);
 			CAST(NumberExpr, new_num, wrapped);
-			AST* last = type_create_array(new_num->i64, ATTR_NONE);
+			TypeInfo* last = type_create_array(new_num->i64, ATTR_NONE);
 			type_wrap(decl->last, last);
 			decl->last = last;
 			ast_destroy(res);
@@ -1136,7 +1139,7 @@ AST* make_ptr(int type_qualifier_list, AST* pointing)
 	{
 		NEW_AST(DeclaratorExpr, ast);
 		ast->first = ast->last = type;
-		return ast;
+		return SUPER(ast);
 	}
 	else {
 		CAST(DeclaratorExpr, decl, pointing);
@@ -1170,7 +1173,7 @@ AST* make_type_specifier(enum Types type)
 	}
 	ast->attributes = ATTR_NONE;
 	
-	return ast;
+	return SUPER(ast);
 }
 
 // TODO: Add other checks including const/confilicts
@@ -1273,8 +1276,9 @@ AST* make_type_specifier_extend(AST* me, AST* other, enum SymbolAttributes stora
 	return SUPER(spec1);
 }
 
-AST* make_type_specifier_from_id(char* id)
+AST* make_type_specifier_from_id(const char* cid)
 {
+	char* id = strdup(cid);
 	Symbol* sym = symtbl_find(ctx->types, id);
 	if (sym == NULL)
 	{
@@ -1297,7 +1301,7 @@ AST* make_empty()
 	return SUPER(ast);
 }
 
-AST* make_error(char* message)
+AST* make_error(const char* message)
 {
 	NEW_AST(EmptyExpr, ast);
 	ast->error = message;
@@ -1357,7 +1361,7 @@ AST* make_declaration(AST* declaration_specifiers, enum SymbolAttributes attribu
 	CAST(TypeSpecifier, spec, declaration_specifiers);
 	NEW_AST(DeclareStmt, ast);
 	ast->identifiers = init_declarator_list;
-	ast->type = spec;
+	ast->type = SUPER(spec);
 
 	return SUPER(ast);
 }
@@ -1376,10 +1380,6 @@ AST* make_type_declarator(AST* specifier_qualifier, AST* declarator)
 
 
 
-Value handle_AST(Context* ctx, SwitchCaseStmt* ast)
-{
-
-}
 
 struct ListItem
 {
@@ -1426,8 +1426,9 @@ void list_destroy(struct List* list)
 	}
 }
 
-AST* make_enum_define(char* identifier, AST* enum_list)
+AST* make_enum_define(const char* const_identifier, AST* enum_list)
 {
+	char* identifier = strdup(const_identifier);
 	char* name = str_concat("enum ", identifier);
 	Symbol* sym = symtbl_find(ctx->types, name);
 	if (sym != NULL)
@@ -1436,7 +1437,7 @@ AST* make_enum_define(char* identifier, AST* enum_list)
 		return make_empty();
 	}
 
-	TypeInfo* enum_type = symbol_create_enum(identifier);
+	Symbol* enum_type = symbol_create_enum(identifier);
 	
 
 	TypeInfo* enums_tail = NULL;
@@ -1453,10 +1454,11 @@ AST* make_enum_define(char* identifier, AST* enum_list)
 	}\
 	}
 
+	// TODO: Fuck 这里我 Symbol & TypeInfo 搞混了, 希望能 work, 懒得改了
 	FOR_EACH(enum_list, iden)
 	{
 		IF_TRY_CAST(IdentifierExpr, id, iden) {
-			TypeInfo* next = NULL;
+			Symbol* next = NULL;
 			if (id->val == NULL)
 			{
 				next = symbol_create_enum_item(id->name, current_val);
@@ -1469,7 +1471,13 @@ AST* make_enum_define(char* identifier, AST* enum_list)
 			}
 			if (next != NULL)
 			{
-				APPEND_ENUM(next);
+				if (enums_head == NULL) {
+						enums_head = enums_tail = &next->type;
+				}
+				else {
+					type_append(enums_tail, &next->type);
+					enums_tail = &next->type;
+				}
 			}
 
 			++current_val;
@@ -1481,7 +1489,8 @@ AST* make_enum_define(char* identifier, AST* enum_list)
 	}
 	
 	NEW_AST(EnumDeclareStmt, ast);
-	ast->ref = symbol_from_type_info(enum_type);
+
+	ast->ref = enum_type;
 	ast->enums = enum_list;
 
 	return SUPER(ast);
@@ -1508,11 +1517,12 @@ AST* make_struct_field_declaration(AST* specifier_qualifier, AST* struct_declara
 }
 
 // TODO: Add type from symbol table
-AST* make_struct_or_union_define(enum Types type, char* identifier, AST* field_list)
+AST* make_struct_or_union_define(enum Types type, const char* const_identifier, AST* field_list)
 {
 	TypeInfo* first = NULL;
 	TypeInfo* last = NULL;
-
+	char* identifier = strdup(const_identifier);
+	
 	FOR_EACH(field_list, st)
 	{
 		CAST(DeclaratorExpr, decl, st);
@@ -1529,7 +1539,7 @@ AST* make_struct_or_union_define(enum Types type, char* identifier, AST* field_l
 
 	NEW_AST(AggregateDeclareStmt, ast);
 	ast->fields = field_list;
-	ast->ref = symbol_create_struct_or_union(type_create_struct_or_union(type), first);
+	ast->ref = symbol_create_struct_or_union(type_create_struct_or_union(type, identifier), first);
 	return SUPER(ast);
 }
 
@@ -1592,6 +1602,8 @@ AST* make_define_function(AST* declaration_specifiers, AST* declarator, AST* com
 	ast->declarator = declarator;
 	ast->body = compound_statement;
 	ast->specifier = declaration_specifiers;
+
+	return SUPER(ast);
 }
 
 

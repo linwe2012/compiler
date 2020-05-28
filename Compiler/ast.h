@@ -98,6 +98,7 @@ struct OperatorExpr
 	AST* rhs;
 	AST* cond;
 	enum Types number_type;
+
 	union
 	{
 		int64_t i64;
@@ -252,7 +253,7 @@ struct SwitchCaseStmt
 	AST super;
 	AST* switch_value;
 	AST* cases;
-	Symbol* exit_label;
+	uint64_t exit_label;
 };
 
 // type name = init_value;
@@ -310,7 +311,7 @@ void ast_init(AST* ast, ASTType type);
 AST* ast_append(AST* leader, AST* follower);
 
 AST* make_empty();
-AST* make_error(char* message);
+AST* make_error(const char* message);
 
 // Expressions
 // =======================================
@@ -326,7 +327,7 @@ AST* make_identifier_with_constant_val(const char* c, AST* constant_val);
 //    string-literal
 // 常量定义, 注意函数会自动释放内存
 AST* make_number_int(char* c, enum Types type);
-AST* make_number_float(char* c, int bits);			// FIX: 和ast.c中的函数签名不匹配
+AST* make_number_float(const char* c, int bits);
 AST* make_string(char* c);
 
 
@@ -397,7 +398,7 @@ int ast_merge_type_qualifier(int a, int b);
 
 // direct_declarator
 //     : IDENTIFIER
-AST* makr_init_direct_declarator(char * name);
+AST* makr_init_direct_declarator(const char * name);
 
 // direct_declarator:
 //     : direct_declarator (wrapped)
@@ -416,7 +417,7 @@ AST* make_declarator_bit_field(AST* declarator, AST* bitfield);
 
 AST* make_type_specifier(enum Types type);
 
-AST* make_type_specifier_from_id(char* id);
+AST* make_type_specifier_from_id(const char* id);
 AST* make_type_specifier_extend(AST* me, AST*other, enum SymbolAttributes storage);
 AST* make_declaration(AST* declaration_specifiers, enum SymbolAttributes attribute_specifier, AST* init_declarator_list);
 
@@ -424,12 +425,12 @@ AST* make_declaration(AST* declaration_specifiers, enum SymbolAttributes attribu
 
 // enum_define:
 //     enum identifier { enum_list }
-AST* make_enum_define(char* identifier, AST* enum_list);
+AST* make_enum_define(const char* identifier, AST* enum_list);
 
 // struct_or_union_define:
 //     struct/union identifier { field_list }
 AST* make_struct_field_declaration(AST* specifier_qualifier, AST* struct_declarator);
-AST* make_struct_or_union_define(enum Types type, char* identifier, AST* field_list);
+AST* make_struct_or_union_define(enum Types type, const char* identifier, AST* field_list);
 
 
 AST* ast_merge_specifier_qualifier(AST* me, AST* other, enum Types qualifier);
