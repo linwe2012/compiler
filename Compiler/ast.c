@@ -22,7 +22,9 @@
 	{ \
 		return make_error("Expected " #type__ " when receiving" ); \
 	} \
-	type__* name__ =  (type__*) from__
+	type__* name__ =  (type__*) (from__)
+
+#define CONSTANT(type__, name__, from__) CAST(type__, name__, from__)
 
 #define FOR_EACH(ast__, iterator__) \
 	for(AST* iterator__ = ast__; iterator__ != NULL; iterator__ = iterator__->next)
@@ -279,6 +281,22 @@ void add_or_dec_one(OperatorExpr* ast, OperatorExpr* num, int value, const char*
 	}
 }
 
+DeclaratorExpr* ast_apply_specifier_to_declartor(TypeSpecifier* spec, DeclaratorExpr* decl)
+{
+	decl->attributes = spec->attributes;
+	/*if (spec->name)
+	{
+		decl->name = spec->name;
+	}*/
+
+	if (spec->info)
+	{
+		type_wrap(decl->last, spec->info);
+		decl->last = spec->info;
+	}
+
+	return decl;
+}
 
 AST* make_unary_expr(enum Operators unary_op, AST* rhs)
 {
@@ -422,8 +440,7 @@ AST* make_unary_expr(enum Operators unary_op, AST* rhs)
 	return SUPER(ast);
 }
 
-// FIX: 没有enum Operator, 是Operators吗? 这个文件里还有好几个enum Operator
-void handle_arithmetic_op_int_value(NumberExpr* ast, enum Operator binary_op, NumberExpr* lhs,
+void handle_arithmetic_op_int_value(NumberExpr* ast, enum Operators binary_op, NumberExpr* lhs,
 	NumberExpr* rhs, const char** err_msg)
 {
 	if (!(lhs->number_type & rhs->number_type & TP_INT64))
@@ -478,7 +495,7 @@ void handle_arithmetic_op_int_value(NumberExpr* ast, enum Operator binary_op, Nu
 	}
 }
 
-void handle_arithmetic_op_float_value(NumberExpr* ast, enum Operator binary_op, NumberExpr* lhs,
+void handle_arithmetic_op_float_value(NumberExpr* ast, enum Operators binary_op, NumberExpr* lhs,
 	NumberExpr* rhs, const char** err_msg)
 {
 	if (!(type_is_arithmetic(lhs->number_type) && type_is_arithmetic(rhs->number_type)))
@@ -539,7 +556,7 @@ void handle_assign_op(NumberExpr* lhs, NumberExpr* rhs, const char** err_msg)
 	}
 }
 
-void handle_logical_op(NumberExpr* ast, enum Operator binary_op, NumberExpr* lhs,
+void handle_logical_op(NumberExpr* ast, enum Operators binary_op, NumberExpr* lhs,
 	NumberExpr* rhs, const char** err_msg)
 {
 	if (!(type_is_arithmetic(lhs->number_type) && type_is_arithmetic(rhs->number_type)))
@@ -1009,8 +1026,6 @@ AST* make_extent_direct_declarator(AST* direct, enum Types type, AST* wrapped)
 	}
 	else // type == TP_FUNC
 	{
-
-
 		TypeInfo* prev = NULL;
 		TypeInfo* first = NULL;
 
@@ -1092,7 +1107,20 @@ AST* make_declarator_with_init(AST* declarator, AST* init)
 	return SUPER(decl);
 }
 
+union ConstantValue constant_from_number_expr(NumberExpr* num)
+{
+	union ConstantValue* constant = (union ConstantValue*)((&num->number_type) + 1);
+	return *constant;
+}
 
+AST* make_declarator_bit_field(AST* declarator, AST* bitfield)
+{
+	CAST(DeclaratorExpr, decl, declarator);
+	CONSTANT(NumberExpr, num, bitfield);
+
+	decl->first->bitfield = constant_cast(num->number_type, TP_INT64, constant_from_number_expr(num)).i64;
+	return SUPER(decl);
+}
 
 
 AST* make_ptr(int type_qualifier_list, AST* pointing)
@@ -1118,11 +1146,29 @@ AST* make_type_specifier(enum Types type)
 {
 	NEW_AST(TypeSpecifier, ast);
 	ast->info = NULL;
-	ast->type = type;
+	ast->flags = TypeSpecifier_None;
+
+	if (type & TP_LONG_FLAG)
+	{
+		ast->flags = TypeSpecifier_Long;
+	}
+	else if (type == TP_UNSIGNED)
+	{
+		ast->flags = TypeSpecifier_Unsigned;
+	}
+	else if (type == TP_SIGNED)
+	{
+		ast->flags = TypeSpecifier_Signed;
+	}
+	else {
+		ast->info = type_fetch_buildtin(type);
+	}
 	ast->attributes = ATTR_NONE;
+	
 	return ast;
 }
 
+// TODO: Add other checks including const/confilicts
 int ast_merge_storage_specifiers(int a, int b)
 {
 
@@ -1140,67 +1186,87 @@ int ast_merge_storage_specifiers(int a, int b)
 
 AST* make_type_specifier_extend(AST* me, AST* other, enum SymbolAttributes storage)
 {
+	if (me == NULL || other == NULL)
+	{
+		NEW_AST(TypeSpecifier, ast);
+		ast->attributes = storage;
+		ast->flags = TypeSpecifier_None;
+		ast->info = NULL;
+		ast->name = NULL;
+		return SUPER(ast);
+	}
+
 	CAST(TypeSpecifier, spec1, me);
 	if (other)
 	{
 		CAST(TypeSpecifier, spec2, other);
-		// 两个 struct 的声明
+
+#define flag(item__, flag__) (item__->flags == flag__)
+
+#define each_flags(flag1__, flag2__) ((spec1->flags == flag1__) && (spec2->flags == flag2__))
+#define both_flags(flag__) each_flags(flag__, flag__)
+#define flag_collision(flag1__, flag2__) (each_flags(flag1__, flag2__) || each_flags(flag2__, flag1__))
+
 		if (spec1->info && spec2->info)
 		{
-			log_error(me, "Duplicated type specifier");
-			ast_destroy(other);
-			return me;
+			return make_error("Duplicated type specfier");
 		}
 
 
-
-		enum Types st = spec1->type | spec2->type;
-
-		// 两个都是 原始类型的声明
-		if (st)
+		// long long
+		if (both_flags(TypeSpecifier_Long))
 		{
-
-			// int 和 struct 同时声明的情况
 			if (spec1->info || spec2->info)
 			{
-				log_error(me, "Duplicated type specifier");
-				ast_destroy(other);
-				return me;
+				log_error(me, "type error");
 			}
-
-#define both_have_flags(flag) (spec1->type & (flag)) && (spec2->type & (flag))
-			if (both_have_flags(TP_SIGNED | TP_UNSIGNED))
-			{
-				log_error(me, "Duplicated signed/unsigned specifier");
-			}
-
-			// long long
-			if (both_have_flags(TP_LONG_FLAG))
-			{
-				spec1->type = TP_INT64;
-			}
-
-			// 如果是 int float 这样的类型声明
-			else if (both_have_flags(TP_CLEAR_ATTRIBUTEFLAGS))
-			{
-				log_error(me, "Duplicated type specifier");
-				ast_destroy(other);
-				return me;
-			}
-#undef both_have_flags
-			else {
-				spec1->type = spec1->type | spec2->type;
-
-				spec1->attributes = ast_merge_storage_specifiers(spec1->attributes, spec2->attributes);
-			}
+			spec1->info = type_fetch_buildtin(TP_INT64);
 		}
+		// long int
+		else if (flag(spec1, TypeSpecifier_Long) || flag(spec2, TypeSpecifier_Long))
+		{
+			TypeInfo* t1 = spec1->info;
+			TypeInfo* t2 = spec2->info;
+
+			if (t2)
+			{
+				t1 = t2;
+			}
+
+			if (t1->type != TP_INT32 || t1->type != TP_INT64)
+			{
+				log_error(me, "long must be applied to 32 bit integer");
+			}
+
+			spec1->info = t1;
+			spec2->info = NULL;
+		}
+
+		// error: unsigned signed int
+		if (both_flags(TypeSpecifier_Unsigned) || both_flags(TypeSpecifier_Signed)
+			|| flag_collision(TypeSpecifier_Unsigned, TypeSpecifier_Signed))
+		{
+			return make_error("Duplicated signed/unsigned specfier");
+		}
+
+
+		else if (spec2->info)
+		{
+			spec1->info = spec2->info;
+		}
+
+		spec1->attributes = ast_merge_storage_specifiers(spec1->attributes, spec2->attributes);
 	}
 	else {
 		spec1->attributes = ast_merge_storage_specifiers(spec1->attributes, storage);
 	}
+#undef flag
+#undef each_flags
+#undef both_flags
+#undef flag_collision
+
+	return SUPER(spec1);
 }
-
-
 
 AST* make_type_specifier_from_id(char* id)
 {
@@ -1211,17 +1277,13 @@ AST* make_type_specifier_from_id(char* id)
 		return NULL;
 	}
 	NEW_AST(TypeSpecifier, ast);
-	ast->type = TP_INCOMPLETE;
 	ast->name = id;
 	ast->info = &sym->type;
 	ast->attributes = ATTR_NONE;
-	return ast;
+	ast->flags = TypeSpecifier_None;
+	return SUPER(ast);
 }
 
-int ast_type_neq(AST* node, ASTType type)
-{
-	return !(node->type == type);
-}
 
 AST* make_empty()
 {
@@ -1237,36 +1299,74 @@ AST* make_error(char* message)
 	return SUPER(ast);
 }
 
-/*
-AST* make_function_call(const char* function_name, AST* params)
+
+AST* make_list_expr(AST* child)
+{
+	NEW_AST(ListExpr, list);
+	list->first_child = child;
+	return SUPER(list);
+}
+
+AST* make_paramter_ellipse()
+{
+	NEW_AST(DeclaratorExpr, decl);
+	decl->first = decl->last = type_create_param_ellipse();
+	decl->init_value = NULL;
+
+	return SUPER(decl);
+}
+
+AST* make_function_call(AST* postfix_expression, AST* params)
 {
 	NEW_AST(FunctionCallExpr, ast);
-
-	ast->function_name = function_name;
+	ast->function = postfix_expression;
 	ast->params = params;
+
+	if (params != NULL)
+	{
+		CAST(DeclaratorExpr, decl, params);
+		if (decl->first->type == TP_VOID)
+		{
+			if (decl->super.next != NULL)
+			{
+				return make_error("void cannot be paramter");
+			}
+			params = NULL;
+		}
+	}
+	
+	int i = 0;
+	while (params)
+	{
+		++i;
+		params = params->next;
+	}
+
+	ast->n_params = i;
+	return SUPER(ast);
+}
+
+
+AST* make_declaration(AST* declaration_specifiers, enum SymbolAttributes attribute_specifier, AST* init_declarator_list)
+{
+	CAST(TypeSpecifier, spec, declaration_specifiers);
+	NEW_AST(DeclareStmt, ast);
+	ast->identifiers = init_declarator_list;
+	ast->type = spec;
 
 	return SUPER(ast);
 }
 
-AST* make_function(const char* return_type, const char* name, AST* arg_list)
+// TODO: 这可能是错的, 脑袋有点炸了
+AST* make_type_declarator(AST* specifier_qualifier, AST* declarator)
 {
+	CAST(TypeSpecifier, spec, specifier_qualifier);
+	CAST(DeclaratorExpr, decl, declarator);
+	
+	decl = ast_apply_specifier_to_declartor(spec, decl);
 
-	NEW_AST(FunctionExpr, func);
-
-	func->ref = sym_get_function(return_type, name, arg_list);
-
-	return SUPER(func);
+	return SUPER(decl);
 }
-
-AST* make_function_body(AST* ast, AST* body)
-{
-	CAST(FunctionExpr, func, ast);
-	func->ref->body = body;
-
-	return ast;
-}
-*/
-
 
 void* ast_destroy(AST* rhs)
 {
@@ -1335,27 +1435,106 @@ AST* make_enum_define(char* identifier, AST* enum_list)
 	}
 
 	TypeInfo* enum_type = symbol_create_enum(identifier);
-	union ConstantValue val;
+	
+
+	TypeInfo* enums_tail = NULL;
+	TypeInfo* enums_head = NULL;
+	int64_t current_val = 0;
+
+#define APPEND_ENUM(b__) {\
+	if (enums_head == NULL) {\
+		enums_head = enums_tail = b__;\
+		}\
+	else {\
+		type_append(enums_tail, b__);\
+		enums_tail = b__;\
+	}\
+	}
 
 	FOR_EACH(enum_list, iden)
 	{
 		IF_TRY_CAST(IdentifierExpr, id, iden) {
+			TypeInfo* next = NULL;
+			if (id->val == NULL)
+			{
+				next = symbol_create_enum_item(id->name, current_val);
+			}
+			else {
+				CONSTANT(NumberExpr, num, id->val);
+				union ConstantValue val = constant_cast(num->number_type, TP_INT64, constant_from_number_expr(num));
+				current_val = val.i64;
+				next = symbol_create_enum_item(id->name, current_val);
+			}
+			if (next != NULL)
+			{
+				APPEND_ENUM(next);
+			}
 
-		}
-		ELSEIF_TRY_CAST(OperatorExpr, op, iden) {
-
+			++current_val;
+			// TODO: Add to symbol tabel
 		}
 		FINALLY_TRY_CAST{
-
+			log_error(iden, "Expected Indetifier or assigenment expression");
 		}
-
-
-
 	}
+	
+	NEW_AST(EnumDeclareStmt, ast);
+	ast->ref = symbol_from_type_info(enum_type);
+	ast->enums = enum_list;
 
+	return SUPER(ast);
 }
 
 
+
+AST* make_struct_field_declaration(AST* specifier_qualifier, AST* struct_declarator)
+{
+	CAST(TypeSpecifier, spec, specifier_qualifier);
+	
+	FOR_EACH(struct_declarator, st)
+	{
+		CAST(DeclaratorExpr, decl, st);
+		if (decl->init_value)
+		{
+			log_warning(st, "Struct field init value will be ignored");
+		}
+		ast_apply_specifier_to_declartor(spec, decl);
+		create_struct_field(decl->first, decl->attributes, decl->name);
+	}
+
+	return struct_declarator;
+}
+
+// TODO: Add type from symbol table
+AST* make_struct_or_union_define(enum Types type, char* identifier, AST* field_list)
+{
+	TypeInfo* first = NULL;
+	TypeInfo* last = NULL;
+
+	FOR_EACH(field_list, st)
+	{
+		CAST(DeclaratorExpr, decl, st);
+		TypeInfo* ty = decl->first;
+		if (first == NULL)
+		{
+			first = last = ty;
+		}
+		else {
+			type_append(last, ty);
+			last = ty;
+		}
+	}
+
+	NEW_AST(AggregateDeclareStmt, ast);
+	ast->fields = field_list;
+	ast->ref = symbol_create_struct_or_union(type_create_struct_or_union(type), first);
+	return SUPER(ast);
+}
+
+AST* ast_merge_specifier_qualifier(AST* me, AST* other, enum SymbolAttributes qualifier)
+{
+	return make_type_specifier_extend(me, other, qualifier);
+}
 /*
 Value handle_SwitchCaseStmt(Context*ctx, SwitchCaseStmt* ast)
 {
