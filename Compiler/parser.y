@@ -7,13 +7,16 @@
 #include <stdlib.h>
 #include "types.h"
 #define _STDLIB_H
+
+// warning C4005: 'INT16_MAX': macro redefinition
+#define __STDC_VERSION__ 199901L
 AST* parser_result = NULL;
 %}
 
 %union {
 	AST *val;
 	int type;
-    const char* str;
+    char* str;
 }
 
 %token <str> IDENTIFIER CONSTANT STRING_LITERAL
@@ -45,7 +48,7 @@ AST* parser_result = NULL;
 
 %start translation_unit
 
-%type <type> type_name type_qualifier type_qualifier_list attribute_specifier
+%type <type> type_qualifier type_qualifier_list attribute_specifier
 %type <type> storage_class_specifier struct_or_union
 %type <val> struct_or_union_specifier struct_declaration_list struct_declaration struct_declarator struct_declarator_list
 %type <val> specifier_qualifier_list
@@ -56,6 +59,7 @@ AST* parser_result = NULL;
 %type <val> enum_specifier enumerator_list  enumerator
 %type <val> abstract_declarator direct_abstract_declarator
 %type <val> external_declaration translation_unit argument_expression_list function_definition
+%type <val> type_name
 %%
 // defination part
 translation_unit 
@@ -208,7 +212,7 @@ specifier_qualifier_list
 	: type_specifier                             { $$ =$1; }
 	| type_specifier specifier_qualifier_list    { $$ = ast_merge_specifier_qualifier($2, $1, TP_INCOMPLETE); }
 	| type_qualifier                             { $$ = ast_merge_specifier_qualifier(NULL,NULL, $1); }
-	| type_qualifier specifier_qualifier_list    { $$ = ast_merge_specifier_qualifier($1, NULL, $1); }
+	| type_qualifier specifier_qualifier_list    { $$ = ast_merge_specifier_qualifier($2, NULL, $1); }
 	;
 
 struct_declarator_list
@@ -466,8 +470,8 @@ postfix_expression
 	| postfix_expression '[' expression ']'  { $$ = make_binary_expr(OP_ARRAY_ACCESS, $1, $3); }
 	| postfix_expression '(' ')'                            { $$ = make_function_call($1, NULL); }
 	| postfix_expression '(' argument_expression_list ')'   { $$ = make_function_call($1, $3); }
-	| postfix_expression '.' IDENTIFIER { $$ = make_binary_expr(OP_STACK_ACCESS, $1, $3); }
-	| postfix_expression PTR_OP IDENTIFIER { $$ = make_binary_expr(OP_PTR_ACCESS, $1, $3); }
+	| postfix_expression '.' IDENTIFIER { $$ = make_binary_expr(OP_STACK_ACCESS, $1, make_identifier($3)); }
+	| postfix_expression PTR_OP IDENTIFIER { $$ = make_binary_expr(OP_PTR_ACCESS, $1, make_identifier($3)); }
 	| postfix_expression INC_OP { $$ = make_unary_expr(OP_POSTFIX_INC, $1); }
 	| postfix_expression DEC_OP { $$ = make_unary_expr(OP_POSTFIX_INC, $1); }
 	;

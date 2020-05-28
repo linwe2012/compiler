@@ -192,7 +192,7 @@ void symtbl_leave_scope(SymbolTable* tbl, int free_all_symols);
 TypeInfo* type_fetch_buildtin(enum Types type);
 Symbol* symbol_create_label(char* name, uint64_t label, int resolved);
 Symbol* symbol_create_constant(Symbol* enum_sym, char* name, union ConstantValue val);
-Symbol* symbol_create_enum(const char* name);
+Symbol* symbol_create_enum(char* name);
 Symbol* symbol_create_enum_item(char* name, int64_t val);
 Symbol* symbol_from_type_info(TypeInfo* info);
 Symbol* symbol_create_struct_or_union(TypeInfo* info, TypeInfo* child);

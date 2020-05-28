@@ -363,7 +363,7 @@ Symbol* symbol_create_constant(Symbol* enum_sym, char* name, union ConstantValue
 	return sym;
 ;}
 
-Symbol* symbol_create_enum(const char* name)
+Symbol* symbol_create_enum(char* name)
 {
 	Symbol* sym = new_symbol(name, Symbol_TypeInfo);
 	type_info_init(&(sym->type));

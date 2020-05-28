@@ -28,7 +28,7 @@ char *( *(*var)() )[10];
  7   6  4 2 1   3    5
 ```
 
-这意味着我们需要一个能支持比较复杂嵌套的类型定义的结构，microsoft 文档这个例子的解释是:
+这意味着我们需要一个能支持比较复杂嵌套的类型定义的结构，microsoft[^msdoc] 文档这个例子的解释是:
 
 1. `var`是一个标识符，它被声明为
 2. 一个指针，**指向**
@@ -169,9 +169,24 @@ d3.js的代码参考了[4].
 例如如下C语言代码，经过我们的编译器生成AST后，进行可视化，效果如图所示.
 
 ```C
+
 ```
 
 ![AST Visualization]()
+
+
+
+## 编译
+
+编译 Lex 文件需要 Linux:
+
+```bash
+flex -d -o"lexer.c" lex.l
+```
+
+
+
+
 
 ## 参考资料
 
@@ -182,3 +197,7 @@ d3.js的代码参考了[4].
 [3] https://docs.microsoft.com/en-us/cpp/c-language/c-language-reference?view=vs-2019
 
 [4] http://bl.ocks.org/robschmuecker/7880033
+
+
+
+[^msdoc]: https://docs.microsoft.com/en-us/cpp/c-language/interpreting-more-complex-declarators?view=vs-2019

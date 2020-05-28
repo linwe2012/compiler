@@ -12,7 +12,6 @@
 #include "parser.h"
 
 #define COPY_STR()             yylval.str = strcpy((char*)malloc(strlen(yytext)+1), yytext)
-void comment(void);
 
 %}
 
@@ -27,6 +26,10 @@ any_int     {oct_int}|{dec_int}|{hex_int}
 identifier	[a-zA-Z_][a-zA-Z0-9_]*
 whitespace	[[:space:]]+
 float		{dec_int}"."[0-9]*
+
+c_comment	\/\*(?:[^\*]|\*+[^\/\*])*\*+\/
+cpp_comment	\/\/.*
+comment		{c_comment}|{cpp_comment}
 
 %%
 
@@ -86,11 +89,10 @@ float		{dec_int}"."[0-9]*
 {float}				{ COPY_STR(); return CONSTANT; }
 {float}"f"			{ COPY_STR(); return CONSTANT; }
 
-{whitespace}    /* do nothing */
+{whitespace}    {}
+{comment}    	{}
 
-"//".*          {  }
-"/*"			{ comment(); }
-
+"..."			{ return ELLIPSIS; }
 ">>="			{ return RIGHT_ASSIGN; }
 "<<="			{ return LEFT_ASSIGN; }
 "+="			{ return ADD_ASSIGN; }
@@ -116,14 +118,3 @@ float		{dec_int}"."[0-9]*
 .               { return yytext[0]; }
 
 %%
-
-void comment(void) {
-	char c, prev = 0;
-  
-	while ((c = input()) != 0) {
-		if (c == '/' && prev == '*')
-			return;
-		prev = c;
-	}
-	error("unterminated comment");
-}
