@@ -34,18 +34,18 @@ STRUCT_TYPE(TypeAlias)
 //         : typename
 struct TypeInfo
 {
-	char* type_name;
-	int is_alias;
-	char* field_name;
-	enum Types type;
+	char* type_name;     // 类型的名称 (必须是 struct TypeInfo 第一个字段)
+	int is_alias;   
+	char* field_name;    // struct/union 字段名称
+	enum Types type;     // 基础类型
 
-	int alignment;  // bytes
-	int aligned_size; // bytes
-	int offset; // 如果是结构体, 距离结构体首部的距离
+	int alignment;       // 最小对齐要求, bytes
+	int aligned_size;    // 对齐后所占的空间, bytes
+	int offset;          // 如果是结构体, 距离结构体首部的距离
 	int bitfield_offset; // bit field 距离上一个非bitfield元素的距离
-	int bitfield;        // 
+	int bitfield;        // bit field 占多少个字节
 
-	enum SymbolAttributes qualifiers;
+	enum SymbolAttributes qualifiers; // const 等 qualifier
 
 	union
 	{
