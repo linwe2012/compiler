@@ -22,6 +22,13 @@ void symtbl_init(SymbolTable* tbl)
 	tbl->bottom = tbl->stack_top = global;
 }
 
+SymbolTable* symtbl_new()
+{
+	NEW_STRUCT(SymbolTable, tbl);
+	symtbl_init(tbl);
+	return tbl;
+}
+
 void symtbl_push(SymbolTable* tbl, Symbol* c)
 {
 	// 如果是这个 scope 的第一个元素
@@ -305,7 +312,8 @@ void symbol_init_context(struct Context* context)
 
 TypeInfo* type_fetch_buildtin(enum Types type)
 {
-	int inc = (type & TP_SIGNED) ? 0: TP_NUM_BUILTINS;
+	int is_unsign = (type & TP_SIGNED);
+	int inc = is_unsign ? TP_NUM_BUILTINS : 0;
 
 	switch (type & TP_CLEAR_SIGNFLAGS)
 	{

@@ -6,30 +6,34 @@
 #include "symbol.h"
 #include "types.h"
 
-#define AST_NODE_LIST(V) \
-	V(BlockExpr) \
-	V(ListExpr) \
-	V(FunctionCallExpr)\
-	V(IdentifierExpr) \
-    V(NumberExpr)   \
-	V(SymbolExpr)   \
-	V(OperatorExpr) \
+#define AST_NODE_LIST_STMT(V) \
 	V(LabelStmt) \
 	V(JumpStmt) \
-	V(InitilizerListExpr)\
 	V(DeclareStmt)\
 	V(EnumDeclareStmt)\
 	V(AggregateDeclareStmt)\
 	V(FunctionDefinitionStmt)
 
+#define AST_NODE_LIST_EXPR(V) \
+	V(BlockExpr) \
+	V(ListExpr) \
+	V(FunctionCallExpr)\
+	V(IdentifierExpr) \
+	V(NumberExpr)   \
+	V(OperatorExpr) \
+	V(InitilizerListExpr)
+
+#define AST_NODE_LIST(V) \
+	AST_NODE_LIST_STMT(V) \
+	AST_NODE_LIST_EXPR(V)
+
 #define AST_AUX_NODE_LIST(V)\
 	V(EmptyExpr) \
-	V(TypenameExpr)\
 	V(LoopStmt)\
 	V(IfStmt) \
 	V(SwitchCaseStmt)\
 	V(DeclaratorExpr)\
-	V(TypeSpecifier) \
+	V(TypeSpecifier)
 
 
 typedef enum ASTType {
@@ -50,19 +54,10 @@ struct AST {
 	ASTType type;
 	// TypeInfo* type;
 	struct AST* prev, * next;
+	struct CompileData* compile_data;
 };
 typedef struct AST AST;
 
-/*
-typedef struct FunctionDefinition
-{
-	AST* params;
-	int n_params;
-	const char* name;
-	AST* body;
-	const char* return_type;
-} FunctionDefinition;
-*/
 // 
 // 用大括号包围的语句会进入一个新的 scope
 // { first_child; second; ... }
@@ -74,9 +69,11 @@ struct BlockExpr
 	AST* first_child;
 };
 
+
 struct FunctionDefinitionStmt
 {
 	AST super;
+
 	AST* declarator;
 	AST* body;
 	AST* specifier;
@@ -163,7 +160,7 @@ struct FunctionCallExpr
 	AST* function;
 	AST* params;
 	int n_params;
-	const char* function_name;
+	const char* function_name; // TODO: 这个要被删掉
 };
 
 

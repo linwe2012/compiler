@@ -82,11 +82,6 @@ void _write_NumberExpr(NumberExpr *expr) {
     // }
 }
 
-void _write_SymbolExpr(SymbolExpr *expr) {
-    // FIX: 未定义
-    fprintf(s_fp, "\"name\":\"UNK\"");
-}
-
 void _write_OperatorExpr(OperatorExpr *expr) {
     int has_child = 0;
     switch (expr->op) {
@@ -301,11 +296,6 @@ void _write_InitilizerListExpr(InitilizerListExpr *expr) {
 }
 
 void _write_EmptyExpr(EmptyExpr *expr) { return; }
-
-void _write_TypenameExpr(TypenameExpr *expr) {
-    // FIX: 2020-05-25 未定义
-    fprintf(s_fp, "\"name\":\"UNK\"");
-}
 
 void _write_LoopStmt(LoopStmt *stmt) {
     switch (stmt->loop_type) {

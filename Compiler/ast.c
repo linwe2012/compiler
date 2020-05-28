@@ -123,7 +123,17 @@ void ast_init_context(Context* _ctx)
 	ctx->ast_data = data;
 	data->breakable.first = NULL;
 	data->breakable.last = NULL;
+	data->current_function = NULL;
+	data->pending_labels.first = NULL;
+	data->pending_labels.last = NULL;
 	data->label_id = 0;
+
+	ctx->current = NULL;
+	ctx->enums = symtbl_new();
+	ctx->functions = symtbl_new();
+	ctx->labels = symtbl_new();
+	ctx->types = symtbl_new();
+	ctx->variables = symtbl_new();
 }
 
 uint64_t next_label()
@@ -195,6 +205,9 @@ AST* make_number_int(char* c, enum Types type)
 	//NEW_AST(NumberExpr, ast);
 	NEW_AST(OperatorExpr, ast);
 	ast->number_type = type;
+	ast->cond = NULL;
+	ast->lhs = NULL;
+	ast->rhs = NULL;
 
 	int is_unsign = type & TP_UNSIGNED;
 	int is_hex = str_begin_with(c, "0x");
@@ -297,6 +310,10 @@ DeclaratorExpr* ast_apply_specifier_to_declartor(TypeSpecifier* spec, Declarator
 	{
 		decl->name = spec->name;
 	}*/
+	if (!decl->first)
+	{
+		decl->first = decl->last = spec->info;
+	}
 
 	if (spec->info)
 	{
@@ -917,17 +934,20 @@ AST* make_jump(enum JumpType type, char* name, AST* ret)
 	case JUMP_BREAK:
 		return make_jump_cont_or_break(type);
 	case JUMP_RET:
-		if (!data->current_function)
-		{
-			make_error("must return within the function");
-		}
-		else {
-			NEW_AST(JumpStmt, ast);
-			ast->type = type;
-			ast->target = ret;
-			ast->ref = data->current_function;
-			return SUPER(ast);
-		}
+		//if (!data->current_function)
+		//{
+			//make_error("must return within the function");
+		//}
+		//else {
+			{
+				NEW_AST(JumpStmt, ast);
+				ast->type = type;
+				ast->target = ret;
+				ast->ref = data->current_function;
+				return SUPER(ast);
+			}
+			
+		//}
 
 		break;
 	default:
@@ -1158,6 +1178,7 @@ AST* make_type_specifier(enum Types type)
 	NEW_AST(TypeSpecifier, ast);
 	ast->info = NULL;
 	ast->flags = TypeSpecifier_None;
+	ast->name = NULL;
 
 	if (type & TP_LONG_FLAG)
 	{
@@ -1260,6 +1281,10 @@ AST* make_type_specifier_extend(AST* me, AST* other, enum SymbolAttributes stora
 			return make_error("Duplicated signed/unsigned specfier");
 		}
 
+		else if (spec2->flags == TypeSpecifier_Unsigned)
+		{
+			spec1->info = type_fetch_buildtin(spec1->info->type | TP_UNSIGNED);
+		}
 
 		else if (spec2->info)
 		{
@@ -1308,6 +1333,7 @@ AST* make_error(const char* message)
 {
 	NEW_AST(EmptyExpr, ast);
 	ast->error = message;
+	assert(0);
 	return SUPER(ast);
 }
 
@@ -1333,6 +1359,8 @@ AST* make_function_call(AST* postfix_expression, AST* params)
 	NEW_AST(FunctionCallExpr, ast);
 	ast->function = postfix_expression;
 	ast->params = params;
+	ast->function_name = NULL;
+	/*
 
 	if (params != NULL)
 	{
@@ -1346,7 +1374,8 @@ AST* make_function_call(AST* postfix_expression, AST* params)
 			params = NULL;
 		}
 	}
-	
+	*/
+
 	int i = 0;
 	while (params)
 	{
@@ -1355,6 +1384,7 @@ AST* make_function_call(AST* postfix_expression, AST* params)
 	}
 
 	ast->n_params = i;
+	
 	return SUPER(ast);
 }
 
@@ -1566,8 +1596,6 @@ void normalize_type_specifier(TypeSpecifier* type)
 	{
 		type->info = type_fetch_buildtin(TP_INT64);
 	}
-
-	
 }
 
 AST* make_parameter_declaration(AST* declaration_specifiers, AST* declarator)
