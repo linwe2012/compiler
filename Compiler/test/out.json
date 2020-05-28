@@ -1,22 +1,26 @@
 {
 "name":"Block",
 "children": [{
-"name":"(DECL))",
+"name":"(DECLARE)",
 "children": [{
 "name":"(TYPESPEC)(null)"
 },
 {
-"name":"(TYPESPEC)(null)"
+"name":"(DECLARATOR)putchar",
+"children": []
+
 }]
 
 },
 {
-"name":"(DECL))",
+"name":"(DECLARE)",
 "children": [{
 "name":"(TYPESPEC)(null)"
 },
 {
-"name":"(TYPESPEC)(null)"
+"name":"(DECLARATOR)dummy",
+"children": []
+
 }]
 
 },
@@ -26,71 +30,89 @@
 "name":"(TYPESPEC)(null)"
 },
 {
-"name":"(DECL)main",
+"name":"(DECLARATOR)main",
 "children": []
 
 },
 {
 "name":"Block",
 "children": [{
-"name":"(CALL)(null)",
+"name":"(CALL)",
 "children": [{
-"name":"UNK",
+"name":"(ID)putchar"
+},
+{
+"name":"CONSTANT",
 "children": []
 
 }]
 
 },
 {
-"name":"(CALL)(null)",
+"name":"(CALL)",
 "children": [{
-"name":"UNK",
+"name":"(ID)putchar"
+},
+{
+"name":"CONSTANT",
 "children": []
 
 }]
 
 },
 {
-"name":"(CALL)(null)",
+"name":"(CALL)",
 "children": [{
-"name":"UNK",
+"name":"(ID)putchar"
+},
+{
+"name":"CONSTANT",
 "children": []
 
 }]
 
 },
 {
-"name":"(CALL)(null)",
+"name":"(CALL)",
 "children": [{
-"name":"UNK",
+"name":"(ID)putchar"
+},
+{
+"name":"CONSTANT",
 "children": []
 
 }]
 
 },
 {
-"name":"(CALL)(null)",
+"name":"(CALL)",
 "children": [{
-"name":"UNK",
+"name":"(ID)putchar"
+},
+{
+"name":"CONSTANT",
 "children": []
 
 }]
 
 },
 {
-"name":"(CALL)(null)",
+"name":"(CALL)",
 "children": [{
-"name":"UNK",
+"name":"(ID)dummy"
+},
+{
+"name":"CONSTANT",
 "children": []
 
 },
 {
-"name":"UNK",
+"name":"CONSTANT",
 "children": []
 
 },
 {
-"name":"UNK",
+"name":"CONSTANT",
 "children": []
 
 }]
@@ -98,9 +120,8 @@
 },
 {
 "name":"Return",
-"children": [,
-{
-"name":"UNK",
+"children": [{
+"name":"CONSTANT",
 "children": []
 
 }]

@@ -62,8 +62,10 @@ void _write_ListExpr(ListExpr *expr) {
 }
 
 void _write_FunctionCallExpr(FunctionCallExpr *expr) {
-    fprintf(s_fp, "\"name\":\"(CALL)%s\"", expr->function_name);
+    fprintf(s_fp, "\"name\":\"(CALL)\"");
     fputs(",\n\"children\": [", s_fp);
+    _write_ast(expr->function);
+    fputs(",\n", s_fp);
     _write_ast(expr->params);
     fputs("]\n", s_fp);
 }
@@ -73,6 +75,7 @@ void _write_IdentifierExpr(IdentifierExpr *expr) {
 }
 
 void _write_NumberExpr(NumberExpr *expr) {
+    // Deprecated Type. 可以随时删除
     PRINT_NAME(Number);
     // TODO: 暂时不关心具体数字了
     // switch (expr->number_type) {
@@ -221,7 +224,7 @@ void _write_OperatorExpr(OperatorExpr *expr) {
         PRINT_NAME(?:);
         break;
     default:
-        PRINT_NAME(UNK);
+        PRINT_NAME(CONSTANT);
         break;
     }
     fputs(",\n\"children\": [", s_fp);
@@ -280,7 +283,6 @@ void _write_JumpStmt(JumpStmt *stmt) {
     }
     fputs(",\n\"children\": [", s_fp);
     if (stmt->target) {
-        fputs(",\n", s_fp);
         _write_ast(stmt->target);
     }
     fputs("]\n", s_fp);
@@ -384,7 +386,7 @@ void _write_SwitchCaseStmt(SwitchCaseStmt *stmt) {
 }
 
 void _write_DeclaratorExpr(DeclaratorExpr *expr) {
-    fprintf(s_fp, "\"name\":\"(DECL)%s\"", expr->name);
+    fprintf(s_fp, "\"name\":\"(DECLARATOR)%s\"", expr->name);
     fputs(",\n\"children\": [", s_fp);
     if (expr->init_value) {
         _write_ast(expr->init_value);
@@ -409,16 +411,16 @@ void _write_FunctionDefinitionStmt(FunctionDefinitionStmt* expr) {
 }
 
 void _write_DeclareStmt(DeclareStmt* stmt) {
-    fprintf(s_fp, "\"name\":\"(DECL))\"");
+    fprintf(s_fp, "\"name\":\"(DECLARE)\"");
     fputs(",\n\"children\": [", s_fp);
     _write_ast(stmt->type);
     fputs(",\n", s_fp);
-    _write_ast(stmt->type);
+    _write_ast(stmt->identifiers);
     fputs("]\n", s_fp);
 }
 
 void _write_AggregateDeclareStmt(AggregateDeclareStmt* stmt) {
-    fprintf(s_fp, "\"name\":\"(AGGREDECL))\"");
+    fprintf(s_fp, "\"name\":\"(AGGREDECL)\"");
     // TODO: Symbol是不是最好也显示一下
     fputs(",\n\"children\": [", s_fp);
     _write_ast(stmt->fields);
@@ -426,7 +428,7 @@ void _write_AggregateDeclareStmt(AggregateDeclareStmt* stmt) {
 }
 
 void _write_EnumDeclareStmt(EnumDeclareStmt* stmt) {
-    fprintf(s_fp, "\"name\":\"(ENUMDECL))\"");
+    fprintf(s_fp, "\"name\":\"(ENUMDECL)\"");
     // TODO: Symbol是不是最好也显示一下
     fputs(",\n\"children\": [", s_fp);
     _write_ast(stmt->enums);

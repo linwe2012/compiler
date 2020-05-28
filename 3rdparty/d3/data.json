@@ -1,37 +1,133 @@
 {
-    "name": "+",
+    "name": "Block",
     "children": [
         {
-            "name": "*",
+            "name": "(DECLARE)",
             "children": [
                 {
-                    "name": "cost",
-                    "children": []
+                    "name": "(TYPESPEC)(null)"
                 },
                 {
-                    "name": "gree",
-                    "children": []
-                },
-                {
-                    "name": "azzz",
+                    "name": "(DECLARATOR)putchar",
                     "children": []
                 }
             ]
         },
         {
-            "name": "*",
+            "name": "(DECLARE)",
             "children": [
                 {
-                    "name": "^",
+                    "name": "(TYPESPEC)(null)"
+                },
+                {
+                    "name": "(DECLARATOR)dummy",
+                    "children": []
+                }
+            ]
+        },
+        {
+            "name": "(FUNCDEF)",
+            "children": [
+                {
+                    "name": "(TYPESPEC)(null)"
+                },
+                {
+                    "name": "(DECLARATOR)main",
                     "children": []
                 },
                 {
-                    "name": "append",
-                    "children": []
-                },
-                {
-                    "name": "optimization",
-                    "children": []
+                    "name": "Block",
+                    "children": [
+                        {
+                            "name": "(CALL)",
+                            "children": [
+                                {
+                                    "name": "(ID)putchar"
+                                },
+                                {
+                                    "name": "CONSTANT",
+                                    "children": []
+                                }
+                            ]
+                        },
+                        {
+                            "name": "(CALL)",
+                            "children": [
+                                {
+                                    "name": "(ID)putchar"
+                                },
+                                {
+                                    "name": "CONSTANT",
+                                    "children": []
+                                }
+                            ]
+                        },
+                        {
+                            "name": "(CALL)",
+                            "children": [
+                                {
+                                    "name": "(ID)putchar"
+                                },
+                                {
+                                    "name": "CONSTANT",
+                                    "children": []
+                                }
+                            ]
+                        },
+                        {
+                            "name": "(CALL)",
+                            "children": [
+                                {
+                                    "name": "(ID)putchar"
+                                },
+                                {
+                                    "name": "CONSTANT",
+                                    "children": []
+                                }
+                            ]
+                        },
+                        {
+                            "name": "(CALL)",
+                            "children": [
+                                {
+                                    "name": "(ID)putchar"
+                                },
+                                {
+                                    "name": "CONSTANT",
+                                    "children": []
+                                }
+                            ]
+                        },
+                        {
+                            "name": "(CALL)",
+                            "children": [
+                                {
+                                    "name": "(ID)dummy"
+                                },
+                                {
+                                    "name": "CONSTANT",
+                                    "children": []
+                                },
+                                {
+                                    "name": "CONSTANT",
+                                    "children": []
+                                },
+                                {
+                                    "name": "CONSTANT",
+                                    "children": []
+                                }
+                            ]
+                        },
+                        {
+                            "name": "Return",
+                            "children": [
+                                {
+                                    "name": "CONSTANT",
+                                    "children": []
+                                }
+                            ]
+                        }
+                    ]
                 }
             ]
         }
