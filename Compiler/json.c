@@ -62,18 +62,19 @@ void _write_ListExpr(ListExpr *expr) {
 }
 
 void _write_FunctionCallExpr(FunctionCallExpr *expr) {
-    fprintf(s_fp, "\"name\":\"%s()\"", expr->function_name);
+    fprintf(s_fp, "\"name\":\"(CALL)%s\"", expr->function_name);
     fputs(",\n\"children\": [", s_fp);
     _write_ast(expr->params);
     fputs("]\n", s_fp);
 }
 
 void _write_IdentifierExpr(IdentifierExpr *expr) {
-    fprintf(s_fp, "\"name\":\"%s\"", expr->name);
+    fprintf(s_fp, "\"name\":\"(ID)%s\"", expr->name);
 }
 
 void _write_NumberExpr(NumberExpr *expr) {
     PRINT_NAME(Number);
+    // TODO: 暂时不关心具体数字了
     // switch (expr->number_type) {
     // // Types
     // default:
@@ -81,7 +82,10 @@ void _write_NumberExpr(NumberExpr *expr) {
     // }
 }
 
-void _write_SymbolExpr(SymbolExpr *expr) {}
+void _write_SymbolExpr(SymbolExpr *expr) {
+    // FIX: 未定义
+    fprintf(s_fp, "\"name\":\"UNK\"");
+}
 
 void _write_OperatorExpr(OperatorExpr *expr) {
     int has_child = 0;
@@ -247,7 +251,7 @@ void _write_OperatorExpr(OperatorExpr *expr) {
 }
 
 void _write_LabelStmt(LabelStmt *stmt) {
-    fprintf(s_fp, "\"name\":\"%s\"", stmt->ref->label->name);
+    fprintf(s_fp, "\"name\":\"(LABEL)%s\"", stmt->ref->label->name);
     fputs(",\n\"children\": [", s_fp);
     if (stmt->condition) {
         _write_ast(stmt->condition);
@@ -279,6 +283,12 @@ void _write_JumpStmt(JumpStmt *stmt) {
         PRINT_NAME(UNK);
         break;
     }
+    fputs(",\n\"children\": [", s_fp);
+    if (stmt->target) {
+        fputs(",\n", s_fp);
+        _write_ast(stmt->target);
+    }
+    fputs("]\n", s_fp);
 }
 
 void _write_InitilizerListExpr(InitilizerListExpr *expr) {
@@ -293,7 +303,7 @@ void _write_InitilizerListExpr(InitilizerListExpr *expr) {
 void _write_EmptyExpr(EmptyExpr *expr) { return; }
 
 void _write_TypenameExpr(TypenameExpr *expr) {
-    // 2020-05-25 未定义
+    // FIX: 2020-05-25 未定义
     fprintf(s_fp, "\"name\":\"UNK\"");
 }
 
@@ -384,7 +394,7 @@ void _write_SwitchCaseStmt(SwitchCaseStmt *stmt) {
 }
 
 void _write_DeclaratorExpr(DeclaratorExpr *expr) {
-    fprintf(s_fp, "\"name\":\"%s(decl)\"", expr->name);
+    fprintf(s_fp, "\"name\":\"(DECL)%s\"", expr->name);
     fputs(",\n\"children\": [", s_fp);
     if (expr->init_value) {
         _write_ast(expr->init_value);
@@ -393,11 +403,42 @@ void _write_DeclaratorExpr(DeclaratorExpr *expr) {
 }
 
 void _write_TypeSpecifier(TypeSpecifier *expr) {
-    fprintf(s_fp, "\"name\":\"%s(decl)\"", expr->name);
+    fprintf(s_fp, "\"name\":\"(TYPESPEC)%s\"", expr->name);
 }
 
 
-void _write_FunctionDeinfitionStmt(FunctionDefinitionStmt* expr)
-{
-    //TODO
+void _write_FunctionDefinitionStmt(FunctionDefinitionStmt* expr) {
+    fprintf(s_fp, "\"name\":\"(FUNCDEF)\"");
+    fputs(",\n\"children\": [", s_fp);
+    _write_ast(expr->specifier);
+    fputs(",\n", s_fp);             // TODO: 暂时先这样，但是感觉把void func(int, float)拿出来做name更好
+    _write_ast(expr->declarator);   // 或者说保持AST结构也行?
+    fputs(",\n", s_fp);
+    _write_ast(expr->body);
+    fputs("]\n", s_fp);
+}
+
+void _write_DeclareStmt(DeclareStmt* stmt) {
+    fprintf(s_fp, "\"name\":\"(DECL))\"");
+    fputs(",\n\"children\": [", s_fp);
+    _write_ast(stmt->type);
+    fputs(",\n", s_fp);
+    _write_ast(stmt->type);
+    fputs("]\n", s_fp);
+}
+
+void _write_AggregateDeclareStmt(AggregateDeclareStmt* stmt) {
+    fprintf(s_fp, "\"name\":\"(AGGREDECL))\"");
+    // TODO: Symbol是不是最好也显示一下
+    fputs(",\n\"children\": [", s_fp);
+    _write_ast(stmt->fields);
+    fputs("]\n", s_fp);
+}
+
+void _write_EnumDeclareStmt(EnumDeclareStmt* stmt) {
+    fprintf(s_fp, "\"name\":\"(ENUMDECL))\"");
+    // TODO: Symbol是不是最好也显示一下
+    fputs(",\n\"children\": [", s_fp);
+    _write_ast(stmt->enums);
+    fputs("]\n", s_fp);
 }
