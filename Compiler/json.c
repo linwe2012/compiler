@@ -182,7 +182,7 @@ void _write_OperatorExpr(OperatorExpr *expr) {
     case OP_ASSIGN_XOR:
         PRINT_NAME(^=);
         break;
-    case OR_ASSIGN_OR:
+    case OP_ASSIGN_OR:
         PRINT_NAME(|=);
         break;
     case OP_EQUAL:

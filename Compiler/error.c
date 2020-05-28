@@ -23,3 +23,13 @@ void cc_log_error(const char* file, int line,  AST* ast, const char* message, ..
 	assert(0);
 #endif // THROW_EXCEPT_ON_LOG_INTERNAL_ERROR
 }
+
+void yyerror(char const* s) {
+
+	HANDLE  hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
+
+	SetConsoleTextAttribute(hConsole, FOREGROUND_RED);
+	fprintf(stderr, "%s\n", s);
+	SetConsoleTextAttribute(hConsole, FOREGROUND_GREEN | FOREGROUND_RED | FOREGROUND_BLUE);
+
+}

@@ -19,7 +19,8 @@
 	V(InitilizerListExpr)\
 	V(DeclareStmt)\
 	V(EnumDeclareStmt)\
-	V(AggregateDeclareStmt)
+	V(AggregateDeclareStmt)\
+	V(FunctionDefinitionStmt)
 
 #define AST_AUX_NODE_LIST(V)\
 	V(EmptyExpr) \
@@ -75,8 +76,10 @@ struct BlockExpr
 
 struct FunctionDefinitionStmt
 {
-	AST* name;
+	AST super;
 	AST* declarator;
+	AST* body;
+	AST* specifier;
 };
 
 //
@@ -112,15 +115,6 @@ struct DeclareStmt
 	AST super;
 	AST* type;
 	AST* identifiers;
-};
-
-
-// { 1, 2, 3, 4 ..}
-struct InitilizerListExpr		// FIX: 有两个InitilizerListExpr，重复定义了
-{
-	AST super;
-	AST* vals;
-	void* evaluated_value;
 };
 
 //   struct/union { fields };
@@ -307,6 +301,8 @@ AST_NODE_LIST(FORWORD_DECL)
 AST_AUX_NODE_LIST(FORWORD_DECL)
 #undef FORWORD_DECL
 
+void ast_init_context(struct Context* _ctx);
+
 
 void ast_init(AST* ast, ASTType type);
 
@@ -432,8 +428,9 @@ AST* make_enum_define(char* identifier, AST* enum_list);
 
 // struct_or_union_define:
 //     struct/union identifier { field_list }
-AST* make_struct_or_union_define(enum Types type, char* identifier, AST* field_list);
 AST* make_struct_field_declaration(AST* specifier_qualifier, AST* struct_declarator);
+AST* make_struct_or_union_define(enum Types type, char* identifier, AST* field_list);
+
 
 AST* ast_merge_specifier_qualifier(AST* me, AST* other, enum Types qualifier);
 

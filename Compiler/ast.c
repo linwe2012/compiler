@@ -138,6 +138,11 @@ void ast_init(AST* ast, ASTType type)
 	ast->type = type;
 }
 
+void* ast_destroy(AST* rhs)
+{
+
+}
+
 int check_ast(AST* ast)
 {
 	// return ast->type >= AST_EmptyExpr && ast->type <= AST_FunctionExpr;
@@ -1368,10 +1373,7 @@ AST* make_type_declarator(AST* specifier_qualifier, AST* declarator)
 	return SUPER(decl);
 }
 
-void* ast_destroy(AST* rhs)
-{
 
-}
 
 
 Value handle_AST(Context* ctx, SwitchCaseStmt* ast)
@@ -1535,6 +1537,64 @@ AST* ast_merge_specifier_qualifier(AST* me, AST* other, enum SymbolAttributes qu
 {
 	return make_type_specifier_extend(me, other, qualifier);
 }
+
+
+AST* make_initializer_list(AST* list)
+{
+	NEW_AST(InitilizerListExpr, ast);
+	ast->list = list;
+	return SUPER(ast);
+}
+
+// 这里解决的是 long a = 0;, 翻译成 int
+void normalize_type_specifier(TypeSpecifier* type)
+{
+	if (type->flags == TypeSpecifier_Long && type->info == NULL)
+	{
+		type->info = type_fetch_buildtin(TP_INT64);
+	}
+
+	
+}
+
+AST* make_parameter_declaration(AST* declaration_specifiers, AST* declarator)
+{
+	CAST(TypeSpecifier, spec, declaration_specifiers);
+	CAST(DeclaratorExpr, decl, declarator);
+
+	normalize_type_specifier(spec);
+
+	if (!declarator)
+	{
+		NEW_AST(DeclaratorExpr, decl);
+		decl->attributes = spec->attributes;
+		decl->first = spec->info;
+		TypeInfo* last = decl->first;
+		TypeInfo* last_child = type_get_child(last);
+		while (last_child)
+		{
+			last = last_child;
+			last_child = type_get_child(last);
+		}
+		decl->last = last;
+		decl->init_value = NULL;
+		decl->name = NULL;
+		return SUPER(decl);
+	}
+
+	decl = ast_apply_specifier_to_declartor(spec, decl);
+	return SUPER(decl);
+}
+
+AST* make_define_function(AST* declaration_specifiers, AST* declarator, AST* compound_statement)
+{
+	NEW_AST(FunctionDefinitionStmt, ast);
+	ast->declarator = declarator;
+	ast->body = compound_statement;
+	ast->specifier = declaration_specifiers;
+}
+
+
 /*
 Value handle_SwitchCaseStmt(Context*ctx, SwitchCaseStmt* ast)
 {
