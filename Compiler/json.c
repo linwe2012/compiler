@@ -48,14 +48,14 @@ void _write_ast(AST *root) {
 }
 
 void _write_BlockExpr(BlockExpr *expr) {
-    PRINT_NAME(Block);
+    PRINT_NAME((BLOCK));
     fputs(",\n\"children\": [", s_fp);
     _write_ast(expr->first_child);
     fputs("]\n", s_fp);
 }
 
 void _write_ListExpr(ListExpr *expr) {
-    PRINT_NAME(List);
+    PRINT_NAME((LIST));
     fputs(",\n\"children\": [", s_fp);
     _write_ast(expr->first_child);
     fputs("]\n", s_fp);
@@ -71,12 +71,12 @@ void _write_FunctionCallExpr(FunctionCallExpr *expr) {
 }
 
 void _write_IdentifierExpr(IdentifierExpr *expr) {
-    fprintf(s_fp, "\"name\":\"(ID)%s\"", expr->name);
+    fprintf(s_fp, "\"name\":\"%s\"", expr->name);
 }
 
 void _write_NumberExpr(NumberExpr *expr) {
     // Deprecated Type. 可以随时删除
-    PRINT_NAME(Number);
+    PRINT_NAME((NUMBER));
     // TODO: 暂时不关心具体数字了
     // switch (expr->number_type) {
     // // Types
@@ -266,16 +266,16 @@ void _write_LabelStmt(LabelStmt *stmt) {
 void _write_JumpStmt(JumpStmt *stmt) {
     switch (stmt->type) {
     case JUMP_GOTO:
-        PRINT_NAME(Goto);
+        PRINT_NAME(goto);
         break;
     case JUMP_BREAK:
-        PRINT_NAME(Break);
+        PRINT_NAME(break);
         break;
     case JUMP_CONTINUE:
-        PRINT_NAME(Continue);
+        PRINT_NAME(continue);
         break;
     case JUMP_RET:
-        PRINT_NAME(Return);
+        PRINT_NAME(return);
         break;
     default:
         PRINT_NAME(UNK);
@@ -289,7 +289,7 @@ void _write_JumpStmt(JumpStmt *stmt) {
 }
 
 void _write_InitilizerListExpr(InitilizerListExpr *expr) {
-    PRINT_NAME(InitList);
+    PRINT_NAME((INIT-LIST));
     if (expr->list) {
         fputs(",\n\"children\": [", s_fp);
         _write_ast(expr->list);
@@ -302,13 +302,13 @@ void _write_EmptyExpr(EmptyExpr *expr) { return; }
 void _write_LoopStmt(LoopStmt *stmt) {
     switch (stmt->loop_type) {
     case LOOP_DOWHILE:
-        PRINT_NAME(DoWhile);
+        PRINT_NAME(do-while);
         break;
     case LOOP_FOR:
-        PRINT_NAME(For);
+        PRINT_NAME(for);
         break;
     case LOOP_WHILE:
-        PRINT_NAME(While);
+        PRINT_NAME(while);
         break;
     default:
         PRINT_NAME(UNK);
@@ -344,7 +344,7 @@ void _write_LoopStmt(LoopStmt *stmt) {
 }
 
 void _write_IfStmt(IfStmt *stmt) {
-    PRINT_NAME(If);
+    PRINT_NAME(if);
     fputs(",\n\"children\": [", s_fp);
     int has_child = 0;
     if (stmt->condition) {
@@ -368,7 +368,7 @@ void _write_IfStmt(IfStmt *stmt) {
 }
 
 void _write_SwitchCaseStmt(SwitchCaseStmt *stmt) {
-    PRINT_NAME(Switch);
+    PRINT_NAME(switch);
     fputs(",\n\"children\": [", s_fp);
     int has_child = 0;
     if (stmt->switch_value) {
@@ -386,7 +386,7 @@ void _write_SwitchCaseStmt(SwitchCaseStmt *stmt) {
 }
 
 void _write_DeclaratorExpr(DeclaratorExpr *expr) {
-    fprintf(s_fp, "\"name\":\"(DECLARATOR)%s\"", expr->name);
+    fprintf(s_fp, "\"name\":\"%s\"", expr->name);
     fputs(",\n\"children\": [", s_fp);
     if (expr->init_value) {
         _write_ast(expr->init_value);
@@ -395,7 +395,7 @@ void _write_DeclaratorExpr(DeclaratorExpr *expr) {
 }
 
 void _write_TypeSpecifier(TypeSpecifier *expr) {
-    fprintf(s_fp, "\"name\":\"(TYPESPEC)%s\"", expr->name);
+    fprintf(s_fp, "\"name\":\"%s\"", expr->info->type_name);
 }
 
 

@@ -1,12 +1,12 @@
 {
-"name":"Block",
+"name":"(BLOCK)",
 "children": [{
 "name":"(DECLARE)",
 "children": [{
-"name":"(TYPESPEC)(null)"
+"name":"void"
 },
 {
-"name":"(DECLARATOR)putchar",
+"name":"putchar",
 "children": []
 
 }]
@@ -15,10 +15,10 @@
 {
 "name":"(DECLARE)",
 "children": [{
-"name":"(TYPESPEC)(null)"
+"name":"void"
 },
 {
-"name":"(DECLARATOR)dummy",
+"name":"dummy",
 "children": []
 
 }]
@@ -27,19 +27,19 @@
 {
 "name":"(FUNCDEF)",
 "children": [{
-"name":"(TYPESPEC)(null)"
+"name":"int"
 },
 {
-"name":"(DECLARATOR)main",
+"name":"main",
 "children": []
 
 },
 {
-"name":"Block",
+"name":"(BLOCK)",
 "children": [{
 "name":"(CALL)",
 "children": [{
-"name":"(ID)putchar"
+"name":"putchar"
 },
 {
 "name":"CONSTANT",
@@ -51,7 +51,7 @@
 {
 "name":"(CALL)",
 "children": [{
-"name":"(ID)putchar"
+"name":"putchar"
 },
 {
 "name":"CONSTANT",
@@ -63,7 +63,7 @@
 {
 "name":"(CALL)",
 "children": [{
-"name":"(ID)putchar"
+"name":"putchar"
 },
 {
 "name":"CONSTANT",
@@ -75,7 +75,7 @@
 {
 "name":"(CALL)",
 "children": [{
-"name":"(ID)putchar"
+"name":"putchar"
 },
 {
 "name":"CONSTANT",
@@ -87,7 +87,7 @@
 {
 "name":"(CALL)",
 "children": [{
-"name":"(ID)putchar"
+"name":"putchar"
 },
 {
 "name":"CONSTANT",
@@ -99,7 +99,7 @@
 {
 "name":"(CALL)",
 "children": [{
-"name":"(ID)dummy"
+"name":"dummy"
 },
 {
 "name":"CONSTANT",
@@ -119,7 +119,7 @@
 
 },
 {
-"name":"Return",
+"name":"return",
 "children": [{
 "name":"CONSTANT",
 "children": []
