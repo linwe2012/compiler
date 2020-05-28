@@ -1,0 +1,135 @@
+{
+    "name": "(BLOCK)",
+    "children": [
+        {
+            "name": "(DECLARE)",
+            "children": [
+                {
+                    "name": "void"
+                },
+                {
+                    "name": "putchar",
+                    "children": []
+                }
+            ]
+        },
+        {
+            "name": "(DECLARE)",
+            "children": [
+                {
+                    "name": "void"
+                },
+                {
+                    "name": "dummy",
+                    "children": []
+                }
+            ]
+        },
+        {
+            "name": "(FUNCDEF)",
+            "children": [
+                {
+                    "name": "int"
+                },
+                {
+                    "name": "main",
+                    "children": []
+                },
+                {
+                    "name": "(BLOCK)",
+                    "children": [
+                        {
+                            "name": "(CALL)",
+                            "children": [
+                                {
+                                    "name": "putchar"
+                                },
+                                {
+                                    "name": "CONSTANT",
+                                    "children": []
+                                }
+                            ]
+                        },
+                        {
+                            "name": "(CALL)",
+                            "children": [
+                                {
+                                    "name": "putchar"
+                                },
+                                {
+                                    "name": "CONSTANT",
+                                    "children": []
+                                }
+                            ]
+                        },
+                        {
+                            "name": "(CALL)",
+                            "children": [
+                                {
+                                    "name": "putchar"
+                                },
+                                {
+                                    "name": "CONSTANT",
+                                    "children": []
+                                }
+                            ]
+                        },
+                        {
+                            "name": "(CALL)",
+                            "children": [
+                                {
+                                    "name": "putchar"
+                                },
+                                {
+                                    "name": "CONSTANT",
+                                    "children": []
+                                }
+                            ]
+                        },
+                        {
+                            "name": "(CALL)",
+                            "children": [
+                                {
+                                    "name": "putchar"
+                                },
+                                {
+                                    "name": "CONSTANT",
+                                    "children": []
+                                }
+                            ]
+                        },
+                        {
+                            "name": "(CALL)",
+                            "children": [
+                                {
+                                    "name": "dummy"
+                                },
+                                {
+                                    "name": "CONSTANT",
+                                    "children": []
+                                },
+                                {
+                                    "name": "CONSTANT",
+                                    "children": []
+                                },
+                                {
+                                    "name": "CONSTANT",
+                                    "children": []
+                                }
+                            ]
+                        },
+                        {
+                            "name": "return",
+                            "children": [
+                                {
+                                    "name": "CONSTANT",
+                                    "children": []
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}
