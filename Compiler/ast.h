@@ -98,10 +98,20 @@ struct OperatorExpr
 	AST* rhs;
 	AST* cond;
 	enum Types number_type;
+	//TODO: 除了f64和i64实际没有被实现
 	union
 	{
+		int8_t i8; 
+		uint8_t ui8;
+		int16_t i16;
+		uint16_t ui16;
+		int32_t i32;
+		uint32_t ui32;
 		int64_t i64;
+		uint64_t ui64;
+		float f32;
 		double f64;
+		char* str;
 	};
 };
 

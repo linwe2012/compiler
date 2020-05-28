@@ -190,7 +190,8 @@ int str_begin_with(const char* a, const char* prefix)
 
 AST* make_number_int(char* c, enum Types type)
 {
-	NEW_AST(NumberExpr, ast);
+	//NEW_AST(NumberExpr, ast);
+	NEW_AST(OperatorExpr, ast);
 	ast->number_type = type;
 
 	int is_unsign = type & TP_UNSIGNED;
@@ -241,7 +242,8 @@ AST* make_string(char* c)
 
 AST* make_number_float(const char* c, int bits)
 {
-	NEW_AST(NumberExpr, ast);
+	//NEW_AST(NumberExpr, ast);
+	NEW_AST(OperatorExpr, ast);
 	if (bits == 32)
 	{
 		ast->number_type = TP_FLOAT32;
@@ -271,7 +273,7 @@ void add_or_dec_one(OperatorExpr* ast, OperatorExpr* num, int value, const char*
 	else if (num->number_type & TP_FLOAT32)
 	{
 		ast->f32 = num->f32 + value;
-	}*/
+	}
 	if (num->number_type & TP_FLOAT64)
 	{
 		ast->f64 = num->f64 + value;
@@ -283,7 +285,7 @@ void add_or_dec_one(OperatorExpr* ast, OperatorExpr* num, int value, const char*
 	else
 	{
 		*err_msg = "This type can not use this operation";
-	}
+	}*/
 }
 
 DeclaratorExpr* ast_apply_specifier_to_declartor(TypeSpecifier* spec, DeclaratorExpr* decl)
@@ -345,7 +347,7 @@ AST* make_unary_expr(enum Operators unary_op, AST* rhs)
 		if (type & TP_INT64)
 		{
 			SET_TYPE(ast, type);
-			ast->i64 = ~number->i64;
+			//ast->i64 = ~number->i64;
 			ast->number_type = type;
 		}
 		else
@@ -357,7 +359,7 @@ AST* make_unary_expr(enum Operators unary_op, AST* rhs)
 		if (type & TP_INT64)
 		{
 			SET_TYPE(ast, type);
-			ast->i64 = !number->i64;
+			//ast->i64 = !number->i64;
 			ast->number_type = type;
 		}
 		else
@@ -383,12 +385,12 @@ AST* make_unary_expr(enum Operators unary_op, AST* rhs)
 		if (type & TP_INT64)
 		{
 			SET_TYPE(ast, type);
-			ast->i64 = -number->i64;
+			//ast->i64 = -number->i64;
 		}
 		else if (type & TP_FLOAT64)
 		{
 			SET_TYPE(ast, type);
-			ast->f64 = -number->f64;
+			//ast->f64 = -number->f64;
 		}
 		else {
 			err_msg = "Expected int or float va";
@@ -445,8 +447,8 @@ AST* make_unary_expr(enum Operators unary_op, AST* rhs)
 	return SUPER(ast);
 }
 
-void handle_arithmetic_op_int_value(NumberExpr* ast, enum Operators binary_op, NumberExpr* lhs,
-	NumberExpr* rhs, const char** err_msg)
+void handle_arithmetic_op_int_value(OperatorExpr* ast, enum Operators binary_op, OperatorExpr* lhs,
+	OperatorExpr* rhs, const char** err_msg)
 {
 	if (!(lhs->number_type & rhs->number_type & TP_INT64))
 	{
@@ -456,7 +458,7 @@ void handle_arithmetic_op_int_value(NumberExpr* ast, enum Operators binary_op, N
 	else
 	{
 		ast->number_type = TP_INT64;
-		switch (binary_op)
+		/*switch (binary_op)
 		{
 		case OP_BIT_AND:
 			ast->i64 = lhs->i64 & rhs->i64;
@@ -496,12 +498,12 @@ void handle_arithmetic_op_int_value(NumberExpr* ast, enum Operators binary_op, N
 			break;
 		default:
 			break;
-		}
+		}*/
 	}
 }
 
-void handle_arithmetic_op_float_value(NumberExpr* ast, enum Operators binary_op, NumberExpr* lhs,
-	NumberExpr* rhs, const char** err_msg)
+void handle_arithmetic_op_float_value(OperatorExpr* ast, enum Operators binary_op, OperatorExpr* lhs,
+	OperatorExpr* rhs, const char** err_msg)
 {
 	if (!(type_is_arithmetic(lhs->number_type) && type_is_arithmetic(rhs->number_type)))
 	{
@@ -510,7 +512,7 @@ void handle_arithmetic_op_float_value(NumberExpr* ast, enum Operators binary_op,
 	}
 	double left_number, right_number;
 	ast->number_type = TP_FLOAT64;
-	if (lhs->number_type & TP_FLOAT64)
+	/*if (lhs->number_type & TP_FLOAT64)
 		left_number = lhs->f64;
 	else
 		left_number = lhs->i64;
@@ -536,11 +538,11 @@ void handle_arithmetic_op_float_value(NumberExpr* ast, enum Operators binary_op,
 		break;
 	default:
 		break;
-	}
+	}*/
 }
-void handle_assign_op(NumberExpr* lhs, NumberExpr* rhs, const char** err_msg)
+void handle_assign_op(OperatorExpr* lhs, OperatorExpr* rhs, const char** err_msg)
 {
-	if (!(type_is_arithmetic(lhs->number_type) && type_is_arithmetic(rhs->number_type)))
+	/*if (!(type_is_arithmetic(lhs->number_type) && type_is_arithmetic(rhs->number_type)))
 	{
 		*err_msg = "lhs or rhs is not arhitecture type";
 		return;
@@ -558,18 +560,19 @@ void handle_assign_op(NumberExpr* lhs, NumberExpr* rhs, const char** err_msg)
 			lhs->f64 = rhs->i64;
 		else
 			lhs->f64 = rhs->i64;
-	}
+	}*/
 }
 
-void handle_logical_op(NumberExpr* ast, enum Operators binary_op, NumberExpr* lhs,
-	NumberExpr* rhs, const char** err_msg)
+void handle_logical_op(OperatorExpr* ast, enum Operators binary_op, OperatorExpr* lhs,
+	OperatorExpr* rhs, const char** err_msg)
 {
 	if (!(type_is_arithmetic(lhs->number_type) && type_is_arithmetic(rhs->number_type)))
 	{
 		*err_msg = "lhs or rhs is not arhitecture type";
 		return;
 	}
-	double left_number, right_number;
+	ast->number_type = TP_INT64;
+	/*double left_number, right_number;
 	if (lhs->number_type & TP_FLOAT64)
 		left_number = lhs->f64;
 	else
@@ -628,7 +631,7 @@ void handle_logical_op(NumberExpr* ast, enum Operators binary_op, NumberExpr* lh
 		break;
 	default:
 		break;
-	}
+	}*/
 }
 
 AST* make_binary_expr(enum Operators binary_op, AST* lhs, AST* rhs)
