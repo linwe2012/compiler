@@ -27,7 +27,7 @@ identifier	[a-zA-Z_][a-zA-Z0-9_]*
 whitespace	[[:space:]]+
 float		{dec_int}"."[0-9]*
 
-c_comment	\/\*(?:[^\*]|\*+[^\/\*])*\*+\/
+c_comment	\/\*[^*]*\*+([^/*][^*]*\*+)*\/
 cpp_comment	\/\/.*
 comment		{c_comment}|{cpp_comment}
 

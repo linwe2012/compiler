@@ -84,13 +84,13 @@ treeJSON = d3.json("data.json", function(error, treeData) {
 
     // sort the tree according to the node names
 
-    function sortTree() {
-        tree.sort(function(a, b) {
-            return b.name.toLowerCase() < a.name.toLowerCase() ? 1 : -1;
-        });
-    }
+    // function sortTree() {
+    //     tree.sort(function(a, b) {
+    //         return b.name.toLowerCase() < a.name.toLowerCase() ? 1 : -1;
+    //     });
+    // }
     // Sort the tree initially incase the JSON isn't in a sorted order.
-    sortTree();
+    // sortTree();
 
     // TODO: Pan function, can be better implemented.
 
@@ -250,7 +250,7 @@ treeJSON = d3.json("data.json", function(error, treeData) {
                 }
                 // Make sure that the node being added to is expanded so user can see added node is correctly moved
                 expand(selectedNode);
-                sortTree();
+                // sortTree();
                 endDrag();
             } else {
                 endDrag();
