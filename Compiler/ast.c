@@ -242,6 +242,13 @@ V(64, "lld")
 	default:
 		break;
 	}
+	
+	// OperatorExpr* op = ast;
+	// printf("\n\nconstant_print: ");
+	// value_constant_print(stdout, op->number_type, 
+	// 	(union ConstantValue*)(&op->_barrier + 1));
+	// printf("\n\n");
+
 
 	return SUPER(ast);
 }

@@ -1,6 +1,4 @@
 {
-"name":"Block",
-"children": [{
 "name":"(DECL))",
 "children": [{
 "name":"(TYPESPEC)(null)"
@@ -102,8 +100,6 @@
 {
 "name":"UNK",
 "children": []
-
-}]
 
 }]
 

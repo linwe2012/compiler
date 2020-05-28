@@ -72,34 +72,34 @@ typedef uint64_t uint128_t;
 
 // typename, typename in c,  bits
 #define INTERNAL_TYPE_LIST_MISC(V) \
-V(VOID, "void", 8, void, v ) \
-V(ELLIPSIS, "...", 8, ellipse, e )
+V(VOID, "void", 8, void, v , "") \
+V(ELLIPSIS, "...", 8, ellipse, e, "")
 
 #define INTERNAL_TYPE_LIST_INT(V)\
-V(INT8, "char", 8, char, i )\
-V(INT16, "short", 16, short, i)\
-V(INT32, "int", 32, int, i) \
-V(INT64, "long long", 64, long long, i)\
-V(INT128, "__int128", 128, long long, i) \
+V(INT8, "char", 8, char, i, "c")\
+V(INT16, "short", 16, short, i, "hd")\
+V(INT32, "int", 32, int, i, "d") \
+V(INT64, "long long", 64, long long, i, "lld")\
+V(INT128, "__int128", 128, long long, i, "lld") \
 
 
 
 #define INTERNAL_TYPE_LIST_FLOAT(V)\
-V(FLOAT32, "float", 32, float, f )\
-V(FLOAT64, "double", 64, double, f )\
-V(FLOAT128, "__float128", 128, __float128, f )
+V(FLOAT32, "float", 32, float, f, "f")\
+V(FLOAT64, "double", 64, double, f, "lf")\
+V(FLOAT128, "__float128", 128, __float128, f , "lf")
 
 #define INTERNAL_TYPE_LIST_INT_2(V)\
-V(INT8, "char", 8, char, i )\
-V(INT16, "short", 16, short, i)\
-V(INT32, "int", 32, int, i) \
-V(INT64, "long long", 64, long long, i)\
-V(INT128, "__int128", 128, long long, i) \
+V(INT8, "char", 8, char, i, "c")\
+V(INT16, "short", 16, short, i, "hd")\
+V(INT32, "int", 32, int, i, "d") \
+V(INT64, "long long", 64, long long, i, "lld")\
+V(INT128, "__int128", 128, long long, i, "lld") 
 
 #define INTERNAL_TYPE_LIST_FLOAT_2(V)\
-V(FLOAT32, "float", 32, float, f )\
-V(FLOAT64, "double", 64, double, f )\
-V(FLOAT128, "__float128", 128, __float128, f )
+V(FLOAT32, "float", 32, float, f, "f")\
+V(FLOAT64, "double", 64, double, f, "lf")\
+V(FLOAT128, "__float128", 128, __float128, f , "lf")
 
 
 #define INTERNAL_TYPE_LIST(V)\

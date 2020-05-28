@@ -7,6 +7,7 @@
 #include <stdint.h>
 #include "types.h"
 #include "hashtable.h"
+#include <stdio.h>
 #include <llvm-c/Core.h>
 
 STRUCT_TYPE(Symbol)
@@ -237,6 +238,6 @@ inline int type_native_alignment(int type)
 	return (x >= TP_INT8) && (x <= TP_FLOAT128);
 }
 
-
+void value_constant_print(FILE* f, enum Types type, union ConstantValue* pval);
 
 #endif

@@ -3,6 +3,7 @@
 #include "error.h"
 #include "utils.h"
 
+
 STRUCT_TYPE(SymbolTableEntry);
 
 TypeInfo builtins[TP_NUM_BUILTINS + TP_NUM_BUILTIN_INTS + 1];
@@ -417,10 +418,10 @@ union ConstantValue constant_cast(enum Types from, enum Types to, union Constant
 	from &= ~TP_SIGNED;
 	to &= ~TP_SIGNED;
 	
-#define INNER_SWICTH(type, name, bits, type_name, prefix)\
+#define INNER_SWICTH(type, name, bits, type_name, prefix, format)\
 	case TP_##type: res.prefix##bits = data; break;
 
-#define INNER_SWICTH_UNSIGNED(type, name, bits, type_name, prefix)\
+#define INNER_SWICTH_UNSIGNED(type, name, bits, type_name, prefix, format)\
 	case TP_##type | TP_UNSIGNED: res.prefix##bits = data; break;
 
 #define INNER_CASES \
@@ -428,7 +429,7 @@ union ConstantValue constant_cast(enum Types from, enum Types to, union Constant
 	INTERNAL_TYPE_LIST_INT_2(INNER_SWICTH_UNSIGNED) \
 	INTERNAL_TYPE_LIST_FLOAT_2(INNER_SWICTH) \
 
-#define OUTER_SWICTH(type, name, bits, type_name, prefix)\
+#define OUTER_SWICTH(type, name, bits, type_name, prefix, format)\
 	case TP_##type: \
 	{   type_name data = src.prefix##bits; \
 		switch (to){\
@@ -439,7 +440,7 @@ union ConstantValue constant_cast(enum Types from, enum Types to, union Constant
 		}\
 	}
 
-#define OUTER_SWICTH_UNSIGNED(type, name, bits, type_name, prefix)\
+#define OUTER_SWICTH_UNSIGNED(type, name, bits, type_name, prefix, format)\
 	case TP_##type | TP_UNSIGNED: \
 	{   unsigned type_name data = src.u##prefix##bits; \
 		switch (to){\
@@ -519,4 +520,24 @@ int type_append(TypeInfo* tail, TypeInfo* new_tail)
 	tail->next = new_tail;
 	new_tail->prev = tail;
 	return 0;
+}
+
+void value_constant_print(FILE* f, enum Types type, union ConstantValue* pval)
+{
+#define PRT_CASE(type_name, pretty_name, bits, c_type, prefix, formater) \
+	case TP_##type_name: fprintf(f, "(" pretty_name ")" "%" formater, pval->prefix##bits); break;
+
+#define PRT_CASE_UNSIGNED(type_name, pretty_name, bits, c_type, prefix, formater) \
+	case TP_##type_name | TP_UNSIGNED: \
+	fprintf(f, "(" pretty_name ")" "%" formater "u" , pval->u##prefix##bits); break;
+
+	switch (type)
+	{
+		INTERNAL_TYPE_LIST_FLOAT(PRT_CASE);
+		INTERNAL_TYPE_LIST_INT(PRT_CASE);
+		INTERNAL_TYPE_LIST_INT(PRT_CASE_UNSIGNED);
+
+	default:
+		break;
+	}
 }

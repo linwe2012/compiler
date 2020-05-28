@@ -29,8 +29,8 @@ int main()
 	else {
 		printf("Parser failed\n");
 	}
-	AST* ast = make_block(parser_result);// yylval.val;
-	ast_to_json(ast, "test/out.json");
+	// AST* ast = make_block(parser_result);// yylval.val;
+	ast_to_json(parser_result, "test/out.json");
 
 	printf("done");
 	return res;
