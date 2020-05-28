@@ -7,7 +7,7 @@
 #include "json.h"
 extern AST* parser_result;
 
-
+extern int yydebug;
 
 
 int main()
@@ -18,6 +18,7 @@ int main()
 
 #ifdef CC_DEBUG
 	// parser_set_debug(0);
+	// yydebug = 1;
 #endif
 	yyin = fopen("test/mini.c", "rt");
 	int res = yyparse();

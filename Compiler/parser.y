@@ -26,6 +26,7 @@ AST* parser_result = NULL;
 %token <str> SUB_ASSIGN LEFT_ASSIGN RIGHT_ASSIGN AND_ASSIGN
 %token <str> XOR_ASSIGN OR_ASSIGN
 %token <str> TYPE_NAME
+%token <str> NUM_INT NUM_FLOAT32 NUM_FLOAT64
 
 %token <str> TYPEDEF EXTERN STATIC AUTO REGISTER INLINE RESTRICT
 %token <str> CHAR SHORT INT LONG SIGNED UNSIGNED FLOAT DOUBLE CONST VOLATILE VOID INT64
@@ -63,8 +64,8 @@ AST* parser_result = NULL;
 %%
 // defination part
 translation_unit 
-    : external_declaration                      { $$ = $1; }
-    | external_declaration translation_unit     { $$ = ast_append($1, $2); }
+    : external_declaration                      { parser_result = $1; $$ = $1; }
+    | external_declaration translation_unit     { parser_result = $1; $$ = ast_append($1, $2); }
     ;
 
 external_declaration
@@ -171,7 +172,7 @@ parameter_list
 type_qualifier_list
     : type_qualifier                     { $$ = $1; }
 	| type_qualifier_list type_qualifier { $$ = ast_merge_type_qualifier($1, $2); }
-
+	;
 
 enum_specifier
 	: ENUM '{' enumerator_list '}'              { $$ = make_enum_define(NULL, $3); }
@@ -187,6 +188,7 @@ enumerator_list
 enumerator
 	: IDENTIFIER                         { $$ = make_identifier($1); }
 	| IDENTIFIER '=' constant_expression { $$ = make_identifier_with_constant_val($1, $3);  }
+	;
 
 struct_or_union_specifier
 	: struct_or_union '{' struct_declaration_list '}'                { $$ = make_struct_or_union_define($1, NULL, $3);  }
@@ -478,7 +480,9 @@ postfix_expression
 
 primary_expression
 	: IDENTIFIER       { $$ = make_identifier($1); }
-	// | CONSTANT <-- 这是啥
+	| NUM_INT            { $$ = make_number_int($1, TP_INT64); }
+	| NUM_FLOAT32           { $$ = make_number_int($1, 32); }
+	| NUM_FLOAT64           { $$ = make_number_int($1, 64); }
 	| STRING_LITERAL      { $$ = make_string($1); }  
 	| '(' expression ')'  { $$ = make_list_expr($2); }
 	;

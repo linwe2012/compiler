@@ -7,9 +7,15 @@
 #include <stdint.h>
 #include "types.h"
 #include "hashtable.h"
-
+#include <llvm-c/Core.h>
 
 STRUCT_TYPE(Symbol)
+
+struct CompileData
+{
+	LLVMValueRef val;
+};
+
 
 
 /*
@@ -180,6 +186,7 @@ void symbol_init_context(struct Context* context);
 
 // 符号表相关函数
 // ================================
+SymbolTable* symtbl_new();
 // Symbol.name 记录了 name 的信息
 void symtbl_push(SymbolTable* tbl, Symbol* c);
 Symbol* symtbl_find(SymbolTable* tbl, const char* name);
