@@ -4,7 +4,7 @@
 
 
 // modified based on Google V8 engine
-
+/*
 #include "config.h"
 #include "ast.h"
 
@@ -231,3 +231,4 @@ void x64_asm_init(ASMContext* ctx);
 
 // dst -= src
 void emit_sub(ASMContext* ctx, Value* dst, Value* src);
+*/

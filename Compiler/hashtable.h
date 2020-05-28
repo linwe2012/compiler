@@ -12,7 +12,8 @@ typedef struct HashItem
 	struct HashItem* next;
 	const void* key;
 	HashedKey key_hash;
-	char payload[1];
+	void* payload;
+	// char payload[1];
 } HashItem;
 
 typedef struct HashTable
@@ -36,7 +37,7 @@ typedef struct HashTable
 // payload_size = sizeof(int)
 // capacity = any prime number, can be zero
 // equal = (a, b)->{ return *(int*)a == *(int*)b; }
-HashTable* hash_new(int payload_size, int capacity, HashEqual equal, Hasher* hasher);
+HashTable* hash_new(int payload_size, int capacity, HashEqual equal, Hasher hasher);
 
 // returns nullptr
 HashTable* hash_destroy(HashTable* table);

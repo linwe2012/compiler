@@ -4,14 +4,15 @@
 // ===============================
 struct StructA
 {
-    char u; // offset = 0
-    int x; // offset = 4
-    double f; // offset = 8
+    char u;   // offset = 0, padding = 3
+    int x;    // offset = 4, padding = 4
+    double f; // offset = 8, padding = 0
+    char j;   // offset = 16, padding = 7
 };
 constexpr size_t int64 = alignof(__int64);
 
 static_assert(alignof(StructA) == 8, "结构体对齐按照最大算");
-static_assert(sizeof(StructA) == 16, "结构体对齐后的大小");
+static_assert(sizeof(StructA) == 24, "结构体对齐后的大小");
 
 
 // Union 的访问能力
@@ -45,6 +46,11 @@ int test(){
 
     constexpr unsigned int x = 0xF0000000;
     constexpr int v = x;
+
+    static char *const (*(*const var)())[10], b;
+    auto x = var();
+
+    constexpr unsigned n = -123456u;
 
     return 0;
 }

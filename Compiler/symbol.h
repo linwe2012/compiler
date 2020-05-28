@@ -2,41 +2,221 @@
 #define _SYMBOL_H_
 
 #include "config.h"
+#include <stdlib.h>
+#include <string.h>
+#include <stdint.h>
+#include "types.h"
+#include "hashtable.h"
 
-enum SymbolAttributes
+
+STRUCT_TYPE(Symbol)
+
+
+/*
+struct TypeAlias
 {
-	ATTR_EXTERN,
-	ATTR_STATIC,
-	ATTR_TYPEDEF,
-	ATTR_INLINE
+	char* alias;
+	int is_alias;
+
+	struct TypeInfo* info;
+	struct TypeAlias* prev;
+	struct TypeAlias* next;
+};
+STRUCT_TYPE(TypeAlias)
+*/
+
+// 注意 类型名称 'struct A;'
+//                     ^
+//                     +------- 只能由一个空格
+// type_name
+//         : struct typename
+//         : union  typename
+//         : typename
+struct TypeInfo
+{
+	char* type_name;     // 类型的名称 (必须是 struct TypeInfo 第一个字段)
+	int is_alias;   
+	char* field_name;    // struct/union 字段名称
+	enum Types type;     // 基础类型
+
+	int alignment;       // 最小对齐要求, bytes
+	int aligned_size;    // 对齐后所占的空间, bytes
+	int offset;          // 如果是结构体, 距离结构体首部的距离
+	int bitfield_offset; // bit field 距离上一个非bitfield元素的距离
+	int bitfield;        // bit field 占多少个字节
+
+	enum SymbolAttributes qualifiers; // const 等 qualifier
+
+	union
+	{
+		struct StructOrUnion
+		{
+			struct TypeInfo* child;
+		} struc ;
+
+		struct Pointer
+		{
+			struct TypeInfo* pointing;
+			int indirection;
+		} ptr ;
+
+		struct Array
+		{
+			struct TypeInfo* array_type;
+			uint64_t array_count;
+		} arr;
+		
+		struct Function
+		{
+			struct TypeInfo* return_type;
+			struct TypeInfo* params;
+		} fn ;
+
+		struct EnumItem
+		{
+			uint64_t val;
+		} enu;
+
+		struct StructField
+		{
+			enum SymbolAttributes attrib;
+		} struc_field;
+	};
+	
+	struct TypeInfo* prev;
+	struct TypeInfo* next;
+
+	struct TypeAlias* alias;
+	struct TypeInfo* alias_origin;
+};
+STRUCT_TYPE(TypeInfo)
+
+struct VariableInfo
+{
+	char* name;
+	enum SymbolAttributes attributes;
+	Symbol* type;
+	int is_constant;
+	union ConstantValue const_val;
+};
+STRUCT_TYPE(VariableInfo)
+
+struct FunctionInfo
+{
+	char* name;
+	TypeInfo* return_type;
+	TypeInfo* params;
+	struct AST* body;
+};
+STRUCT_TYPE(FunctionInfo)
+
+struct LabelInfo
+{
+	char* name;
+	uint64_t label_id;
+	int resolved; // 当 goto 定义在 label: 之前的时候, 会产生一个 unresolved label
+};
+STRUCT_TYPE(LabelInfo)
+
+
+struct SymbolBase
+{
+	char* key;
 };
 
-enum Types
+enum SymbolTypes
 {
-	TP_VOID,
-	TP_INT8, // signed char
-	TP_INT16, // short
-	TP_INT32, // int
-	TP_INT64, // long long
-	TP_INT128,
-
-	TP_FLOAT32, // float
-	TP_FLOAT64, // double
-	TP_FLOAT128,
-
-	TP_STRUCT = 0x0010,
-	TP_UNION,
-	TP_ENUM,
-	TP_PTR, // pointer
-	TP_FUNC, // function
-
-	TP_UNSIGNED = 0x00100,
-	TP_SIGNED   = 0x00200,
-	TP_ARRAY    = 0x00400,
-	TP_BITFIELD = 0x00800,
-	TP_CONST    = 0x01000,
-	TP_VOLATILE = 0x02000,
+	Symbol_TypeInfo,
+	Symbol_VariableInfo,
+	Symbol_FunctionInfo,
+	Symbol_LabelInfo
 };
+struct Symbol
+{
+	union 
+	{
+		struct
+		{
+			char* name;
+		};
+		TypeInfo type;
+		VariableInfo var;
+		FunctionInfo func;
+		LabelInfo* label;
+	};
+
+	Symbol* prev;
+	// Symbol* next;
+	enum SymbolTypes usage;
+};
+
+
+
+struct SymbolStackInfo
+{
+	Symbol* first;
+	Symbol* last;
+
+	struct SymbolStackInfo* prev;
+	struct SymbolStackInfo* next;
+
+	struct SymbolStackInfo* real_prev;
+	int nest;
+};
+
+// TODO: Use hash table to optimize
+struct SymbolTable
+{
+	struct SymbolStackInfo* stack_top;
+	struct SymbolStackInfo* bottom;
+	
+	//struct SymbolStackInfo* global;
+};
+
+STRUCT_TYPE(SymbolTable)
+
+
+void symbol_init_context(struct Context* context);
+
+// 符号表相关函数
+// ================================
+// Symbol.name 记录了 name 的信息
+void symtbl_push(SymbolTable* tbl, Symbol* c);
+Symbol* symtbl_find(SymbolTable* tbl, const char* name);
+// 如果进入函数的话, 那么函数只能访问全局变量, 所以要 keep_global_only = true
+void symtbl_enter_scope(SymbolTable* tbl, int keep_global_only);
+void symtbl_leave_scope(SymbolTable* tbl, int free_all_symols);
+
+// 符号创建函数
+// ================================
+TypeInfo* type_fetch_buildtin(enum Types type);
+Symbol* symbol_create_label(char* name, uint64_t label, int resolved);
+Symbol* symbol_create_constant(Symbol* enum_sym, char* name, union ConstantValue val);
+Symbol* symbol_create_enum(char* name);
+Symbol* symbol_create_enum_item(char* name, int64_t val);
+Symbol* symbol_from_type_info(TypeInfo* info);
+Symbol* symbol_create_struct_or_union(TypeInfo* info, TypeInfo* child);
+
+// 类型管理 & 创建
+// ================================
+TypeInfo* type_create_array(uint64_t n, enum SymbolAttributes qualifers);
+TypeInfo* type_create_struct_or_union(enum Types type, char* name);
+TypeInfo* type_create_ptr(enum SymbolAttributes qualifers);
+TypeInfo* type_create_func(struct TypeInfo* params);
+TypeInfo* create_struct_field(TypeInfo* type_info, enum SymbolAttributes attributes, char* field_name);
+
+TypeInfo* type_create_param_ellipse();
+
+
+int type_wrap(TypeInfo* parent, TypeInfo* child);
+int type_append(TypeInfo* tail, TypeInfo* new_tail);
+TypeInfo* type_get_child(TypeInfo* parent);
+
+// 类型工具
+// ================================
+
+// 把一个任意的 numeric 类型 cast 成别的 numeric 类型
+union ConstantValue constant_cast(enum Types from, enum Types to, union ConstantValue src);
 
 inline int type_is_number(int type)
 {
@@ -50,95 +230,6 @@ inline int type_native_alignment(int type)
 	return (x >= TP_INT8) && (x <= TP_FLOAT128);
 }
 
-int type_number_size(int type);
-
-struct TypeInfo
-{
-	char* type_name;
-	char* field_name;
-	enum Types type;
-	int aligned_size;
-	int alignment;
-	int offset; // 如果是结构体, 距离结构体首部的距离
-	struct TypeInfo* child;
-
-	struct TypeInfo* prev;
-	struct TypeInfo* next;
-};
-STRUCT_TYPE(TypeInfo)
-
-TypeInfo* type_access(TypeInfo* info, const char* name)
-{
-	
-}
-
-#define max(x, y) ((x) > (y) ? (x) : (y))
-
-int type_add_child(TypeInfo* info, TypeInfo* child)
-{
-	TypeInfo* move = child;
-	int max_aligned_size = 0;
-	int max_alignment = 0;
-	while (move)
-	{
-		max_aligned_size = max(move->aligned_size, max_aligned_size);
-		max_alignment = max(move->alignment, max_alignment);
-	}
-
-	if (info->type & TP_UNION)
-	{
-		move->offset = 0;
-		info->aligned_size = max_aligned_size;
-		info->alignment = max_alignment;
-	}
-	else if (info->type & TP_STRUCT)
-	{
-		int size = 0;
-		move = child;
-		while (move)
-		{
-			if (size != 0)
-			{
-				size = (size / move->alignment + 1) * move->alignment;
-			}
-			
-			move->offset = size;
-			size += move->alignment;
-		}
-
-		info->aligned_size = size;
-		info->alignment = max_alignment;
-	}
-	else if (info->type & TP_ENUM)
-	{
-
-	}
-	
-
-
-}
-
-TypeInfo* type_append(TypeInfo* left, TypeInfo* right)
-{
-
-}
-
-
-struct SymbolType
-{
-
-};
-
-struct Symbol
-{
-	int type;
-	int attributes;
-};
-
-struct TypeDeclaration
-{
-	
-};
 
 
 #endif

@@ -3,100 +3,57 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include "config.h"
-#define AST_PARAMS 
-
-enum Types
-{
-	TP_VOID = 0u,
-	TP_INT8, // signed char
-	TP_INT16, // short
-	TP_INT32, // int
-	TP_INT64, // long long
-	TP_INT128,
-
-	TP_FLOAT32, // float
-	TP_FLOAT64, // double
-	TP_FLOAT128,
-
-	TP_STRUCT = 0x0010u,
-	TP_UNION  = 0x0020u,
-	TP_ENUM   = 0x0040u,
-	TP_PTR    = 0x0080u, // pointer
-	TP_FUNC   = 0x0100u, // function
-
-	TP_UNSIGNED = 0x001000u,
-	TP_SIGNED   = 0x002000u,
-	TP_ARRAY    = 0x004000u,
-	TP_BITFIELD = 0x008000u,
-	TP_CONST    = 0x010000u,
-	TP_VOLATILE = 0x020000u,
-
-	TP_CLEAR_SIGNFLAGS = ~(TP_UNSIGNED | TP_SIGNED),
-	TP_CLEAR_ATTRIBUTEFLAGS = (TP_UNSIGNED - 1)
-};
-
-// typename, typename in c,  bits
-#define INTERNAL_TYPE_LIST(V)\
-V(INT8, "char", 8)\
-V(INT16, "short", 16)\
-V(INT32, "int", 32) \
-V(INT64, "long long", 64)\
-V(INT128, "__int128", 128) \
-V(FLOAT32, "float", 32)\
-V(FLOAT64, "double", 64)\
-V(FLOAT128, "__float128", 128)
-
-
-inline int type_numeric_bytes(enum Types t)
-{
-#define TYPE_BYTES(t, cstr, bits) case TP_##t: return bits / 8;
-	switch (t)
-	{
-		INTERNAL_TYPE_LIST(TYPE_BYTES)
-	default:
-		break;
-	}
-#undef TYPE_BYTES
-	return -1;
-}
-
-inline int type_is_float_point(enum Types t)
-{
-	return t <= TP_FLOAT128 && t >= TP_FLOAT32;
-}
-
+#include "symbol.h"
+#include "types.h"
 
 #define AST_NODE_LIST(V) \
-	V(EmptyExpr) \
 	V(BlockExpr) \
-	V(ReturnStatement) \
 	V(ListExpr) \
 	V(FunctionCallExpr)\
-    V(NumberExpr) \
-	V(SymbolExpr) \
-	V(FunctionExpr)
+	V(IdentifierExpr) \
+    V(NumberExpr)   \
+	V(SymbolExpr)   \
+	V(OperatorExpr) \
+	V(LabelStmt) \
+	V(JumpStmt) \
+	V(InitilizerListExpr)\
+	V(DeclareStmt)\
+	V(EnumDeclareStmt)\
+	V(AggregateDeclareStmt)\
+	V(FunctionDefinitionStmt)
+
+#define AST_AUX_NODE_LIST(V)\
+	V(EmptyExpr) \
+	V(TypenameExpr)\
+	V(LoopStmt)\
+	V(IfStmt) \
+	V(SwitchCaseStmt)\
+	V(DeclaratorExpr)\
+	V(TypeSpecifier) \
 
 
 typedef enum ASTType {
 #define ENUM_AST(x) AST_##x,
 	AST_NODE_LIST(ENUM_AST)
+	AST_AUX_NODE_LIST(ENUM_AST)
 #undef ENUM_AST
 } ASTType;
 
 
+struct ASTVPTR
+{
+	int (*is_constexpr)();
+
+};
+
 struct AST {
 	ASTType type;
+	// TypeInfo* type;
 	struct AST* prev, * next;
 };
 typedef struct AST AST;
 
-
-struct Symbol
-{
-	const char* name;
-};
-typedef struct Symbol Symbol;
-
+/*
 typedef struct FunctionDefinition
 {
 	AST* params;
@@ -105,18 +62,10 @@ typedef struct FunctionDefinition
 	AST* body;
 	const char* return_type;
 } FunctionDefinition;
-
-
-// 方便 yacc
-struct EmptyExpr
-{
-
-	AST super;
-
-};
-
-//
-// { BlockNode }
+*/
+// 
+// 用大括号包围的语句会进入一个新的 scope
+// { first_child; second; ... }
 // 
 struct BlockExpr
 {
@@ -125,16 +74,80 @@ struct BlockExpr
 	AST* first_child;
 };
 
-struct ReturnStatement
+struct FunctionDefinitionStmt
+{
+	AST super;
+	AST* declarator;
+	AST* body;
+	AST* specifier;
+};
+
+//
+// OperationExpr
+//      : unary_expr(op, prefix_or_postfix, rhs)   <-- ++rhs
+//      | binary_expr(op, lhs, rhs)        <-- lhs + rhs
+//      | trinary_expr(op, cond, lhs, rhs) <--  cond ? lhs : rhs
+//      | cast_expr(type, expr)            <-- (type) expr
+//
+struct OperatorExpr
 {
 	AST super;
 
-	AST* return_val;
+	enum Operators op;
+	AST* lhs;
+	AST* rhs;
+	AST* cond;
+	enum Types number_type;
+	//TODO: 除了f64和i64实际没有被实现
+	union
+	{
+		int8_t i8; 
+		uint8_t ui8;
+		int16_t i16;
+		uint16_t ui16;
+		int32_t i32;
+		uint32_t ui32;
+		int64_t i64;
+		uint64_t ui64;
+		float f32;
+		double f64;
+		char* str;
+	};
 };
+
+
+//
+// DeclareStmt
+//         : type identifier
+//         : type assignment*    <-- int a = 10, b=20;
+struct DeclareStmt
+{
+	AST super;
+	AST* type;
+	AST* identifiers;
+};
+
+//   struct/union { fields };
+struct AggregateDeclareStmt
+{
+	AST super;
+	Symbol* ref;
+	AST* fields;
+};
+
+// enum { enums }
+struct EnumDeclareStmt
+{
+	AST super;
+	Symbol* ref;
+	AST* enums;
+};
+
 
 // a, b, c, d
 // ^
 // +-------- first child
+// List expr 的值是最后一个 child
 struct ListExpr
 {
 	AST super;
@@ -147,13 +160,78 @@ struct FunctionCallExpr
 {
 	AST super;
 
+	AST* function;
 	AST* params;
 	int n_params;
 	const char* function_name;
 };
 
+
+// goto label;
+// continue;
+// break;
+struct JumpStmt
+{
+	AST super;
+	enum JumpType type;
+	AST* target;
+	Symbol* ref;
+};
+
+
+// next_loop:       <-- label
+//      io += 10;   <-- target
+struct LabelStmt
+{
+	AST super;
+	AST* target;
+	AST* condition; // < swtich case 中的 condition
+
+	Symbol* ref;
+};
+
+
+// TODO: Rename as constant
+struct NumberExpr
+{
+	AST super;
+
+	enum Types number_type;
+	union
+	{
+		int8_t i8;
+		uint8_t ui8;
+		int16_t i16;
+		uint16_t ui16;
+		int32_t i32;
+		uint32_t ui32;
+		int64_t i64;
+		uint64_t ui64;
+		float f32;
+		double f64;
+		char* str;
+	};
+};
+
+struct IdentifierExpr
+{
+	AST super;
+	char* name;
+	AST* val;
+};
+
+
+
+// 方便 yacc
+// 如果在解析出错的时候也返回 empry
+struct EmptyExpr
+{
+	AST super;
+	const char* error;
+};
+
 // if(condition) then; else otherwise;
-struct IfStatement
+struct IfStmt
 {
 	AST super;
 
@@ -162,105 +240,230 @@ struct IfStatement
 	AST* otherwise;
 };
 
+
 // while (condition) body;
 // for(enter; condition; step) body;
-struct LoopStatement
+struct LoopStmt
 {
 	AST super;
-
+	enum LoopType loop_type;
 	AST* enter; // 进入循环前执行的代码
 	AST* condition; // 循环条件
-	AST* step; // 每一步
+	AST* step; // 每一步要做的操作
 	AST* body;
+
+	uint64_t cond_label;
+	uint64_t exit_label;
+	uint64_t step_label;
 };
 
-
-
-struct GotoStatement
+struct SwitchCaseStmt
 {
 	AST super;
-	const char* label;
+	AST* switch_value;
+	AST* cases;
+	uint64_t exit_label;
 };
 
-// next_loop:       <-- label
-//      io += 10;   <-- target
-struct LabelStatement
+// type name = init_value;
+// init_value 可能是 算数表达式
+//   也可能是初始化语句
+struct DeclaratorExpr
 {
 	AST super;
-	const char* label;
-	AST* target;
+	char* name;
+	TypeInfo* last;
+	TypeInfo* first;
+	AST* init_value;
+	enum SymbolAttributes attributes;
 };
 
-struct NumberExpr
+
+struct InitilizerListExpr
 {
 	AST super;
-
-	enum Types number_type;
-	union
-	{
-		int32_t i32;
-		uint32_t ui32;
-		int64_t i64;
-		uint64_t ui64;
-		float f32;
-		double f64;
-	};
+	AST* list;
 };
 
-struct UnionOrStructExpr
+// Auxiliary AST Nodes
+// ================================
+// 辅助 AST 节点, 便于 yacc 调用时生成,
+
+enum TypeSpecifierFlags
 {
-	AST supr;
-	Symbol* ref;
+	TypeSpecifier_None,
+	TypeSpecifier_Unsigned,
+	TypeSpecifier_Signed,
+	TypeSpecifier_Long
 };
-
-// int x;
-struct SymbolExpr
+struct TypeSpecifier
 {
 	AST super;
-	Symbol* type;
-	Symbol* name;
-};
-
-struct FunctionExpr
-{
-	AST super;
-	FunctionDefinition* ref;
+	const char* name;
+	TypeInfo* info;
+	enum TypeSpecifierFlags flags;
+	enum SymbolAttributes attributes;
 };
 
 
 #define FORWORD_DECL(x) STRUCT_TYPE(x)
 AST_NODE_LIST(FORWORD_DECL)
+AST_AUX_NODE_LIST(FORWORD_DECL)
 #undef FORWORD_DECL
+
+void ast_init_context(struct Context* _ctx);
+
 
 void ast_init(AST* ast, ASTType type);
 
+// argument-expression-list
 AST* ast_append(AST* leader, AST* follower);
 
-AST* make_number_int32(const char* c);
+AST* make_empty();
+AST* make_error(const char* message);
 
-AST* make_number_float(const char* c, int bits);
+// Expressions
+// =======================================
 
+// primary-expression:
+//    identifier
+// 变量声明
 AST* make_identifier(const char* c);
+AST* make_identifier_with_constant_val(const char* c, AST* constant_val);
 
-Symbol* sym_get_type(const char* n);
+// primary-expression:
+//    constants
+//    string-literal
+// 常量定义, 注意函数会自动释放内存
+AST* make_number_int(char* c, enum Types type);
+AST* make_number_float(const char* c, int bits);
+AST* make_string(char* c);
 
-Symbol* sym_get_identifier(const char* n);
 
-FunctionDefinition* sym_get_function(const char* return_type, const char* name, AST* args);
+// conditional-expression
+// assignment-expression
+// postfix-expression
+// 
+// n-nary operator expr
+// 赋值, 条件, 比较, 比特运算, 取址, 访问元素等
+AST* make_unary_expr(enum Operators unary_op, AST* rhs);
+AST* make_binary_expr(enum Operators binary_op, AST* lhs, AST* rhs);
+AST* make_trinary_expr(enum Operators triary_op, AST* cond, AST* lhs, AST* rhs);
 
-AST* make_symbol(const char* type, const char* name);
+AST* make_list_expr(AST* child);
 
-AST* make_block(AST* first_child);
+// Statements
+// ======================================
+AST* make_block(AST* statements);
+void ast_notify_enter_block();
 
-AST* make_function_call(const char* function_name, AST* params);
+AST* make_label(char* name, AST* statement);
+AST* make_label_case(AST* constant, AST* statements);
+AST* make_label_default(AST* statements);
+void notify_label(char* name);
+
+// goto name
+// continue
+// break
+// return ret
+AST* make_jump(enum JumpType type, char* name, AST* ret);
+
+// while(condition) loop_body
+// for(before_loop; condition; loop_step) loop_body;
+// do loop_body while(condition)
+AST* make_loop(AST* condition, AST* before_loop, AST* loop_body, AST* loop_step, enum LoopType loop_type);
+void notify_loop(enum LoopType type);
+
+// if(condition) then else otherwise
+AST* make_ifelse(AST* condition, AST* then, AST* otherwise);
+
+// switch ( condition ) { body }
+AST* make_switch(AST* condition, AST* body);
+
+AST* make_parameter_declaration(AST* declaration_specifiers, AST* declarator);
+
+AST* make_define_function(AST* declaration_specifiers, AST* declarator, AST* compound_statement);
+
+// attr 是 register/auto/extern/static
+// type 是 TP_VOID ~ TP_FLOAT128 等数字类型的时候, name = NULL
+// type 是 TP_STRUCT/TP_UNION/TP_ENUM 等, 那么 struct/union/enum的名字作为 name
+// type 是 TP_INCOMPLETE, 说明是用户自定义的类型 (通过 typedef)
+// name 会被 AST 接管(由AST负责释放)
+// AST* make_type(enum SymbolAttributes attr, enum Types type, const char* name);
+
+
+
+
+// Declarations
+// =================================
+
+// qualifier 是 const/volatile/restrict
+// pointer:
+//    '*' type-qualifier-list?
+//    '*' type-qualifier-list? pointer
+AST* make_ptr(int type_qualifier_list, AST* pointing);
+int ast_merge_type_qualifier(int a, int b);
+
+
+// direct_declarator
+//     : IDENTIFIER
+AST* makr_init_direct_declarator(const char * name);
+
+// direct_declarator:
+//     : direct_declarator (wrapped)
+//     | direct_declarator [wrapped]
+AST* make_extent_direct_declarator(AST* direct, enum Types type, AST* wrapped);
+
+
+// declarator:
+//    pointer? direct_declarator
+AST* make_declarator(AST* pointer, AST* direct_declarator);
+
+// init_declarator:
+//       declarator = initializer
+AST* make_declarator_with_init(AST* declarator, AST* init);
+AST* make_declarator_bit_field(AST* declarator, AST* bitfield);
+
+AST* make_type_specifier(enum Types type);
+
+AST* make_type_specifier_from_id(const char* id);
+AST* make_type_specifier_extend(AST* me, AST*other, enum SymbolAttributes storage);
+AST* make_declaration(AST* declaration_specifiers, enum SymbolAttributes attribute_specifier, AST* init_declarator_list);
+
+// attr 是 __cdecl, __stdcall, inline
+
+// enum_define:
+//     enum identifier { enum_list }
+AST* make_enum_define(const char* identifier, AST* enum_list);
+
+// struct_or_union_define:
+//     struct/union identifier { field_list }
+AST* make_struct_field_declaration(AST* specifier_qualifier, AST* struct_declarator);
+AST* make_struct_or_union_define(enum Types type, const char* identifier, AST* field_list);
+
+
+AST* ast_merge_specifier_qualifier(AST* me, AST* other, enum Types qualifier);
+
+AST* make_initializer_list(AST* list);
+
+
+AST* make_function_call(AST* postfix_expression, AST* params);
+AST* make_type_declarator(AST* specifier_qualifier, AST* declarator);
+AST* make_paramter_ellipse();
+
+
+
+/*
+
 
 AST* make_function(const char* return_type, const char* name, AST* arg_list);
 
 AST* make_function_body(AST* function_ast_node, AST* body);
 
 AST* make_return(AST* exp);
+*/
 
-AST* make_empty();
+
 
 #define TYPECHECK(x) inline int is_##x(AST* ast) { return ast->type == AST_##x; }
 
