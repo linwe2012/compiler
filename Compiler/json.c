@@ -283,9 +283,9 @@ void _write_JumpStmt(JumpStmt *stmt) {
 
 void _write_InitilizerListExpr(InitilizerListExpr *expr) {
     PRINT_NAME(InitList);
-    if (expr->vals) {
+    if (expr->list) {
         fputs(",\n\"children\": [", s_fp);
-        _write_ast(expr->vals);
+        _write_ast(expr->list);
         fputs("]\n", s_fp);
     }
 }
@@ -394,4 +394,10 @@ void _write_DeclaratorExpr(DeclaratorExpr *expr) {
 
 void _write_TypeSpecifier(TypeSpecifier *expr) {
     fprintf(s_fp, "\"name\":\"%s(decl)\"", expr->name);
+}
+
+
+void _write_FunctionDeinfitionStmt(FunctionDefinitionStmt* expr)
+{
+    //TODO
 }
