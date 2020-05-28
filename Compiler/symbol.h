@@ -9,6 +9,7 @@
 #include "hashtable.h"
 
 
+STRUCT_TYPE(Symbol)
 
 
 /*
@@ -148,7 +149,7 @@ struct Symbol
 	// Symbol* next;
 	enum SymbolTypes usage;
 };
-STRUCT_TYPE(Symbol)		// FIX: 这个是不是要放在文件开头?
+
 
 
 struct SymbolStackInfo
@@ -194,7 +195,7 @@ Symbol* symbol_create_constant(Symbol* enum_sym, char* name, union ConstantValue
 Symbol* symbol_create_enum(char* name);
 Symbol* symbol_create_enum_item(char* name, int64_t val);
 Symbol* symbol_from_type_info(TypeInfo* info);
-TypeInfo* symbol_create_struct_or_union(TypeInfo* info, TypeInfo* child);
+Symbol* symbol_create_struct_or_union(TypeInfo* info, TypeInfo* child);
 
 // 类型管理 & 创建
 // ================================
@@ -209,7 +210,7 @@ TypeInfo* type_create_param_ellipse();
 
 int type_wrap(TypeInfo* parent, TypeInfo* child);
 int type_append(TypeInfo* tail, TypeInfo* new_tail);
-
+TypeInfo* type_get_child(TypeInfo* parent);
 
 // 类型工具
 // ================================

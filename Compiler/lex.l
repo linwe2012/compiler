@@ -12,6 +12,7 @@
 #include "parser.h"
 
 #define COPY_STR()             yylval.str = strcpy((char*)malloc(strlen(yytext)+1), yytext)
+void comment(void);
 
 %}
 
@@ -21,7 +22,7 @@ oct_int		0[0-7]*
 dec_int		0|([1-9][0-9]*)
 hex_int		0[xX][0-9a-fA-F]+
 
-any_int     {oct_int} | {dec_int} | {hex_int}
+any_int     {oct_int}|{dec_int}|{hex_int}
 
 identifier	[a-zA-Z_][a-zA-Z0-9_]*
 whitespace	[[:space:]]+

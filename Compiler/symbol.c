@@ -260,12 +260,22 @@ int type_wrap(TypeInfo* parent, TypeInfo* child)
 	return 1;
 }
 
+TypeInfo* type_get_child(TypeInfo* parent)
+{
+	if (parent->type == TP_FUNC || TP_ARRAY || TP_STRUCT || TP_PTR)
+	{
+		return parent->struc.child;
+	}
+
+	return NULL;
+}
+
 void symbol_init_context(struct Context* context)
 {
 	enum Types theor = TP_INCOMPLETE;
 	enum TypesHelper offset = 0;
 	const char* prefix = "";
-#define INIT(type__, name__, bits__) \
+#define INIT(type__, name__, bits__){ \
 	struct TypeInfo type;\
 	type_info_init(&type);\
 	type.aligned_size = bits__ / 8;\
@@ -274,7 +284,7 @@ void symbol_init_context(struct Context* context)
 	type.type_name = str_concat(prefix, name__);\
 	type.type = theor | TP_##type__;\
 \
-	builtins[offset + TP_##type__] = type;
+	builtins[offset + TP_##type__] = type;}
 
 	INTERNAL_TYPE_LIST_MISC(INIT);
 	INTERNAL_TYPE_LIST_INT(INIT);

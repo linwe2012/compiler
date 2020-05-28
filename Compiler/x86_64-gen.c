@@ -1,3 +1,4 @@
+/*
 #include <windows.h>
 #include <winnt.h>
 #include <time.h>
@@ -637,3 +638,4 @@ void emit_label(ASMContext* ctx, const char* name)
 		write_str(ctx, "%s:", name);
 	}
 }
+*/
