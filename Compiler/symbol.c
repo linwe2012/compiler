@@ -397,6 +397,13 @@ Symbol* symbol_create_enum_item(Symbol* type, Symbol* prev, char* name, void* va
 	return sym;
 }
 
+void variable_append(Symbol* last, Symbol* new_last)
+{
+	if (last == NULL) return;
+	last->var.next = &new_last->var;
+	new_last->var.prev = last;
+}
+
 
 Symbol* symbol_from_type_info(TypeInfo* info)
 {

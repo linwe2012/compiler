@@ -1015,6 +1015,24 @@ AST* make_switch(AST* condition, AST* body)
 	return SUPER(ast);
 }
 
+// Type specifiers Merging
+// ======================================
+// TODO: Add other checks including const/confilicts
+int ast_merge_storage_specifiers(int a, int b)
+{
+
+	int la = a & ATTR_MASK_STORAGE;
+	int lb = b & ATTR_MASK_STORAGE;
+
+	if (la && lb)
+	{
+		log_error(NULL, "duplicated storage specifiers");
+		return a;
+	}
+
+	return a | b;
+}
+
 int ast_merge_type_qualifier(int a, int b)
 {
 	if (a & b)
@@ -1025,6 +1043,9 @@ int ast_merge_type_qualifier(int a, int b)
 	return a | b;
 }
 
+
+// Declarators
+// ======================================
 AST* makr_init_direct_declarator(const char* name)
 {
 	NEW_AST(DeclaratorExpr, ast);
@@ -1174,12 +1195,24 @@ AST* make_ptr(int type_qualifier_list, AST* pointing)
 	return pointing;
 }
 
+
+// Type specifiers
+// ======================================
+void init_type_specifier(TypeSpecifier* ts, enum TypeSpecifierFlags flags)
+{
+	ts->array_element_count = NULL;
+	ts->attributes = ATTR_NONE;
+	ts->child = NULL;
+	ts->flags = TypeSpecifier_None;
+	ts->name = NULL;
+	ts->type = TP_INCOMPLETE;
+	ts->flags |= flags;
+}
+
 AST* make_type_specifier(enum Types type)
 {
 	NEW_AST(TypeSpecifier, ast);
-	ast->info = NULL;
-	ast->flags = TypeSpecifier_None;
-	ast->name = NULL;
+	init_type_specifier(ast, TypeSpecifier_Exclusive);
 
 	if (type & TP_LONG_FLAG)
 	{
@@ -1194,38 +1227,20 @@ AST* make_type_specifier(enum Types type)
 		ast->flags = TypeSpecifier_Signed;
 	}
 	else {
-		ast->info = type_fetch_buildtin(type);
+		ast->type = type;
 	}
-	ast->attributes = ATTR_NONE;
-	
 	return SUPER(ast);
 }
 
-// TODO: Add other checks including const/confilicts
-int ast_merge_storage_specifiers(int a, int b)
-{
 
-	int la = a & ATTR_MASK_STORAGE;
-	int lb = b & ATTR_MASK_STORAGE;
-
-	if (la && lb)
-	{
-		log_error(NULL, "duplicated storage specifiers");
-		return a;
-	}
-
-	return a | b;
-}
 
 AST* make_type_specifier_extend(AST* me, AST* other, enum SymbolAttributes storage)
 {
 	if (me == NULL || other == NULL)
 	{
 		NEW_AST(TypeSpecifier, ast);
+		init_type_specifier(ast, TypeSpecifier_None);
 		ast->attributes = storage;
-		ast->flags = TypeSpecifier_None;
-		ast->info = NULL;
-		ast->name = NULL;
 		return SUPER(ast);
 	}
 
@@ -1234,45 +1249,64 @@ AST* make_type_specifier_extend(AST* me, AST* other, enum SymbolAttributes stora
 	{
 		CAST(TypeSpecifier, spec2, other);
 
-#define flag(item__, flag__) (item__->flags == flag__)
+#define flag(item__, flag__) (item__->flags & flag__)
 
-#define each_flags(flag1__, flag2__) ((spec1->flags == flag1__) && (spec2->flags == flag2__))
+#define each_flags(flag1__, flag2__) (flag(spec1, flag1__) && flag(spec2, flag2__))
 #define both_flags(flag__) each_flags(flag__, flag__)
 #define flag_collision(flag1__, flag2__) (each_flags(flag1__, flag2__) || each_flags(flag2__, flag1__))
+#define either_flags(flag__) (flag(spec1, flag__) || flag(spec2, flag__))
 
-		if (spec1->info && spec2->info)
+		if (both_flags(TypeSpecifier_Exclusive))
 		{
-			return make_error("Duplicated type specfier");
+			return make_error("Conflicting type specifiers");
 		}
+
+#define i32_or_incomplete() \
+		(spec1->type == TP_INT32 && spec2->type == TP_INCOMPLETE \
+		|| spec1->type == TP_INT32 && spec2->type == TP_INCOMPLETE)
+
+#define one_incomplete() \
+		(spec1->type == TP_INCOMPLETE || spec2->type == TP_INCOMPLETE)
+
 
 
 		// long long
 		if (both_flags(TypeSpecifier_Long))
 		{
-			if (spec1->info || spec2->info)
-			{
-				log_error(me, "type error");
-			}
-			spec1->info = type_fetch_buildtin(TP_INT64);
-		}
-		// long int
-		else if (flag(spec1, TypeSpecifier_Long) || flag(spec2, TypeSpecifier_Long))
-		{
-			TypeInfo* t1 = spec1->info;
-			TypeInfo* t2 = spec2->info;
-
-			if (t2)
-			{
-				t1 = t2;
-			}
-
-			if (t1->type != TP_INT32 || t1->type != TP_INT64)
+			if (!i32_or_incomplete())
 			{
 				log_error(me, "long must be applied to 32 bit integer");
 			}
 
-			spec1->info = t1;
-			spec2->info = NULL;
+			spec1->flags &= ~TypeSpecifier_Long;
+			spec1->flags |= TypeSpecifier_LongLong;
+			spec2->type = TP_INCOMPLETE;
+		}
+
+		// long int
+		else if (flag(spec1, TypeSpecifier_Long) || flag(spec2, TypeSpecifier_Long))
+		{
+			if (i32_or_incomplete())
+			{
+				spec1->type = TP_INT32;
+			}
+			else {
+				log_error(me, "long must be applied to 32 bit integer");
+			}
+			spec2->type = TP_INCOMPLETE;
+		}
+
+		// long long int
+		else if (flag(spec1, TypeSpecifier_LongLong) || flag(spec2, TypeSpecifier_LongLong))
+		{
+			if (i32_or_incomplete())
+			{
+				spec1->type = TP_INT64;
+			}
+			else {
+				log_error(me, "long must be applied to 32 bit integer");
+			}
+			spec2->type = TP_INCOMPLETE;
 		}
 
 		// error: unsigned signed int
@@ -1282,15 +1316,31 @@ AST* make_type_specifier_extend(AST* me, AST* other, enum SymbolAttributes stora
 			return make_error("Duplicated signed/unsigned specfier");
 		}
 
-		else if (spec2->flags == TypeSpecifier_Unsigned)
-		{
-			spec1->info = type_fetch_buildtin(spec1->info->type | TP_UNSIGNED);
+		if (spec1->type && spec2->type) {
+			return make_error("Duplicated type specfier");
 		}
 
-		else if (spec2->info)
+		enum Types type = spec1->type | spec2->type;
+
+		if (either_flags(TypeSpecifier_Unsigned))
 		{
-			spec1->info = spec2->info;
+			if (type & TP_UNSIGNED)
+			{
+				log_error(me, "Duplicated unsigned specfier");
+			}
+
+			type |= TP_UNSIGNED;
 		}
+
+		else if (either_flags(TypeSpecifier_Signed))
+		{
+			if (type & TP_UNSIGNED)
+			{
+				log_error(me, "Conflicting singned/unsigned specfier");
+			}
+		}
+
+		spec1->type = type;
 
 		spec1->attributes = ast_merge_storage_specifiers(spec1->attributes, spec2->attributes);
 	}
@@ -1301,24 +1351,17 @@ AST* make_type_specifier_extend(AST* me, AST* other, enum SymbolAttributes stora
 #undef each_flags
 #undef both_flags
 #undef flag_collision
-
+#undef either_flags
+#undef i32_or_incomplete
+#undef one_incomplete
 	return SUPER(spec1);
 }
 
-AST* make_type_specifier_from_id(const char* cid)
+AST* make_type_specifier_from_id(char* id)
 {
-	char* id = strdup(cid);
-	Symbol* sym = symtbl_find(ctx->types, id);
-	if (sym == NULL)
-	{
-		log_error(NULL, "Undeclared type name");
-		return NULL;
-	}
 	NEW_AST(TypeSpecifier, ast);
+	init_type_specifier(ast, TypeSpecifier_Exclusive);
 	ast->name = id;
-	ast->info = &sym->type;
-	ast->attributes = ATTR_NONE;
-	ast->flags = TypeSpecifier_None;
 	return SUPER(ast);
 }
 
@@ -1396,6 +1439,7 @@ AST* make_declaration(AST* declaration_specifiers, enum SymbolAttributes attribu
 	NEW_AST(DeclareStmt, ast);
 	ast->identifiers = init_declarator_list;
 	ast->type = SUPER(spec);
+	ast->attributes = attribute_specifier;
 
 	return SUPER(ast);
 }
@@ -1465,63 +1509,7 @@ AST* make_enum_define(const char* const_identifier, AST* enum_list)
 	char* identifier = strdup(const_identifier);
 	char* name = str_concat("enum ", identifier);
 	Symbol* sym = symtbl_find(ctx->types, name);
-	if (sym != NULL)
-	{
-		log_error(enum_list, "Enum already declared");
-		return make_empty();
-	}
 
-	Symbol* enum_type = symbol_create_enum(identifier);
-	
-
-	TypeInfo* enums_tail = NULL;
-	TypeInfo* enums_head = NULL;
-	int64_t current_val = 0;
-
-#define APPEND_ENUM(b__) {\
-	if (enums_head == NULL) {\
-		enums_head = enums_tail = b__;\
-		}\
-	else {\
-		type_append(enums_tail, b__);\
-		enums_tail = b__;\
-	}\
-	}
-
-	// TODO: Fuck 这里我 Symbol & TypeInfo 搞混了, 希望能 work, 懒得改了
-	FOR_EACH(enum_list, iden)
-	{
-		IF_TRY_CAST(IdentifierExpr, id, iden) {
-			Symbol* next = NULL;
-			if (id->val == NULL)
-			{
-				next = symbol_create_enum_item(id->name, current_val);
-			}
-			else {
-				CONSTANT(NumberExpr, num, id->val);
-				union ConstantValue val = constant_cast(num->number_type, TP_INT64, constant_from_number_expr(num));
-				current_val = val.i64;
-				next = symbol_create_enum_item(id->name, current_val);
-			}
-			if (next != NULL)
-			{
-				if (enums_head == NULL) {
-						enums_head = enums_tail = &next->type;
-				}
-				else {
-					type_append(enums_tail, &next->type);
-					enums_tail = &next->type;
-				}
-			}
-
-			++current_val;
-			// TODO: Add to symbol tabel
-		}
-		FINALLY_TRY_CAST{
-			log_error(iden, "Expected Indetifier or assigenment expression");
-		}
-	}
-	
 	NEW_AST(EnumDeclareStmt, ast);
 
 	ast->ref = enum_type;

@@ -53,6 +53,7 @@ struct TypeInfo
 	int offset;          // 如果是结构体, 距离结构体首部的距离
 	int bitfield_offset; // bit field 距离上一个非bitfield元素的距离
 	int bitfield;        // bit field 占多少个字节
+	int incomplete;
 
 	enum SymbolAttributes qualifiers; // const 等 qualifier
 
@@ -215,21 +216,28 @@ Symbol* symbol_create_enum(char* name);
 Symbol* symbol_create_enum_item(Symbol* type, Symbol* prev, char* name, void* val);
 Symbol* symbol_from_type_info(TypeInfo* info);
 Symbol* symbol_create_struct_or_union(TypeInfo* info, TypeInfo* child);
+Symbol* symbol_create_struct_or_union_incomplete(char* name, enum Types struct_or_union);
+
 
 // 类型管理 & 创建
 // ================================
-TypeInfo* type_create_array(uint64_t n, enum SymbolAttributes qualifers);
+TypeInfo* type_create_array(uint64_t n, enum SymbolAttributes qualifers, TypeInfo* array_element_type);
 TypeInfo* type_create_struct_or_union(enum Types type, char* name);
-TypeInfo* type_create_ptr(enum SymbolAttributes qualifers);
-TypeInfo* type_create_func(struct TypeInfo* params);
+TypeInfo* type_create_ptr(enum SymbolAttributes qualifers, struct TypeInfo* pointing);
+TypeInfo* type_create_func(struct TypeInfo* ret, char* name, struct TypeInfo* params);
 TypeInfo* create_struct_field(TypeInfo* type_info, enum SymbolAttributes attributes, char* field_name);
 
 TypeInfo* type_create_param_ellipse();
 
+void variable_append(Symbol* last, Symbol* new_last);
 
 int type_wrap(TypeInfo* parent, TypeInfo* child);
 int type_append(TypeInfo* tail, TypeInfo* new_tail);
+int type_is_builtin(enum Types type);
+
 TypeInfo* type_get_child(TypeInfo* parent);
+TypeInfo* type_get_error_type();
+
 
 // 类型工具
 // ================================
@@ -248,6 +256,9 @@ inline int type_native_alignment(int type)
 	int x = (type & (0x0010 - 1));
 	return (x >= TP_INT8) && (x <= TP_FLOAT128);
 }
+
+int type_is_interger(enum Types type);
+
 
 void value_constant_print(FILE* f, enum Types type, union ConstantValue* pval);
 
