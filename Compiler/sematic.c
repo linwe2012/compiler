@@ -40,7 +40,8 @@ struct SematicContext
 	struct SematicTempContext* tmp_top;
 
 	LLVMBuilderRef builder;
-
+	LLVMContextRef context;		// FIX: 我随便放的，不清楚是不是该放在这里
+	LLVMModuleRef module;		// FIX: 同上
 } sem_ctx;
 
 char* next_temp_id_str()
@@ -68,6 +69,11 @@ STRUCT_TYPE(SematicData);
 AST_NODE_LIST(FUNC_FORWARD_DECL)
 AST_AUX_NODE_LIST(FUNC_FORWARD_DECL)
 #undef FUNC_FORWARD_DECL
+
+
+// DeclareStmt如果是函数的话应该也可以用这个
+static LLVMValueRef eval_prototype(AST* type, AST* signature);
+
 
 void sem_init(AST* ast)
 {
@@ -478,14 +484,57 @@ LLVMValueRef eval_LoopStmt(LoopStmt* ast)
 	NOT_IMPLEMENTED;
 }
 
-LLVMValueRef eval_IfStmt(IfStmt* ast)
-{
+// TODO: @wushuhui
+LLVMValueRef eval_prototype(AST* type, AST* signature) {
 	NOT_IMPLEMENTED;
 }
 
-LLVMValueRef eval_SwitchCaseStmt(SwitchCaseStmt* ast)
-{
+// TODO: @wushuhui
+LLVMValueRef eval_IfStmt(IfStmt* ast) {
+	LLVMValueRef condv = eval_ast(ast->condition);
+	if (condv == NULL) {
+		return NULL;
+	}
+	// 将condv和0比较, LLVMRealOEQ是否合适, NAN应该是false吧
+	// 要Cast吗?
+	condv = LLVMConstFCmp(LLVMRealOEQ, condv, LLVMConstReal(LLVMDoubleType(), 0.0));
+	LLVMValueRef func = LLVMGetBasicBlockParent(LLVMGetInsertBlock(sem_ctx.builder));
+	LLVMBasicBlockRef then_bb = LLVMAppendBasicBlockInContext(sem_ctx.context, func, "then");
+	LLVMBasicBlockRef else_bb = LLVMCreateBasicBlockInContext(sem_ctx.context, "else");
+	LLVMBasicBlockRef merge_bb = LLVMCreateBasicBlockInContext(sem_ctx.context, "ifcont");
+
+	LLVMBuildCondBr(sem_ctx.builder, condv, then_bb, else_bb);
+	LLVMPositionBuilderAtEnd(sem_ctx.builder, then_bb);	// Builder.SetInsertPoint(ThenBB);
+
+	LLVMValueRef thenv = eval_ast(ast->then);
+	if (thenv == NULL) {
+		return NULL;	
+	}
+	LLVMBuildBr(sem_ctx.builder, merge_bb);
+	// Codegen of 'Then' can change the current block, update ThenBB for the PHI.
+	then_bb = LLVMGetInsertBlock(sem_ctx.builder);
+	LLVMAppendExistingBasicBlock(func, merge_bb);		// 这个怎么不存在啊?
+	LLVMPositionBuilderAtEnd(sem_ctx.builder, merge_bb);
+	
+	LLVMValueRef phi_n = LLVMBuildPhi(sem_ctx.builder, LLVMFloatType(), "iftmp");
+	// PN->addIncoming(ThenV, ThenBB);
+  	// PN->addIncoming(ElseV, ElseBB);
+  	return phi_n;
+}
+
+// TODO: @wushuhui
+LLVMValueRef eval_SwitchCaseStmt(SwitchCaseStmt* ast) {
 	NOT_IMPLEMENTED;
+}
+
+// TODO: @wushuhui
+// 如果没有Declare过,要加SymbolTable
+// main要特殊处理吗?
+LLVMValueRef eval_FunctionDefinitionStmt(FunctionDefinitionStmt* ast) {
+	LLVMValueRef func_type = eval_prototype(ast->specifier, ast->declarator);
+	if (func_type == NULL) {
+		return NULL;
+	}
 }
 
 LLVMValueRef eval_DeclaratorExpr(DeclaratorExpr* ast)
