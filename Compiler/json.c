@@ -224,7 +224,7 @@ void _write_OperatorExpr(OperatorExpr *expr) {
         PRINT_NAME(?:);
         break;
     default:
-        PRINT_NAME(CONSTANT);
+        value_constant_print(s_fp, expr->number_type, &expr->i8);   // 这个union
         break;
     }
     fputs(",\n\"children\": [", s_fp);
@@ -249,7 +249,7 @@ void _write_OperatorExpr(OperatorExpr *expr) {
 }
 
 void _write_LabelStmt(LabelStmt *stmt) {
-    fprintf(s_fp, "\"name\":\"(LABEL)%s\"", stmt->ref->label->name);
+    fprintf(s_fp, "\"name\":\"(LABEL)%s\"", stmt->ref->label.name);
     fputs(",\n\"children\": [", s_fp);
     if (stmt->condition) {
         _write_ast(stmt->condition);
