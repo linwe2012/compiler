@@ -143,8 +143,9 @@ struct AggregateDeclareStmt
 struct EnumDeclareStmt
 {
 	AST super;
-	Symbol* ref;
 	AST* enums;
+	char* name;
+	Symbol* ref;
 };
 
 

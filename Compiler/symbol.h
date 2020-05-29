@@ -42,6 +42,8 @@ STRUCT_TYPE(TypeAlias)
 struct TypeInfo
 {
 	char* type_name;     // 类型的名称 (必须是 struct TypeInfo 第一个字段)
+	void* value;
+
 	int is_alias;   
 	char* field_name;    // struct/union 字段名称
 	enum Types type;     // 基础类型
@@ -101,16 +103,22 @@ STRUCT_TYPE(TypeInfo)
 struct VariableInfo
 {
 	char* name;
+	void* value;
+
 	enum SymbolAttributes attributes;
 	Symbol* type;
 	int is_constant;
-	union ConstantValue const_val;
+
+	struct VariableInfo* prev;
+	struct VariableInfo* next;
 };
 STRUCT_TYPE(VariableInfo)
 
 struct FunctionInfo
 {
 	char* name;
+	void* value;
+
 	TypeInfo* return_type;
 	TypeInfo* params;
 	struct AST* body;
@@ -120,6 +128,8 @@ STRUCT_TYPE(FunctionInfo)
 struct LabelInfo
 {
 	char* name;
+	void* value;
+
 	uint64_t label_id;
 	int resolved; // 当 goto 定义在 label: 之前的时候, 会产生一个 unresolved label
 };
@@ -145,11 +155,12 @@ struct Symbol
 		struct
 		{
 			char* name;
+			void* value;
 		};
 		TypeInfo type;
 		VariableInfo var;
 		FunctionInfo func;
-		LabelInfo* label;
+		LabelInfo label;
 	};
 
 	Symbol* prev;
@@ -201,7 +212,7 @@ TypeInfo* type_fetch_buildtin(enum Types type);
 Symbol* symbol_create_label(char* name, uint64_t label, int resolved);
 Symbol* symbol_create_constant(Symbol* enum_sym, char* name, union ConstantValue val);
 Symbol* symbol_create_enum(char* name);
-Symbol* symbol_create_enum_item(char* name, int64_t val);
+Symbol* symbol_create_enum_item(Symbol* type, Symbol* prev, char* name, void* val);
 Symbol* symbol_from_type_info(TypeInfo* info);
 Symbol* symbol_create_struct_or_union(TypeInfo* info, TypeInfo* child);
 

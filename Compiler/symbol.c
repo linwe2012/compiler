@@ -354,8 +354,8 @@ Symbol* symbol_create_label(char* name, uint64_t label, int resolved)
 {
 	Symbol* sym = new_symbol(name, Symbol_LabelInfo);
 
-	sym->label->label_id = label;
-	sym->label->resolved = resolved;
+	sym->label.label_id = label;
+	sym->label.resolved = resolved;
 
 	return sym;
 }
@@ -384,16 +384,15 @@ Symbol* symbol_create_enum(char* name)
 	return sym;
 }
 
-Symbol* symbol_create_enum_item(char* name, int64_t val)
+Symbol* symbol_create_enum_item(Symbol* type, Symbol* prev, char* name, void* val)
 {
 	Symbol* sym = new_symbol(name, Symbol_TypeInfo);
-	type_info_init(&(sym->type));
-
-	sym->type.type = TP_ENUM;
-	sym->type.alignment = 8;
-	sym->type.aligned_size = 8;
-
-	sym->type.enu.val = val;
+	sym->var.name = name;
+	sym->var.attributes = ATTR_CONST;
+	sym->var.is_constant = 1;
+	sym->var.value = val;
+	sym->var.type = type;
+	sym->var.prev = prev;
 
 	return sym;
 }

@@ -33,6 +33,8 @@ struct SematicContext
 {
 	struct SematicTempContext* tmp_bottom;
 	struct SematicTempContext* tmp_top;
+
+	LLVMBuilderRef builder;
 } sem_ctx;
 
 char* next_temp_id_str()
@@ -90,6 +92,7 @@ LLVMValueRef eval_list(AST* ast)
 	}
 }
 
+// bootstrapping
 void do_eval(AST* ast, struct Context* _ctx)
 {
 	ctx = _ctx;
@@ -116,13 +119,20 @@ LLVMValueRef eval_DeclareStmt(DeclareStmt* ast)
 LLVMValueRef eval_EnumDeclareStmt(EnumDeclareStmt* ast)
 {
 	int64_t enum_val = 0;
+
+	Symbol* enum_type = symbol_create_enum(ast->name ? ast->name : strdup("@anon enum"));
+	symtbl_push(ctx->types, enum_type);
+
+	Symbol* first_enum_item = NULL;
+	Symbol* last_enum_item = NULL;
+
 	FOR_EACH(ast->enums, enu_ast)
 	{
 		TRY_CAST(OperatorExpr, op, enu_ast);
 		TRY_CAST(IdentifierExpr, id, enu_ast);
 		
 
-		if (!op || !id)
+		if (!op && !id)
 		{
 			log_internal_error(enu_ast, "Expected constant as enum");
 		}
@@ -155,7 +165,17 @@ LLVMValueRef eval_EnumDeclareStmt(EnumDeclareStmt* ast)
 			continue;
 		}
 
-		symtbl_push(ctx->variables, symbol_create_enum_item(id->name, enum_val));
+		//TODO: Check for duplicate enums
+		Symbol* enum_item = symbol_create_enum_item(
+			enum_type, last_enum_item, id->name, 
+			LLVMConstInt(LLVMInt64Type(), enum_val, 1));
+
+		symtbl_push(ctx->variables, enum_item);
+		last_enum_item = enum_item;
+		if (first_enum_item == NULL)
+		{
+			first_enum_item = enum_item;
+		}
 
 		++enum_val;
 	}
@@ -217,15 +237,26 @@ LLVMValueRef eval_OperatorExpr(OperatorExpr* ast)
 
 LLVMValueRef eval_InitilizerListExpr(InitilizerListExpr* ast)
 {
+
+	
 	NOT_IMPLEMENTED;
 }
 
 LLVMValueRef eval_EmptyExpr(EmptyExpr* ast)
 {
-	NOT_IMPLEMENTED;
+	if (ast->error)
+	{
+		log_error(ast, "Error during parsing: %s", ast->error);
+	}
+	return NULL;
 }
 
 LLVMValueRef eval_LoopStmt(LoopStmt* ast)
+{
+	NOT_IMPLEMENTED;
+}
+
+LLVMValueRef eval_IfStmt(IfStmt* ast)
 {
 	NOT_IMPLEMENTED;
 }
