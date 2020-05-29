@@ -2,6 +2,8 @@
 #include "context.h"
 #include "error.h"
 #include "symbol.h"
+#include "utils.h"
+
 
 #include <llvm-c/Core.h>
 
@@ -20,6 +22,8 @@ struct Context* ctx;
 struct SematicData
 {
 	// LLVMValueRef val;
+	TypeInfo* type; // 第二个 pass 推导的类型信息
+
 	int dummy;
 };
 
@@ -112,9 +116,190 @@ LLVMValueRef eval_JumpStmt(JumpStmt* ast)
 	NOT_IMPLEMENTED;
 }
 
+
+struct DeclaraData
+{
+	LLVMValueRef value;
+
+};
+
+struct SematicData* sematic_data_new() {
+	NEW_STRUCT(SematicData, sem);
+	sem->type = NULL;
+	return sem;
+}
+
+TypeInfo* extract_type(TypeSpecifier* spec)
+{
+	if (spec == NULL)
+	{
+		return type_get_error_type();
+	}
+
+	enum Types ty = spec->type & TP_CLEAR_SIGNFLAGS;
+	enum Types sign_flag = spec->type & TP_GET_SIGNFLAGS;
+	char* name = NULL;
+	Symbol* sym_in_tbl = NULL;;
+	TypeInfo* first = NULL;
+	TypeInfo* last = NULL;
+	LLVMValueRef array_element_count = NULL;
+	TypeInfo* result = type_get_error_type();
+
+	if (ty == TP_INCOMPLETE)
+	{
+		if (spec->flags & TypeSpecifier_Long)
+		{
+			spec->type = TP_INT32 | sign_flag;
+		}
+		if (spec->flags & TypeSpecifier_LongLong)
+		{
+			spec->type = TP_INT64 | sign_flag;
+		}
+	}
+
+	spec->flags = TypeSpecifier_None;
+	switch (ty)
+	{
+	case TP_INCOMPLETE:
+		log_error(spec, "Incomplete type specifier");
+		break;
+
+	// Numeric & void types
+	case TP_VOID:
+	case TP_FLOAT32:
+	case TP_FLOAT64:
+	case TP_FLOAT128:
+	case TP_ELLIPSIS:
+		if (sign_flag) {
+			log_error(spec, "Invalid sign flag on void/float type");
+			break;
+		}
+
+	// fall through
+	case TP_INT8:
+	case TP_INT16:
+	case TP_INT32:
+	case TP_INT64:
+	case TP_INT128:
+		result = type_fetch_buildtin(spec->type);
+		break;
+
+	case TP_STRUCT: // fall through
+	case TP_UNION:
+		name = str_concat(ty == TP_STRUCT ? "struct " : "union ", spec->name);
+		sym_in_tbl = symtbl_find(ctx->types, name);
+
+		if (sym_in_tbl == NULL)
+		{
+			sym_in_tbl = symbol_create_struct_or_union_incomplete(name, ty);
+			symtbl_push(ctx->types, sym_in_tbl);
+		}
+
+		free(name);
+		result = sym_in_tbl;
+		break;
+
+	case TP_ENUM:
+		name = str_concat("enum ", spec->name);
+		sym_in_tbl = symtbl_find(ctx->types, name);
+		if (sym_in_tbl == NULL)
+		{
+			log_error(spec, "'enum %s' is not defined", name);
+			break;
+		}
+
+		result = sym_in_tbl;
+		break;
+
+
+	case TP_PTR:
+		return type_create_ptr(
+			spec->attributes,
+			extract_type(spec->child)
+		);
+
+	case TP_FUNC:
+		// 提取函数参数类型
+		if (spec->type == TP_VOID)
+		{
+			if(spec->child->super.next)
+			{
+				log_error(spec, "parameter cannot hav void type");
+				break;
+			}
+		}
+		FOR_EACH(spec->child, ast_ts)
+		{
+			TRY_CAST(TypeSpecifier, ts, ast_ts);
+			TypeInfo* type = extract_type(ts);
+			type_append(last, type);
+			last = type;
+			if (first == NULL)
+			{
+				first = type;
+			}
+		}
+
+		result = type_create_func(
+			extract_type(spec->child), // 返回值
+			spec->name, // 函数名
+			first // 函数参数
+			);
+
+		break;
+
+	case TP_ARRAY:
+		array_element_count = eval_ast(spec->array_element_count);
+		if (!LLVMIsConstant(array_element_count))
+		{
+			log_error(spec, "Expected array to be constant");
+			break;
+		}
+		;
+		result = type_create_array(
+			LLVMConstIntGetZExtValue(array_element_count),
+			spec->attributes,
+			extract_type(spec->child)
+		);
+
+		//TODO: Bit field
+	case TP_BITFIELD:
+		break;
+	case TP_LONG_FLAG:
+		break;
+	default:
+		break;
+	}
+
+	if (spec->super.sematic == NULL)
+	{
+		spec->super.sematic = sematic_data_new();
+	}
+	spec->super.sematic->type = result;
+	return result;
+}
+
+
 LLVMValueRef eval_DeclareStmt(DeclareStmt* ast)
 {
-	NOT_IMPLEMENTED;
+	FOR_EACH(ast->identifiers, id_ast)
+	{
+		if (id_ast->type == AST_EmptyExpr)
+		{
+			eval_EmptyExpr(id_ast);
+			continue;
+		}
+
+		TRY_CAST(DeclaratorExpr, id, id_ast);
+		if (!id)
+		{
+			log_error(id_ast, "Expected declarator");
+			continue;
+		}
+
+
+
+	}
 }
 
 LLVMValueRef eval_EnumDeclareStmt(EnumDeclareStmt* ast)
@@ -172,6 +357,8 @@ LLVMValueRef eval_EnumDeclareStmt(EnumDeclareStmt* ast)
 			LLVMConstInt(LLVMInt64Type(), enum_val, 1));
 
 		symtbl_push(ctx->variables, enum_item);
+		variable_append(last_enum_item, enum_item);
+
 		last_enum_item = enum_item;
 		if (first_enum_item == NULL)
 		{

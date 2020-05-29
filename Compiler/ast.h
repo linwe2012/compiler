@@ -129,6 +129,7 @@ struct DeclareStmt
 	AST super;
 	AST* type;
 	AST* identifiers;
+	enum SymbolAttributes attributes;
 };
 
 //   struct/union { fields };
@@ -279,6 +280,9 @@ struct DeclaratorExpr
 	char* name;
 	TypeInfo* last;
 	TypeInfo* first;
+
+	AST* type;
+
 	AST* init_value;
 	enum SymbolAttributes attributes;
 };
@@ -297,17 +301,25 @@ struct InitilizerListExpr
 enum TypeSpecifierFlags
 {
 	TypeSpecifier_None,
-	TypeSpecifier_Unsigned,
-	TypeSpecifier_Signed,
-	TypeSpecifier_Long
+	TypeSpecifier_Unsigned = 1,
+	TypeSpecifier_Signed = 2,
+	TypeSpecifier_Long = 4,
+	TypeSpecifier_LongLong = 8,
+	TypeSpecifier_Exclusive = 16
 };
+
 struct TypeSpecifier
 {
 	AST super;
 	const char* name;
-	TypeInfo* info;
-	enum TypeSpecifierFlags flags;
+	enum Types type;
+	
+	struct TypeSpecifier* child;
+
 	enum SymbolAttributes attributes;
+
+	enum TypeSpecifierFlags flags;
+	AST* array_element_count;
 };
 
 
@@ -431,7 +443,7 @@ AST* make_declarator_bit_field(AST* declarator, AST* bitfield);
 
 AST* make_type_specifier(enum Types type);
 
-AST* make_type_specifier_from_id(const char* id);
+AST* make_type_specifier_from_id(char* id);
 AST* make_type_specifier_extend(AST* me, AST*other, enum SymbolAttributes storage);
 AST* make_declaration(AST* declaration_specifiers, enum SymbolAttributes attribute_specifier, AST* init_declarator_list);
 
