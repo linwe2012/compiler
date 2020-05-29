@@ -143,6 +143,8 @@ uint64_t next_label()
 }
 
 
+void init_type_specifier(TypeSpecifier* ts, enum TypeSpecifierFlags flags);
+
 void ast_init(AST* ast, ASTType type)
 {
 	ast->prev = NULL;
@@ -304,13 +306,14 @@ void add_or_dec_one(OperatorExpr* ast, OperatorExpr* num, int value, const char*
 	}*/
 }
 
+/*
 DeclaratorExpr* ast_apply_specifier_to_declartor(TypeSpecifier* spec, DeclaratorExpr* decl)
 {
 	decl->attributes = spec->attributes;
-	/*if (spec->name)
-	{
-		decl->name = spec->name;
-	}*/
+	//if (spec->name)
+	//{
+	//	decl->name = spec->name;
+	//}
 	if (!decl->first)
 	{
 		decl->first = decl->last = spec->info;
@@ -324,6 +327,7 @@ DeclaratorExpr* ast_apply_specifier_to_declartor(TypeSpecifier* spec, Declarator
 
 	return decl;
 }
+*/
 
 AST* make_unary_expr(enum Operators unary_op, AST* rhs)
 {
@@ -799,6 +803,7 @@ void ast_notify_enter_block() {
 
 void notify_label(char* name)
 {
+	/*
 	// 如果是 label:
 	if (name != NULL)
 	{
@@ -825,6 +830,7 @@ void notify_label(char* name)
 		symtbl_push(ctx->labels, sym);
 	}
 	astlist_push(&data->pending_labels, SUPER(ast));
+	*/
 }
 
 AST* make_label(char* name, AST* statement)
@@ -1049,13 +1055,30 @@ int ast_merge_type_qualifier(int a, int b)
 AST* makr_init_direct_declarator(const char* name)
 {
 	NEW_AST(DeclaratorExpr, ast);
-	ast->name = strdup(name);
-	ast->last = ast->first = NULL;
+	if (name)
+	{
+		ast->name = strdup(name);
+	}
 	ast->init_value = NULL;
+
+	ast->type_spec = NULL;
+	ast->type_spec_last = NULL;
+	ast->bitfield = NULL;
 
 	return SUPER(ast);
 }
 
+void extend_declarator_with_specifier(DeclaratorExpr* decl, TypeSpecifier* spec)
+{
+	if (decl->type_spec = NULL)
+	{
+		decl->type_spec = spec;
+	}
+	else {
+		decl->type_spec_last->child = spec;
+	}
+	decl->type_spec_last = spec;
+}
 
 AST* make_extent_direct_declarator(AST* direct, enum Types type, AST* wrapped)
 {
@@ -1066,61 +1089,61 @@ AST* make_extent_direct_declarator(AST* direct, enum Types type, AST* wrapped)
 		CAST(DeclaratorExpr, decl, direct);
 		if (wrapped)
 		{
+			NEW_AST(TypeSpecifier, spec);
+			init_type_specifier(spec, TypeSpecifier_Exclusive);
+			spec->type = TP_ARRAY;
+			spec->array_element_count = wrapped;
 
-			CAST(NumberExpr, number, wrapped);
-			AST* res = make_binary_expr(OP_CAST, make_type_specifier(TP_INT64 | TP_UNSIGNED), wrapped);
-			CAST(NumberExpr, new_num, wrapped);
-			TypeInfo* last = type_create_array(new_num->i64, ATTR_NONE);
-			type_wrap(decl->last, last);
-			decl->last = last;
-			ast_destroy(res);
+			extend_declarator_with_specifier(decl, spec);
 		}
 		res = decl;
 	}
 	else // type == TP_FUNC
 	{
-		TypeInfo* prev = NULL;
-		TypeInfo* first = NULL;
+		TypeSpecifier* prev = NULL;
+		TypeSpecifier* first = NULL;
+		int i = 0;
 
-		// 把 AST 链表串联成 TypeInfo* 链表
+		// 把 DeclaratorExpr* 链表串联成 TypeSpecifier* 链表
 		FOR_EACH(wrapped, param)
 		{
 			CAST(DeclaratorExpr, p, param);
-			p->first->field_name = p->name;
-			p->first->prev = prev;
-			if (prev)
+
+			if (p->type_spec == NULL)
 			{
-				prev->next = p->first;
+				continue;
+			}
+
+			p->type_spec->field_name = p->name;
+			p->type_spec->super.prev = SUPER(prev);
+			p->type_spec->attributes |= p->attributes;
+
+			if (first == NULL)
+			{
+				first = p->type_spec;
 			}
 			else {
-				first = p->first;
+				prev->super.next = SUPER(p->type_spec);
 			}
-			prev = p->first;
 
+			prev = p->type_spec;
 		}
-		TypeInfo* func = type_create_func(first);
 
+		NEW_AST(TypeSpecifier, spec);
+		init_type_specifier(spec, TypeSpecifier_Exclusive);
+		spec->params = first;
+		
 		// 如果不是 abstract declarator
 		if (direct != NULL)
 		{
 			CAST(DeclaratorExpr, decl, direct);
-
-
-			if (decl->last == NULL)
-			{
-				decl->last = decl->first = func;
-			}
-			else {
-				type_wrap(decl->last, func);
-			}
-
-			decl->last = func;
+			extend_declarator_with_specifier(decl, spec);
 			res = decl;
 		}
 		else {
 			NEW_AST(DeclaratorExpr, decl);
 			decl->attributes = ATTR_NONE;
-			decl->first = decl->last = func;
+			decl->type_spec = decl->type_spec_last = spec;
 			decl->init_value = NULL;
 			decl->name = NULL;
 			res = decl;
@@ -1136,16 +1159,8 @@ AST* make_declarator(AST* pointer, AST* direct_declarator)
 	CAST(DeclaratorExpr, ptr, pointer);
 	CAST(DeclaratorExpr, decl, direct_declarator);
 
-	if (decl->last != NULL)
-	{
-		type_wrap(decl->last, ptr->first);
-	}
-	else
-	{
-		decl->last = ptr->first;
-	}
-
-	decl->last = ptr->last;
+	ptr->type_spec_last->child = decl->type_spec;
+	decl->type_spec = ptr->type_spec;
 
 	free(ptr);
 
@@ -1169,28 +1184,29 @@ union ConstantValue constant_from_number_expr(NumberExpr* num)
 AST* make_declarator_bit_field(AST* declarator, AST* bitfield)
 {
 	CAST(DeclaratorExpr, decl, declarator);
-	CONSTANT(NumberExpr, num, bitfield);
-
-	decl->first->bitfield = constant_cast(num->number_type, TP_INT64, constant_from_number_expr(num)).i64;
+	decl->bitfield = bitfield;
 	return SUPER(decl);
 }
 
 
 AST* make_ptr(int type_qualifier_list, AST* pointing)
 {
-	TypeInfo* type = type_create_ptr(type_qualifier_list);
+	NEW_AST(TypeSpecifier, spec);
+	init_type_specifier(spec, TypeSpecifier_Exclusive);
+	spec->type = TP_PTR;
+	spec->attributes = type_qualifier_list;
 
 	if (pointing == NULL)
 	{
-		NEW_AST(DeclaratorExpr, ast);
-		ast->first = ast->last = type;
+		// 利用这个函数帮我们初始化
+		DeclaratorExpr* ast = (DeclaratorExpr*) makr_init_direct_declarator(NULL);
+		ast->type_spec = ast->type_spec_last = spec;
+
 		return SUPER(ast);
 	}
 	else {
 		CAST(DeclaratorExpr, decl, pointing);
-		type_wrap(decl->last, type);
-		decl->last = type;
-
+		extend_declarator_with_specifier(decl, spec);
 	}
 	return pointing;
 }
@@ -1207,6 +1223,7 @@ void init_type_specifier(TypeSpecifier* ts, enum TypeSpecifierFlags flags)
 	ts->name = NULL;
 	ts->type = TP_INCOMPLETE;
 	ts->flags |= flags;
+	ts->params = NULL;
 }
 
 AST* make_type_specifier(enum Types type)
@@ -1391,9 +1408,10 @@ AST* make_list_expr(AST* child)
 
 AST* make_paramter_ellipse()
 {
-	NEW_AST(DeclaratorExpr, decl);
-	decl->first = decl->last = type_create_param_ellipse();
-	decl->init_value = NULL;
+	DeclaratorExpr* decl = (DeclaratorExpr*)makr_init_direct_declarator(NULL);
+	NEW_AST(TypeSpecifier, spec);
+	init_type_specifier(spec, TypeSpecifier_Exclusive);
+	spec->type = TP_ELLIPSIS;
 
 	return SUPER(decl);
 }
@@ -1447,10 +1465,12 @@ AST* make_declaration(AST* declaration_specifiers, enum SymbolAttributes attribu
 // TODO: 这可能是错的, 脑袋有点炸了
 AST* make_type_declarator(AST* specifier_qualifier, AST* declarator)
 {
+	
 	CAST(TypeSpecifier, spec, specifier_qualifier);
 	CAST(DeclaratorExpr, decl, declarator);
-	
-	decl = ast_apply_specifier_to_declartor(spec, decl);
+
+
+	return make_parameter_declaration(specifier_qualifier, declarator);
 
 	return SUPER(decl);
 }
@@ -1504,15 +1524,13 @@ void list_destroy(struct List* list)
 	}
 }
 
-AST* make_enum_define(const char* const_identifier, AST* enum_list)
+AST* make_enum_define(char* identifier, AST* enum_list)
 {
-	char* identifier = strdup(const_identifier);
-	char* name = str_concat("enum ", identifier);
-	Symbol* sym = symtbl_find(ctx->types, name);
-
 	NEW_AST(EnumDeclareStmt, ast);
 
-	ast->ref = enum_type;
+	ast->name = identifier;
+	ast->ref = NULL;
+	
 	ast->enums = enum_list;
 
 	return SUPER(ast);
@@ -1523,7 +1541,7 @@ AST* make_enum_define(const char* const_identifier, AST* enum_list)
 AST* make_struct_field_declaration(AST* specifier_qualifier, AST* struct_declarator)
 {
 	CAST(TypeSpecifier, spec, specifier_qualifier);
-	
+
 	FOR_EACH(struct_declarator, st)
 	{
 		CAST(DeclaratorExpr, decl, st);
@@ -1531,37 +1549,20 @@ AST* make_struct_field_declaration(AST* specifier_qualifier, AST* struct_declara
 		{
 			log_warning(st, "Struct field init value will be ignored");
 		}
-		ast_apply_specifier_to_declartor(spec, decl);
-		create_struct_field(decl->first, decl->attributes, decl->name);
+
+		extend_declarator_with_specifier(decl, spec);
 	}
 
 	return struct_declarator;
 }
 
-// TODO: Add type from symbol table
-AST* make_struct_or_union_define(enum Types type, const char* const_identifier, AST* field_list)
+AST* make_struct_or_union_define(enum Types type, char* identifier, AST* field_list)
 {
-	TypeInfo* first = NULL;
-	TypeInfo* last = NULL;
-	char* identifier = strdup(const_identifier);
-	
-	FOR_EACH(field_list, st)
-	{
-		CAST(DeclaratorExpr, decl, st);
-		TypeInfo* ty = decl->first;
-		if (first == NULL)
-		{
-			first = last = ty;
-		}
-		else {
-			type_append(last, ty);
-			last = ty;
-		}
-	}
-
 	NEW_AST(AggregateDeclareStmt, ast);
+	ast->type = type;
 	ast->fields = field_list;
-	ast->ref = symbol_create_struct_or_union(type_create_struct_or_union(type, identifier), first);
+	ast->name = identifier;
+	ast->ref = NULL;
 	return SUPER(ast);
 }
 
@@ -1579,19 +1580,31 @@ AST* make_initializer_list(AST* list)
 }
 
 // 这里解决的是 long a = 0;, 翻译成 int
+/*
 void normalize_type_specifier(TypeSpecifier* type)
 {
 	if (type->flags == TypeSpecifier_Long && type->info == NULL)
 	{
 		type->info = type_fetch_buildtin(TP_INT64);
 	}
-}
+}*/
 
 AST* make_parameter_declaration(AST* declaration_specifiers, AST* declarator)
 {
 	CAST(TypeSpecifier, spec, declaration_specifiers);
-	CAST(DeclaratorExpr, decl, declarator);
+	DeclaratorExpr* gdecl = NULL;
+	if (!declarator)
+	{
+		gdecl = (DeclaratorExpr*)(makr_init_direct_declarator(NULL));
+	}
+	else {
+		CAST(DeclaratorExpr, decl, declarator);
+		gdecl = decl;
+	}
+	
+	extend_declarator_with_specifier(gdecl, spec);
 
+	/*
 	normalize_type_specifier(spec);
 
 	if (!declarator)
@@ -1613,7 +1626,9 @@ AST* make_parameter_declaration(AST* declaration_specifiers, AST* declarator)
 	}
 
 	decl = ast_apply_specifier_to_declartor(spec, decl);
-	return SUPER(decl);
+	*/
+
+	return SUPER(gdecl);
 }
 
 AST* make_define_function(AST* declaration_specifiers, AST* declarator, AST* compound_statement)

@@ -207,6 +207,7 @@
     <ClCompile Include="main.c" />
     <ClCompile Include="parser.c" />
     <ClCompile Include="preprocessor.c" />
+    <ClCompile Include="sematic.c" />
     <ClCompile Include="symbol.c" />
     <ClCompile Include="utils.c" />
     <ClCompile Include="x86_64-gen.c" />

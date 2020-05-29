@@ -7,6 +7,7 @@
 
 #include <llvm-c/Core.h>
 
+#define SUPER(ptr) &(ptr->super)
 #define NOT_IMPLEMENTED return NULL
 #define FOR_EACH(ast__, iterator__) \
 	for(AST* iterator__ = ast__; iterator__ != NULL; iterator__ = iterator__->next)
@@ -46,10 +47,19 @@ char* next_temp_id_str()
 {
 	uint64_t id = sem_ctx.tmp_top->temp_id++;
 	char* buf = (char*)malloc(32);
-	snprintf(buf, 32, "%ld", id);
+	snprintf(buf, 32, "%lld", id);
 	return buf;
 }
 
+static void enter_sematic_temp_context()
+{
+
+}
+
+static void leave_sematic_temp_context()
+{
+
+}
 
 STRUCT_TYPE(SematicData);
 
@@ -90,11 +100,14 @@ LLVMValueRef eval_ast(AST* ast)
 // returns the value of last eval
 LLVMValueRef eval_list(AST* ast)
 {
+	LLVMValueRef last = NULL;
 	while (ast)
 	{
-		eval_ast(ast);
+		last = eval_ast(ast);
 		ast = ast->next;
 	}
+
+	return last;
 }
 
 // bootstrapping
@@ -161,7 +174,7 @@ TypeInfo* extract_type(TypeSpecifier* spec)
 	switch (ty)
 	{
 	case TP_INCOMPLETE:
-		log_error(spec, "Incomplete type specifier");
+		log_error(SUPER(spec), "Incomplete type specifier");
 		break;
 
 	// Numeric & void types
@@ -171,7 +184,7 @@ TypeInfo* extract_type(TypeSpecifier* spec)
 	case TP_FLOAT128:
 	case TP_ELLIPSIS:
 		if (sign_flag) {
-			log_error(spec, "Invalid sign flag on void/float type");
+			log_error(SUPER(spec), "Invalid sign flag on void/float type");
 			break;
 		}
 
@@ -196,7 +209,7 @@ TypeInfo* extract_type(TypeSpecifier* spec)
 		}
 
 		free(name);
-		result = sym_in_tbl;
+		result = &sym_in_tbl->type;
 		break;
 
 	case TP_ENUM:
@@ -204,11 +217,11 @@ TypeInfo* extract_type(TypeSpecifier* spec)
 		sym_in_tbl = symtbl_find(ctx->types, name);
 		if (sym_in_tbl == NULL)
 		{
-			log_error(spec, "'enum %s' is not defined", name);
+			log_error(SUPER(spec), "'enum %s' is not defined", name);
 			break;
 		}
 
-		result = sym_in_tbl;
+		result = &sym_in_tbl->type;
 		break;
 
 
@@ -220,15 +233,17 @@ TypeInfo* extract_type(TypeSpecifier* spec)
 
 	case TP_FUNC:
 		// 提取函数参数类型
-		if (spec->type == TP_VOID)
+		if (spec->params->type == TP_VOID)
 		{
-			if(spec->child->super.next)
+			if(spec->params->super.next)
 			{
-				log_error(spec, "parameter cannot hav void type");
+				log_error(SUPER(spec), "parameter cannot hav void type");
 				break;
 			}
 		}
-		FOR_EACH(spec->child, ast_ts)
+
+		AST* params = SUPER(spec->params);
+		FOR_EACH(params, ast_ts)
 		{
 			TRY_CAST(TypeSpecifier, ts, ast_ts);
 			TypeInfo* type = extract_type(ts);
@@ -252,7 +267,7 @@ TypeInfo* extract_type(TypeSpecifier* spec)
 		array_element_count = eval_ast(spec->array_element_count);
 		if (!LLVMIsConstant(array_element_count))
 		{
-			log_error(spec, "Expected array to be constant");
+			log_error(SUPER(spec), "Expected array element count to be constant");
 			break;
 		}
 		;
@@ -270,7 +285,7 @@ TypeInfo* extract_type(TypeSpecifier* spec)
 	default:
 		break;
 	}
-
+	result->field_name = spec->field_name;
 	if (spec->super.sematic == NULL)
 	{
 		spec->super.sematic = sematic_data_new();
@@ -286,7 +301,7 @@ LLVMValueRef eval_DeclareStmt(DeclareStmt* ast)
 	{
 		if (id_ast->type == AST_EmptyExpr)
 		{
-			eval_EmptyExpr(id_ast);
+			eval_EmptyExpr((EmptyExpr*)id_ast);
 			continue;
 		}
 
@@ -300,6 +315,7 @@ LLVMValueRef eval_DeclareStmt(DeclareStmt* ast)
 
 
 	}
+	NOT_IMPLEMENTED;
 }
 
 LLVMValueRef eval_EnumDeclareStmt(EnumDeclareStmt* ast)
@@ -371,15 +387,33 @@ LLVMValueRef eval_EnumDeclareStmt(EnumDeclareStmt* ast)
 	return LLVMConstInt(LLVMInt64Type(), enum_val, 1);
 }
 
+// TODO: Add type from symbol table
 LLVMValueRef eval_AggregateDeclareStmt(AggregateDeclareStmt* ast)
 {
+	/*
+	TypeInfo* first = NULL;
+	TypeInfo* last = NULL;
+	FOR_EACH(field_list, st)
+	{
+		CAST(DeclaratorExpr, decl, st);
+		TypeInfo* ty = decl->first;
+		if (first == NULL)
+		{
+			first = last = ty;
+		}
+		else {
+			type_append(last, ty);
+			last = ty;
+		}
+	}
+	*/
 	NOT_IMPLEMENTED;
 }
 
 LLVMValueRef eval_BlockExpr(BlockExpr* ast)
 {
 	ctx_enter_block_scope(ctx);
-	LLVMValueRef last = eval_list(ast);
+	LLVMValueRef last = eval_list(SUPER(ast));
 	ctx_leave_block_scope(ctx, 0);
 
 	return last;
@@ -434,7 +468,7 @@ LLVMValueRef eval_EmptyExpr(EmptyExpr* ast)
 {
 	if (ast->error)
 	{
-		log_error(ast, "Error during parsing: %s", ast->error);
+		log_error(SUPER(ast), "Error during parsing: %s", ast->error);
 	}
 	return NULL;
 }

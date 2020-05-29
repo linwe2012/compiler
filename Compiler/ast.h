@@ -135,9 +135,12 @@ struct DeclareStmt
 //   struct/union { fields };
 struct AggregateDeclareStmt
 {
+	enum Types type; // TP_STRUCT/TP_UNION
 	AST super;
-	Symbol* ref;
 	AST* fields;
+	char* name;
+
+	Symbol* ref;
 };
 
 // enum { enums }
@@ -278,10 +281,12 @@ struct DeclaratorExpr
 {
 	AST super;
 	char* name;
-	TypeInfo* last;
-	TypeInfo* first;
+	//TypeInfo* last;
+	//TypeInfo* first;
 
-	AST* type;
+	struct TypeSpecifier* type_spec;
+	struct TypeSpecifier* type_spec_last;
+	AST* bitfield;
 
 	AST* init_value;
 	enum SymbolAttributes attributes;
@@ -311,10 +316,12 @@ enum TypeSpecifierFlags
 struct TypeSpecifier
 {
 	AST super;
-	const char* name;
+	char* name;
+	char* field_name;
 	enum Types type;
 	
 	struct TypeSpecifier* child;
+	struct TypeSpecifier* params;
 
 	enum SymbolAttributes attributes;
 
@@ -419,8 +426,7 @@ AST* make_define_function(AST* declaration_specifiers, AST* declarator, AST* com
 //    '*' type-qualifier-list?
 //    '*' type-qualifier-list? pointer
 AST* make_ptr(int type_qualifier_list, AST* pointing);
-int ast_merge_type_qualifier(int a, int b);
-
+AST* make_declaration(AST* declaration_specifiers, enum SymbolAttributes attribute_specifier, AST* init_declarator_list);
 
 // direct_declarator
 //     : IDENTIFIER
@@ -441,25 +447,26 @@ AST* make_declarator(AST* pointer, AST* direct_declarator);
 AST* make_declarator_with_init(AST* declarator, AST* init);
 AST* make_declarator_bit_field(AST* declarator, AST* bitfield);
 
-AST* make_type_specifier(enum Types type);
 
-AST* make_type_specifier_from_id(char* id);
+AST* make_type_specifier(enum Types type);
 AST* make_type_specifier_extend(AST* me, AST*other, enum SymbolAttributes storage);
-AST* make_declaration(AST* declaration_specifiers, enum SymbolAttributes attribute_specifier, AST* init_declarator_list);
+AST* make_type_specifier_from_id(char* id);
+AST* ast_merge_specifier_qualifier(AST* me, AST* other, enum Types qualifier);
+int ast_merge_type_qualifier(int a, int b);
 
 // attr 是 __cdecl, __stdcall, inline
 
 // enum_define:
 //     enum identifier { enum_list }
-AST* make_enum_define(const char* identifier, AST* enum_list);
+AST* make_enum_define(char* identifier, AST* enum_list);
 
 // struct_or_union_define:
 //     struct/union identifier { field_list }
 AST* make_struct_field_declaration(AST* specifier_qualifier, AST* struct_declarator);
-AST* make_struct_or_union_define(enum Types type, const char* identifier, AST* field_list);
+AST* make_struct_or_union_define(enum Types type, char* identifier, AST* field_list);
 
 
-AST* ast_merge_specifier_qualifier(AST* me, AST* other, enum Types qualifier);
+
 
 AST* make_initializer_list(AST* list);
 

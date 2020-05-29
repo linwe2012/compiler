@@ -211,7 +211,7 @@ void symtbl_leave_scope(SymbolTable* tbl, int free_all_symols);
 // ================================
 TypeInfo* type_fetch_buildtin(enum Types type);
 Symbol* symbol_create_label(char* name, uint64_t label, int resolved);
-Symbol* symbol_create_constant(Symbol* enum_sym, char* name, union ConstantValue val);
+Symbol* symbol_create_constant(Symbol* enum_sym, char* name, void* val);
 Symbol* symbol_create_enum(char* name);
 Symbol* symbol_create_enum_item(Symbol* type, Symbol* prev, char* name, void* val);
 Symbol* symbol_from_type_info(TypeInfo* info);
@@ -231,7 +231,7 @@ TypeInfo* type_create_param_ellipse();
 
 void variable_append(Symbol* last, Symbol* new_last);
 
-int type_wrap(TypeInfo* parent, TypeInfo* child);
+// int type_wrap(TypeInfo* parent, TypeInfo* child);
 int type_append(TypeInfo* tail, TypeInfo* new_tail);
 int type_is_builtin(enum Types type);
 
