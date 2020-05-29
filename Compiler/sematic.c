@@ -40,6 +40,7 @@ struct SematicContext
 
 	LLVMBuilderRef builder;
 	LLVMContextRef context;		// FIX: 我随便放的，不清楚是不是该放在这里
+	LLVMModuleRef module;		// FIX: 同上
 } sem_ctx;
 
 char* next_temp_id_str()
@@ -58,6 +59,11 @@ STRUCT_TYPE(SematicData);
 AST_NODE_LIST(FUNC_FORWARD_DECL)
 AST_AUX_NODE_LIST(FUNC_FORWARD_DECL)
 #undef FUNC_FORWARD_DECL
+
+
+// DeclareStmt如果是函数的话应该也可以用这个
+static LLVMValueRef eval_prototype(AST* type, AST* signature);
+
 
 void sem_init(AST* ast)
 {
@@ -445,6 +451,11 @@ LLVMValueRef eval_LoopStmt(LoopStmt* ast)
 }
 
 // TODO: @wushuhui
+LLVMValueRef eval_prototype(AST* type, AST* signature) {
+	NOT_IMPLEMENTED;
+}
+
+// TODO: @wushuhui
 LLVMValueRef eval_IfStmt(IfStmt* ast) {
 	LLVMValueRef condv = eval_ast(ast->condition);
 	if (condv == NULL) {
@@ -486,7 +497,7 @@ LLVMValueRef eval_SwitchCaseStmt(SwitchCaseStmt* ast) {
 // 如果没有Declare过,要加SymbolTable
 // main要特殊处理吗?
 LLVMValueRef eval_FunctionDefinitionStmt(FunctionDefinitionStmt* ast) {
-	LLVMValueRef func_type = eval_ast(ast->specifier);
+	LLVMValueRef func_type = eval_prototype(ast->specifier, ast->declarator);
 	if (func_type == NULL) {
 		return NULL;
 	}

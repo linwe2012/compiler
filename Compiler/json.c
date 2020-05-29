@@ -395,7 +395,9 @@ void _write_DeclaratorExpr(DeclaratorExpr *expr) {
 }
 
 void _write_TypeSpecifier(TypeSpecifier *expr) {
-    fprintf(s_fp, "\"name\":\"%s\"", expr->info->type_name);
+    // fprintf(s_fp, "\"name\":\"%s\"", expr->info->type_name);
+    // FIX: 等待Debug
+    fprintf(s_fp, "\"name\":\"(TYPE)\"");
 }
 
 
