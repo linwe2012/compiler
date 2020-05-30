@@ -661,7 +661,9 @@ void handle_logical_op(OperatorExpr* ast, enum Operators binary_op, OperatorExpr
 AST* make_binary_expr(enum Operators binary_op, AST* lhs, AST* rhs)
 {
 	NEW_AST(OperatorExpr, ast);
-	CAST(OperatorExpr, left_number, rhs);
+	//这里临时处理一下
+	if (!(binary_op & OP_ASSIGN))
+		CAST(OperatorExpr, left_number, lhs);
 	CAST(OperatorExpr, right_number, rhs);
 	ast->op = binary_op;
 	ast->rhs = rhs;
@@ -727,14 +729,9 @@ AST* make_binary_expr(enum Operators binary_op, AST* lhs, AST* rhs)
 		break;
 		//assignment
 	case OP_ASSIGN:
-		if (!(type_is_arithmetic(left_number->number_type) && type_is_arithmetic(right_number->number_type)))
-		{
-			err_msg = "lhs or rhs is not arhitecture type";
-		}
-		handle_assign_op(left_number, right_number, &err_msg);
-		ast_destroy(SUPER(ast));
+		//TODO
+		ast->number_type = right_number->number_type;
 		break;
-		//其他ASSIGNMENT 暂未实现
 		//logical
 	case OP_EQUAL:
 		handle_logical_op(ast, binary_op, left_number, right_number, &err_msg);
