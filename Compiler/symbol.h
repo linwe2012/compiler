@@ -217,6 +217,7 @@ Symbol* symbol_create_enum_item(Symbol* type, Symbol* prev, char* name, void* va
 Symbol* symbol_from_type_info(TypeInfo* info);
 Symbol* symbol_create_struct_or_union(TypeInfo* info, TypeInfo* child);
 Symbol* symbol_create_struct_or_union_incomplete(char* name, enum Types struct_or_union);
+Symbol* symbol_create_func(char* name, void* val, TypeInfo* ret, TypeInfo* params, struct AST* body);
 
 
 // 类型管理 & 创建
