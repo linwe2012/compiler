@@ -37,6 +37,9 @@
     <ClCompile Include="preprocessor.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="sematic.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="alloc.h">

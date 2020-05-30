@@ -169,10 +169,24 @@ d3.js的代码参考了[4].
 例如如下C语言代码，经过我们的编译器生成AST后，进行可视化，效果如图所示.
 
 ```C
+void putchar(int c);
 
+void dummy(int a, float b, double c);
+
+
+int main()
+{
+    putchar(104); // 'h'
+    putchar(111); // 'o'
+    putchar(108); // 'l'
+    putchar(97);  // 'a'
+    putchar(10);  // '\n'
+    dummy(8, 0.8f, 0.9);
+    return 0;
+}
 ```
 
-![AST Visualization]()
+![AST Visualization](ast2json.png)
 
 
 

@@ -37,6 +37,7 @@ enum Types
 	TP_FLOAT128,
 
 	TP_ELLIPSIS, // ... <- 函数调用的时候
+	TP_ERROR,
 
 	TP_STRUCT = 0x0010u,
 	TP_UNION = 0x0020u,

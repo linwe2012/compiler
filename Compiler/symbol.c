@@ -6,13 +6,14 @@
 
 STRUCT_TYPE(SymbolTableEntry);
 
-TypeInfo builtins[TP_NUM_BUILTINS + TP_NUM_BUILTIN_INTS + 1];
+TypeInfo builtins[TP_NUM_BUILTINS + TP_NUM_BUILTIN_INTS + 2];
+#define ERROR_TYPE_INDEX TP_NUM_BUILTINS + TP_NUM_BUILTIN_INTS + 1
 
 #ifndef max
 #define max(x, y) ((x) > (y) ? (x) : (y))
 #endif // !max
 
-
+Symbol* new_symbol(char* name, enum SymbolTypes type);
 
 void symtbl_init(SymbolTable* tbl)
 {
@@ -209,16 +210,19 @@ void type_info_init(TypeInfo* info)
 	info->bitfield_offset = -1;
 	info->prev = NULL;
 	info->next = NULL;
+	info->incomplete = 0;
 }
 
-TypeInfo* type_create_array(uint64_t n, enum SymbolAttributes qualifers)
+TypeInfo* type_create_array(uint64_t n, enum SymbolAttributes qualifers, TypeInfo* array_element_type)
 {
-	NEW_STRUCT(TypeInfo, info);
+	Symbol* sym = new_symbol(NULL, Symbol_TypeInfo);
+	TypeInfo* info = &sym->type;
 	type_info_init(info);
 
 	info->type = TP_ARRAY;
 	info->arr.array_count = n;
 	info->qualifiers = qualifers;
+	info->arr.array_type = array_element_type;
 
 	return info;
 }
@@ -233,26 +237,37 @@ TypeInfo* type_create_struct_or_union(enum Types type, char* name)
 	return info;
 }
 
-TypeInfo* type_create_ptr(enum SymbolAttributes qualifers)
+TypeInfo* type_create_ptr(enum SymbolAttributes qualifers, struct TypeInfo* pointing)
 {
-	NEW_STRUCT(TypeInfo, info);
+	Symbol* sym = new_symbol(NULL, Symbol_TypeInfo);
+	TypeInfo* info = &sym->type;
 	type_info_init(info);
+
+
 	info->qualifiers = qualifers;
 	info->type = TP_PTR;
+	info->alignment = 8;
+	info->aligned_size = 8;
+	info->ptr.pointing = pointing;
 
 	return info;
 }
 
-TypeInfo* type_create_func(struct TypeInfo* params)
+TypeInfo* type_create_func(struct TypeInfo* ret, char* name, struct TypeInfo* params)
 {
-	NEW_STRUCT(TypeInfo, info);
+	Symbol* sym = new_symbol(NULL, Symbol_TypeInfo);
+	TypeInfo* info = &sym->type;
 	type_info_init(info);
 
+	//TODO: should i add alignment?
 	info->type = TP_FUNC;
 	info->fn.params = params;
+	info->fn.return_type = ret;
 
 	return info;
 }
+
+
 
 TypeInfo* create_struct_field(TypeInfo* type_info, enum SymbolAttributes attributes, char* field_name)
 {
@@ -308,6 +323,14 @@ void symbol_init_context(struct Context* context)
 
 	INTERNAL_TYPE_LIST_INT(INIT);
 
+	{
+		struct TypeInfo type;
+		type_info_init(&type);
+		type.type_name = "<error type>";
+		type.type = TP_ERROR;
+		builtins[ERROR_TYPE_INDEX] = type;
+	}
+
 }
 
 
@@ -354,17 +377,17 @@ Symbol* symbol_create_label(char* name, uint64_t label, int resolved)
 {
 	Symbol* sym = new_symbol(name, Symbol_LabelInfo);
 
-	sym->label->label_id = label;
-	sym->label->resolved = resolved;
+	sym->label.label_id = label;
+	sym->label.resolved = resolved;
 
 	return sym;
 }
 
-Symbol* symbol_create_constant(Symbol* enum_sym, char* name, union ConstantValue val)
+Symbol* symbol_create_constant(Symbol* enum_sym, char* name, void* val)
 {
 	Symbol* sym = new_symbol(name, Symbol_VariableInfo);
 	sym->var.attributes = ATTR_NONE;
-	sym->var.const_val = val;
+	sym->var.value = val;
 	sym->var.is_constant = 1;
 
 	sym->var.type = enum_sym;
@@ -384,18 +407,24 @@ Symbol* symbol_create_enum(char* name)
 	return sym;
 }
 
-Symbol* symbol_create_enum_item(char* name, int64_t val)
+Symbol* symbol_create_enum_item(Symbol* type, Symbol* prev, char* name, void* val)
 {
 	Symbol* sym = new_symbol(name, Symbol_TypeInfo);
-	type_info_init(&(sym->type));
-
-	sym->type.type = TP_ENUM;
-	sym->type.alignment = 8;
-	sym->type.aligned_size = 8;
-
-	sym->type.enu.val = val;
+	sym->var.name = name;
+	sym->var.attributes = ATTR_CONST;
+	sym->var.is_constant = 1;
+	sym->var.value = val;
+	sym->var.type = type;
+	sym->var.prev = &prev->var;
 
 	return sym;
+}
+
+void variable_append(Symbol* last, Symbol* new_last)
+{
+	if (last == NULL) return;
+	last->var.next = &new_last->var;
+	new_last->var.prev = &last->var;
 }
 
 
@@ -505,6 +534,22 @@ Symbol* symbol_create_struct_or_union(TypeInfo* info, TypeInfo* child)
 	}
 
 	return symbol_from_type_info(info);
+}
+TypeInfo* type_get_error_type()
+{
+	return &builtins[ERROR_TYPE_INDEX];
+}
+
+Symbol* symbol_create_struct_or_union_incomplete(char* name, enum Types struct_or_union)
+{
+	Symbol* sym = new_symbol(name, Symbol_TypeInfo);
+	TypeInfo* info = &sym->type;
+	type_info_init(info);
+
+	info->type = struct_or_union;
+	info->incomplete = 1;
+
+	return sym;
 }
 
 TypeInfo* type_create_param_ellipse()

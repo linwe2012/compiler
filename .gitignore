@@ -19,3 +19,5 @@
 **/parser.output
 
 packages
+
+test/*.json

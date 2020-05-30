@@ -42,6 +42,8 @@ STRUCT_TYPE(TypeAlias)
 struct TypeInfo
 {
 	char* type_name;     // 类型的名称 (必须是 struct TypeInfo 第一个字段)
+	void* value;
+
 	int is_alias;   
 	char* field_name;    // struct/union 字段名称
 	enum Types type;     // 基础类型
@@ -51,6 +53,7 @@ struct TypeInfo
 	int offset;          // 如果是结构体, 距离结构体首部的距离
 	int bitfield_offset; // bit field 距离上一个非bitfield元素的距离
 	int bitfield;        // bit field 占多少个字节
+	int incomplete;
 
 	enum SymbolAttributes qualifiers; // const 等 qualifier
 
@@ -101,16 +104,22 @@ STRUCT_TYPE(TypeInfo)
 struct VariableInfo
 {
 	char* name;
+	void* value;
+
 	enum SymbolAttributes attributes;
 	Symbol* type;
 	int is_constant;
-	union ConstantValue const_val;
+
+	struct VariableInfo* prev;
+	struct VariableInfo* next;
 };
 STRUCT_TYPE(VariableInfo)
 
 struct FunctionInfo
 {
 	char* name;
+	void* value;
+
 	TypeInfo* return_type;
 	TypeInfo* params;
 	struct AST* body;
@@ -120,6 +129,8 @@ STRUCT_TYPE(FunctionInfo)
 struct LabelInfo
 {
 	char* name;
+	void* value;
+
 	uint64_t label_id;
 	int resolved; // 当 goto 定义在 label: 之前的时候, 会产生一个 unresolved label
 };
@@ -145,11 +156,12 @@ struct Symbol
 		struct
 		{
 			char* name;
+			void* value;
 		};
 		TypeInfo type;
 		VariableInfo var;
 		FunctionInfo func;
-		LabelInfo* label;
+		LabelInfo label;
 	};
 
 	Symbol* prev;
@@ -199,26 +211,33 @@ void symtbl_leave_scope(SymbolTable* tbl, int free_all_symols);
 // ================================
 TypeInfo* type_fetch_buildtin(enum Types type);
 Symbol* symbol_create_label(char* name, uint64_t label, int resolved);
-Symbol* symbol_create_constant(Symbol* enum_sym, char* name, union ConstantValue val);
+Symbol* symbol_create_constant(Symbol* enum_sym, char* name, void* val);
 Symbol* symbol_create_enum(char* name);
-Symbol* symbol_create_enum_item(char* name, int64_t val);
+Symbol* symbol_create_enum_item(Symbol* type, Symbol* prev, char* name, void* val);
 Symbol* symbol_from_type_info(TypeInfo* info);
 Symbol* symbol_create_struct_or_union(TypeInfo* info, TypeInfo* child);
+Symbol* symbol_create_struct_or_union_incomplete(char* name, enum Types struct_or_union);
+
 
 // 类型管理 & 创建
 // ================================
-TypeInfo* type_create_array(uint64_t n, enum SymbolAttributes qualifers);
+TypeInfo* type_create_array(uint64_t n, enum SymbolAttributes qualifers, TypeInfo* array_element_type);
 TypeInfo* type_create_struct_or_union(enum Types type, char* name);
-TypeInfo* type_create_ptr(enum SymbolAttributes qualifers);
-TypeInfo* type_create_func(struct TypeInfo* params);
+TypeInfo* type_create_ptr(enum SymbolAttributes qualifers, struct TypeInfo* pointing);
+TypeInfo* type_create_func(struct TypeInfo* ret, char* name, struct TypeInfo* params);
 TypeInfo* create_struct_field(TypeInfo* type_info, enum SymbolAttributes attributes, char* field_name);
 
 TypeInfo* type_create_param_ellipse();
 
+void variable_append(Symbol* last, Symbol* new_last);
 
-int type_wrap(TypeInfo* parent, TypeInfo* child);
+// int type_wrap(TypeInfo* parent, TypeInfo* child);
 int type_append(TypeInfo* tail, TypeInfo* new_tail);
+int type_is_builtin(enum Types type);
+
 TypeInfo* type_get_child(TypeInfo* parent);
+TypeInfo* type_get_error_type();
+
 
 // 类型工具
 // ================================
@@ -237,6 +256,9 @@ inline int type_native_alignment(int type)
 	int x = (type & (0x0010 - 1));
 	return (x >= TP_INT8) && (x <= TP_FLOAT128);
 }
+
+int type_is_interger(enum Types type);
+
 
 void value_constant_print(FILE* f, enum Types type, union ConstantValue* pval);
 
