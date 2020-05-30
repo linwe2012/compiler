@@ -32,3 +32,5 @@ STRUCT_TYPE(Context)
 
 void ctx_enter_block_scope(Context* ctx);
 void ctx_leave_block_scope(Context* ctx, int free_all_symbols);
+void ctx_enter_function_scope(Context* ctx);
+void ctx_leave_function_scope(Context* ctx);

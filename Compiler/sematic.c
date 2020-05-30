@@ -40,7 +40,6 @@ struct SematicContext
 	struct SematicTempContext* tmp_top;
 
 	LLVMBuilderRef builder;
-	LLVMContextRef context;		// FIX: 我随便放的，不清楚是不是该放在这里
 	LLVMModuleRef module;		// FIX: 同上
 } sem_ctx;
 
@@ -69,10 +68,6 @@ STRUCT_TYPE(SematicData);
 AST_NODE_LIST(FUNC_FORWARD_DECL)
 AST_AUX_NODE_LIST(FUNC_FORWARD_DECL)
 #undef FUNC_FORWARD_DECL
-
-
-// DeclareStmt如果是函数的话应该也可以用这个
-static LLVMValueRef eval_prototype(AST* type, AST* signature);
 
 
 void sem_init(AST* ast)
@@ -485,11 +480,6 @@ LLVMValueRef eval_LoopStmt(LoopStmt* ast)
 }
 
 // TODO: @wushuhui
-LLVMValueRef eval_prototype(AST* type, AST* signature) {
-	NOT_IMPLEMENTED;
-}
-
-// TODO: @wushuhui
 LLVMValueRef eval_IfStmt(IfStmt* ast) {
 	LLVMValueRef condv = eval_ast(ast->condition);
 	if (condv == NULL) {
@@ -497,14 +487,15 @@ LLVMValueRef eval_IfStmt(IfStmt* ast) {
 	}
 	// 将condv和0比较, LLVMRealOEQ是否合适, NAN应该是false吧
 	// 要Cast吗?
-	condv = LLVMConstFCmp(LLVMRealOEQ, condv, LLVMConstReal(LLVMDoubleType(), 0.0));
+	condv = LLVMBuildFCmp(sem_ctx.builder, LLVMRealOEQ, condv, LLVMConstReal(LLVMDoubleType(), 0.0), "ifcond");
 	LLVMValueRef func = LLVMGetBasicBlockParent(LLVMGetInsertBlock(sem_ctx.builder));
-	LLVMBasicBlockRef then_bb = LLVMAppendBasicBlockInContext(sem_ctx.context, func, "then");
-	LLVMBasicBlockRef else_bb = LLVMCreateBasicBlockInContext(sem_ctx.context, "else");
-	LLVMBasicBlockRef merge_bb = LLVMCreateBasicBlockInContext(sem_ctx.context, "ifcont");
+	LLVMBasicBlockRef then_bb = LLVMAppendBasicBlock(func, "then");
+	LLVMBasicBlockRef else_bb = LLVMAppendBasicBlock(func, "else");
+	LLVMBasicBlockRef merge_bb = LLVMAppendBasicBlock(func, "ifcont");	// 这里应该有两种操作，一种是创建bb并写入，还有一种是创建但不写入
 
 	LLVMBuildCondBr(sem_ctx.builder, condv, then_bb, else_bb);
-	LLVMPositionBuilderAtEnd(sem_ctx.builder, then_bb);	// Builder.SetInsertPoint(ThenBB);
+
+	LLVMPositionBuilderAtEnd(sem_ctx.builder, then_bb);		// 期望让builder的写指针指向then_bb的末尾，不知道是不是这个
 
 	LLVMValueRef thenv = eval_ast(ast->then);
 	if (thenv == NULL) {
@@ -513,7 +504,7 @@ LLVMValueRef eval_IfStmt(IfStmt* ast) {
 	LLVMBuildBr(sem_ctx.builder, merge_bb);
 	// Codegen of 'Then' can change the current block, update ThenBB for the PHI.
 	then_bb = LLVMGetInsertBlock(sem_ctx.builder);
-	LLVMAppendExistingBasicBlock(func, merge_bb);		// 这个怎么不存在啊?
+	// LLVMAppendExistingBasicBlock(func, merge_bb);			// 这个怎么不存在啊?
 	LLVMPositionBuilderAtEnd(sem_ctx.builder, merge_bb);
 	
 	LLVMValueRef phi_n = LLVMBuildPhi(sem_ctx.builder, LLVMFloatType(), "iftmp");
@@ -528,13 +519,72 @@ LLVMValueRef eval_SwitchCaseStmt(SwitchCaseStmt* ast) {
 }
 
 // TODO: @wushuhui
-// 如果没有Declare过,要加SymbolTable
 // main要特殊处理吗?
 LLVMValueRef eval_FunctionDefinitionStmt(FunctionDefinitionStmt* ast) {
-	LLVMValueRef func_type = eval_prototype(ast->specifier, ast->declarator);
-	if (func_type == NULL) {
+	TRY_CAST(DeclareStmt, decl_ast, ast->declarator);
+	if (decl_ast == NULL) {
 		return NULL;
 	}
+	TRY_CAST(IdentifierExpr, id_ast, decl_ast->identifiers);
+	if (id_ast == NULL) {
+		return NULL;
+	}
+	TRY_CAST(TypeSpecifier, type_ast, ast->specifier);
+	if (type_ast == NULL) {
+		return NULL;
+	}
+
+	ctx_enter_function_scope(ctx);
+
+	LLVMValueRef func;
+
+	Symbol* func_sym = symtbl_find(ctx->functions, id_ast->name);
+	if (func_sym == NULL) {
+		// 没有声明，那么定义和声明在一起
+		// NOTE: 这段代码，Declare那边应该可以复用
+
+		AST* param = id_ast->super.next;
+		TypeInfo* params = NULL;
+		TypeInfo* params_cur = NULL;
+		while (param) {
+			TRY_CAST(TypeSpecifier, type_ast, param);
+			TypeInfo* tmp = extract_type(type_ast);
+			if (params == NULL) {
+				params = params_cur = tmp;
+			} else {
+				params_cur->next = tmp;
+				params_cur = tmp;
+			}
+		}
+
+		LLVMTypeRef func_type = eval_TypeSpecifier(type_ast);
+		func = LLVMAddFunction(sem_ctx.module, id_ast->name, func_type);
+
+		func_sym = symbol_create_func(id_ast->name, func, extract_type(type_ast), params, ast->body);
+		symtbl_push(ctx->functions, func_sym);
+	} else if (func_sym->func.body != NULL) {
+		// 已经有定义了
+		log_error(SUPER(ast), "Function Redifinition");
+		return NULL;
+	} else {
+		// 如果符号表中已经有了函数，那么用那个符号
+		func = func_sym->value;
+	}
+
+
+	LLVMBasicBlockRef entry_bb = LLVMAppendBasicBlock(func, "entry");
+	// 将参数加入
+
+	LLVMValueRef body = eval_ast(ast->body);
+	if (body == NULL) {
+		return NULL;
+	}
+
+	LLVMBuildRet(sem_ctx.builder, body);
+	// 没有verify吗?
+
+	ctx_leave_function_scope(ctx);
+	return func;
 }
 
 LLVMValueRef eval_DeclaratorExpr(DeclaratorExpr* ast)
@@ -544,6 +594,11 @@ LLVMValueRef eval_DeclaratorExpr(DeclaratorExpr* ast)
 
 LLVMValueRef eval_TypeSpecifier(TypeSpecifier* ast)
 {
+	NOT_IMPLEMENTED;
+}
+
+// Deprecated，为了不编译报错加的
+LLVMValueRef eval_NumberExpr(NumberExpr* ast) {
 	NOT_IMPLEMENTED;
 }
 
