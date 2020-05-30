@@ -97,26 +97,6 @@ struct OperatorExpr
 	enum Types number_type;
 	
 	uint64_t _barrier; // 这个主要为了帮助我们获取指向 Union 的指针, 因为内存对齐的要求, 它必须是 int64
-
-	//TODO: 除了f64和i64实际没有被实现
-	union // 必须和 union ConstantValue 保持一致
-	{
-		int8_t i8;
-		uint8_t ui8;
-		int16_t i16;
-		uint16_t ui16;
-		int32_t i32;
-		uint32_t ui32;
-		int64_t i64;
-		uint64_t ui64;
-		int128_t i128;
-		uint128_t ui128;
-
-		float f32;
-		double f64;
-		__float128 f128;
-		char* str;
-	};
 };
 
 

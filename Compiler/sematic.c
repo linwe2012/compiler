@@ -453,14 +453,80 @@ LLVMOpcode eval_binary_opcode_llvm(enum Operators op)
 	}
 }
 
-static int llvm_is_float(LLVMValueRef v)
+static LLVMTypeKind llvm_is_float(LLVMValueRef v)
 {
-	// LLVMGetTypeKind(LLVMGet)
+	return LLVMGetTypeKind(LLVMTypeOf(v));//这样好像可以判断类型
 }
 
-LLVMValueRef eval_OperatorExpr(OperatorExpr* ast)
+LLVMValueRef get_numberexpr_llvm_value(NumberExpr* number)
 {
-	NOT_IMPLEMENTED;
+	if (number->number_type && TP_INT64)
+	{
+		return LLVMConstInt(LLVMInt64Type, number->i64, 1);
+	}
+	else
+	{
+		return LLVMConstReal(LLVMDoubleType, number->f64);
+	}
+}
+
+LLVMValueRef get_identifierxpr_llvm_value(IdentifierExpr* identifier)
+{
+	Symbol* sym = symtbl_find(ctx->variables, identifier->name);
+	return sym->var.value;
+}
+
+LLVMValueRef eval_OperatorExpr(AST* ast)
+{
+	LLVMValueRef lhs, rhs;
+	if (ast->type & AST_NumberExpr)
+	{
+		NumberExpr* number;
+		TRY_CAST(NumberExpr, number, ast);
+		if (!number)
+		{
+			log_error(ast, "Expected NumberExpr");
+			return NULL;
+		}
+		return get_numberexpr_llvm_value(number);
+	}
+	else if (ast->type & AST_IdentifierExpr)
+	{
+		IdentifierExpr* identifier;
+		TRY_CAST(IdentifierExpr, identifier, ast);
+		if (!identifier)
+		{
+			log_error(ast, "Expected IdentifierExpr");
+			return NULL;
+		}
+		return get_identifierxpr_llvm_value(identifier);
+	}
+	else if (ast->type & AST_OperatorExpr)
+	{
+		OperatorExpr* operator;
+		TRY_CAST(OperatorExpr, operator, ast);
+		if (!operator)
+		{
+			log_error(ast, "Expected OperatorExpr");
+			return NULL;
+		}
+		switch (operator->op)
+		{
+		case OP_ADD:
+			lhs = eval_OperatorExpr(operator->lhs);
+			rhs = eval_OperatorExpr(operator->rhs);
+			return LLVMConstAdd(lhs, rhs);
+			break;
+		default:
+			return NULL;
+			break;
+		}
+	}
+	else
+	{
+		log_error(ast, "Unknown AST Type for function eval_OperatorExpr");
+		return NULL;
+	}
 }
 
 LLVMValueRef eval_InitilizerListExpr(InitilizerListExpr* ast)
