@@ -589,12 +589,8 @@ LLVMValueRef eval_SwitchCaseStmt(SwitchCaseStmt* ast) {
 // TODO: @wushuhui
 // main要特殊处理吗?
 LLVMValueRef eval_FunctionDefinitionStmt(FunctionDefinitionStmt* ast) {
-	TRY_CAST(DeclareStmt, decl_ast, ast->declarator);
+	TRY_CAST(DeclaratorExpr, decl_ast, ast->declarator);
 	if (decl_ast == NULL) {
-		return NULL;
-	}
-	TRY_CAST(IdentifierExpr, id_ast, decl_ast->identifiers);
-	if (id_ast == NULL) {
 		return NULL;
 	}
 	TRY_CAST(TypeSpecifier, type_ast, ast->specifier);
@@ -606,30 +602,13 @@ LLVMValueRef eval_FunctionDefinitionStmt(FunctionDefinitionStmt* ast) {
 
 	LLVMValueRef func;
 
-	Symbol* func_sym = symtbl_find(ctx->functions, id_ast->name);
+	Symbol* func_sym = symtbl_find(ctx->functions, decl_ast->name);
 	if (func_sym == NULL) {
 		// 没有声明，那么定义和声明在一起
-		// NOTE: 这段代码，Declare那边应该可以复用
-
-		AST* param = id_ast->super.next;
-		TypeInfo* params = NULL;
-		TypeInfo* params_cur = NULL;
-		while (param) {
-			// FIX: 这里好像有点问题，要debug一下
-			TRY_CAST(TypeSpecifier, type_ast, param);
-			TypeInfo* tmp = extract_type(type_ast);
-			if (params == NULL) {
-				params = params_cur = tmp;
-			} else {
-				params_cur->next = tmp;
-				params_cur = tmp;
-			}
-		}
-
 		LLVMTypeRef func_type = eval_TypeSpecifier(type_ast);
-		func = LLVMAddFunction(sem_ctx.module, id_ast->name, func_type);
+		func = LLVMAddFunction(sem_ctx.module, decl_ast->name, func_type);
 
-		func_sym = symbol_create_func(id_ast->name, func, extract_type(type_ast), params, ast->body);
+		func_sym = symbol_create_func(decl_ast->name, func, extract_type(type_ast), decl_ast->type_spec->params, ast->body);
 		symtbl_push(ctx->functions, func_sym);
 	} else if (func_sym->func.body != NULL) {
 		// 已经有定义了
@@ -639,10 +618,15 @@ LLVMValueRef eval_FunctionDefinitionStmt(FunctionDefinitionStmt* ast) {
 		// 如果符号表中已经有了函数，那么用那个符号
 		func = func_sym->value;
 		func_sym->func.body = ast->body;
-
-		// TODO 构建实参
 	}
 
+	// TODO 构建实参
+	TypeSpecifier* cur = decl_ast->type_spec->params;
+	while (cur) {
+		
+		// symtbl_push(ctx->variables, )
+		cur = cur->super.next;
+	}
 
 	LLVMBasicBlockRef entry_bb = LLVMAppendBasicBlock(func, "entry");
 	// 将参数加入

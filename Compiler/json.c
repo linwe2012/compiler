@@ -403,54 +403,60 @@ void _write_DeclaratorExpr(DeclaratorExpr *expr) {
 
 void _write_TypeSpecifier(TypeSpecifier *expr) {
     // char* name;
-    // char* field_name;
+    START_NAME();
+    APPEND_NAME(<);
     switch (expr->type) {
     case TP_ARRAY:
-        PRINT_NAME(array);
+        APPEND_NAME(array);
         break;
     case TP_ELLIPSIS:
-        PRINT_NAME(ellipsis);
+        APPEND_NAME(ellipsis);
         break;
     case TP_ENUM:
-        PRINT_NAME(enum);
+        APPEND_NAME(enum);
         break;
     case TP_FLOAT128:
-        PRINT_NAME(float128);
+        APPEND_NAME(float128);
         break;
     case TP_FLOAT32:
-        PRINT_NAME(float32);
+        APPEND_NAME(float32);
         break;
     case TP_FLOAT64:
-        PRINT_NAME(float64);
+        APPEND_NAME(float64);
         break;
     case TP_FUNC:
-        PRINT_NAME(func);
+        APPEND_NAME(func);
         break;
     case TP_INT128:
-        PRINT_NAME(int128);
+        APPEND_NAME(int128);
         break;
     case TP_INT16:
-        PRINT_NAME(int16);
+        APPEND_NAME(int16);
         break;
     case TP_INT32:
-        PRINT_NAME(int32);
+        APPEND_NAME(int32);
         break;
     case TP_INT64:
-        PRINT_NAME(int64);
+        APPEND_NAME(int64);
         break;
     case TP_INT8:
-        PRINT_NAME(int8);
+        APPEND_NAME(int8);
         break;
     case TP_PTR:
-        PRINT_NAME(ptr);
+        APPEND_NAME(ptr);
         break;
     case TP_VOID:
-        PRINT_NAME(void);
+        APPEND_NAME(void);
         break;
     default:
-        PRINT_NAME(UNK);
+        APPEND_NAME(UNK);
         break;
     }
+    APPEND_NAME(>);
+    if (expr->field_name) {
+        fprintf(s_fp, " %s", expr->field_name);
+    }
+    COMPLETE_NAME();
 }
 
 

@@ -177,27 +177,39 @@ struct TypeInfo
 之后在浏览器中访问```localhost:8000```即可查看可视化的抽象语法树。这个抽象语法树是可以交互的，可以实现语法树节点的展开收起。
 d3.js的代码参考了[4].
 
+因为最终展示的是树状结构，而C语言单个文件生成的AST可能并不是一棵树而是一个森林。为了能够正确显示，在生成的json最外层可以套上一个伪根节点，如下所示
+
+```JSON
+{
+    "name": "(ROOT)",
+    "children": [
+        // 编译器生成的json
+        // ...
+    ]
+}
+```
+
 例如如下C语言代码，经过我们的编译器生成AST后，进行可视化，效果如图所示.
 
 ```C
 void putchar(int c);
 
-void dummy(int a, float b, double c);
+int dummy(int a, float b, double c);
 
-
-int main()
+int main(int argc, char** argv)
 {
     putchar(104); // 'h'
     putchar(111); // 'o'
     putchar(108); // 'l'
     putchar(97);  // 'a'
     putchar(10);  // '\n'
-    dummy(8, 0.8f, 0.9);
+    int x = dummy(8, 0.8f, (12 + 4 % 3) * 5.5);
     return 0;
 }
 ```
 
 ![AST Visualization](ast2json.png)
+![AST Visualization1](ast2json1.png)
 
 
 

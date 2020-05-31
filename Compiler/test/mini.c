@@ -1,7 +1,6 @@
 void putchar(int c);
 
-void dummy(int a, float b, double c);
-
+int dummy(int a, float b, double c);
 
 int main(int argc, char** argv)
 {
@@ -10,6 +9,6 @@ int main(int argc, char** argv)
     putchar(108); // 'l'
     putchar(97);  // 'a'
     putchar(10);  // '\n'
-    dummy(8, 0.8f, 0.9);
+    int x = dummy(8, 0.8f, (12 + 4 % 3) * 5.5);
     return 0;
 }
