@@ -28,12 +28,8 @@ void _write_ast(AST *root) {
 #define AST_WRITE_CASE(x) case AST_##x: _write_##x((x *)root); break;
     switch (root->type) {
         AST_NODE_LIST(AST_WRITE_CASE)
-    default:
-        switch (root->type) {
         AST_AUX_NODE_LIST(AST_WRITE_CASE)
-        default:
-            break;
-        }
+    default:
         break;
     }
 #undef AST_WRITE_CASE
@@ -224,7 +220,7 @@ void _write_OperatorExpr(OperatorExpr *expr) {
         PRINT_NAME(?:);
         break;
     default:
-        value_constant_print(s_fp, expr->number_type, &expr->i8);   // 这个union
+        value_constant_print(s_fp, expr->number_type, &expr->_barrier);   // 这个union
         break;
     }
     fputs(",\n\"children\": [", s_fp);

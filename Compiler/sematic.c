@@ -567,12 +567,16 @@ LLVMValueRef eval_IfStmt(IfStmt* ast) {
 	LLVMBuildBr(sem_ctx.builder, merge_bb);
 	// Codegen of 'Then' can change the current block, update ThenBB for the PHI.
 	then_bb = LLVMGetInsertBlock(sem_ctx.builder);
-	// LLVMAppendExistingBasicBlock(func, merge_bb);			// 这个怎么不存在啊?
 	LLVMPositionBuilderAtEnd(sem_ctx.builder, merge_bb);
+
+	LLVMValueRef elsev = eval_ast(ast->otherwise);
+	if (elsev == NULL) {
+		return NULL;
+	}
 	
 	LLVMValueRef phi_n = LLVMBuildPhi(sem_ctx.builder, LLVMFloatType(), "iftmp");
-	// PN->addIncoming(ThenV, ThenBB);
-  	// PN->addIncoming(ElseV, ElseBB);
+	LLVMAddIncoming(phi_n, thenv, then_bb, 0);
+	LLVMAddIncoming(phi_n, elsev, else_bb, 1);
   	return phi_n;
 }
 
@@ -610,6 +614,7 @@ LLVMValueRef eval_FunctionDefinitionStmt(FunctionDefinitionStmt* ast) {
 		TypeInfo* params = NULL;
 		TypeInfo* params_cur = NULL;
 		while (param) {
+			// FIX: 这里好像有点问题，要debug一下
 			TRY_CAST(TypeSpecifier, type_ast, param);
 			TypeInfo* tmp = extract_type(type_ast);
 			if (params == NULL) {
@@ -640,6 +645,7 @@ LLVMValueRef eval_FunctionDefinitionStmt(FunctionDefinitionStmt* ast) {
 
 	LLVMValueRef body = eval_ast(ast->body);
 	if (body == NULL) {
+		LLVMDeleteFunction(func);
 		return NULL;
 	}
 
