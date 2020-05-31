@@ -9,7 +9,7 @@
 #include <llvm-c/Core.h>
 
 #define NEW_AST(type, name) \
-	type* name = (type*) malloc (sizeof(type)); \
+	type* name = (type*) calloc (1, sizeof(type)); \
 	ast_init(&name->super, AST_##type);
 
 #define SUPER(ptr) &(ptr->super)
