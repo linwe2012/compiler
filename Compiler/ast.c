@@ -698,6 +698,10 @@ AST* make_declarator(AST* pointer, AST* direct_declarator)
 
 	ptr->type_spec_last->child = decl->type_spec;
 	decl->type_spec = ptr->type_spec;
+	if (decl->type_spec_last == NULL)
+	{
+		decl->type_spec_last = ptr->type_spec;
+	}
 
 	free(ptr);
 

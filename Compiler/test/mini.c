@@ -3,7 +3,7 @@ void putchar(int c);
 void dummy(int a, float b, double c);
 
 
-int main(int argc)
+int main(int argc, char** argv)
 {
     putchar(104); // 'h'
     putchar(111); // 'o'
