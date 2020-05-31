@@ -71,7 +71,6 @@ void _write_IdentifierExpr(IdentifierExpr *expr) {
 }
 
 void _write_NumberExpr(NumberExpr *expr) {
-    // Deprecated Type. 可以随时删除
     PRINT_NAME((NUMBER));
     // TODO: 暂时不关心具体数字了
     // switch (expr->number_type) {
@@ -392,7 +391,54 @@ void _write_DeclaratorExpr(DeclaratorExpr *expr) {
 }
 
 void _write_TypeSpecifier(TypeSpecifier *expr) {
-    fprintf(s_fp, "\"name\":\"%s\"", expr->name);
+    switch (expr->type) {
+    case TP_ARRAY:
+        PRINT_NAME(array);
+        break;
+    case TP_ELLIPSIS:
+        PRINT_NAME(ellipsis);
+        break;
+    case TP_ENUM:
+        PRINT_NAME(enum);
+        break;
+    case TP_FLOAT128:
+        PRINT_NAME(float128);
+        break;
+    case TP_FLOAT32:
+        PRINT_NAME(float32);
+        break;
+    case TP_FLOAT64:
+        PRINT_NAME(float64);
+        break;
+    case TP_FUNC:
+        PRINT_NAME(func);
+        break;
+    case TP_INT128:
+        PRINT_NAME(int128);
+        break;
+    case TP_INT16:
+        PRINT_NAME(int16);
+        break;
+    case TP_INT32:
+        PRINT_NAME(int32);
+        break;
+    case TP_INT64:
+        PRINT_NAME(int64);
+        break;
+    case TP_INT8:
+        PRINT_NAME(int8);
+        break;
+    case TP_PTR:
+        PRINT_NAME(ptr);
+        break;
+    case TP_VOID:
+        PRINT_NAME(void);
+        break;
+    default:
+        PRINT_NAME(UNK);
+        break;
+
+    }
 }
 
 
@@ -400,8 +446,8 @@ void _write_FunctionDefinitionStmt(FunctionDefinitionStmt* expr) {
     fprintf(s_fp, "\"name\":\"(FUNCDEF)\"");
     fputs(",\n\"children\": [", s_fp);
     _write_ast(expr->specifier);
-    fputs(",\n", s_fp);             // TODO: 暂时先这样，但是感觉把void func(int, float)拿出来做name更好
-    _write_ast(expr->declarator);   // 或者说保持AST结构也行?
+    fputs(",\n", s_fp);
+    _write_ast(expr->declarator);
     fputs(",\n", s_fp);
     _write_ast(expr->body);
     fputs("]\n", s_fp);

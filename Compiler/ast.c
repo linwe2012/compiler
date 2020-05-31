@@ -607,7 +607,7 @@ AST* makr_init_direct_declarator(const char* name)
 
 void extend_declarator_with_specifier(DeclaratorExpr* decl, TypeSpecifier* spec)
 {
-	if (decl->type_spec = NULL)
+	if (decl->type_spec == NULL)
 	{
 		decl->type_spec = spec;
 	}

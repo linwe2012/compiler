@@ -20,4 +20,4 @@
 
 packages
 
-test/*.json
+Compiler/test/*.json
