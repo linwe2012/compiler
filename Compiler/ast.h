@@ -52,7 +52,6 @@ struct ASTVPTR
 
 struct AST {
 	ASTType type;
-	// TypeInfo* type;
 	struct AST* prev, * next;
 	struct SematicData* sematic;
 };

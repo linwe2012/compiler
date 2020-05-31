@@ -9,25 +9,24 @@ typedef unsigned int HashedKey;
 
 typedef struct HashItem
 {
-	struct HashItem* next;
-	const void* key;
-	HashedKey key_hash;
-	void* payload;
-	// char payload[1];
+	struct HashItem* next; // next hash item
+	const void* key;       // key of this item
+	HashedKey key_hash;    // hashed key of this item, for quick look up
+	void* payload;         // user's data, i.e. value of the entry
 } HashItem;
 
 typedef struct HashTable
 {
-	HashItem** items;
-	int* collisions;
-	int count;
-	int capacity;
+	HashItem** items;   // hash bins of key-value pairs
+	int* collisions;    // collison count for each bin
+	int count;          // number of key-value pairs
+	int capacity;       // number of bins
 
 	int max_collisions; // if collisions exceeds, a rehash is done
-	int payload_size;
-	int item_size; // item_size = payload_size + sizeof(struct HashItem*)
-	HashEqual equal;
-	Hasher hasher;
+	int payload_size;   // size of the value
+	int item_size;      // item_size = payload_size + sizeof(struct HashItem*)
+	HashEqual equal;    // function determines 2 keys are equal
+	Hasher hasher;      // function that hashes a key
 } HashTable;
 
 // Hash 表操作

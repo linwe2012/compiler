@@ -107,8 +107,8 @@ struct VariableInfo
 	void* value;
 
 	enum SymbolAttributes attributes;
-	Symbol* type;
-	int is_constant;
+	Symbol* type;     // Typeinfo of this symbol
+	int is_constant;  // is constant value
 
 	struct VariableInfo* prev;
 	struct VariableInfo* next;
@@ -155,32 +155,31 @@ struct Symbol
 	{
 		struct
 		{
-			char* name;
-			void* value;
-		};
-		TypeInfo type;
-		VariableInfo var;
-		FunctionInfo func;
-		LabelInfo label;
+			char* name;    // name of the symbol
+			void* value;   // value of the symbol, used for evaluation
+		};                 // all symbol must have these 2 fields as first 2 fields
+		TypeInfo type;     // type info
+		VariableInfo var;  // variables, including constants like enums
+		FunctionInfo func; // functions
+		LabelInfo label;   // labels
 	};
 
 	Symbol* prev;
-	// Symbol* next;
-	enum SymbolTypes usage;
+	enum SymbolTypes usage; // used for determine which kind of symbo this is.
 };
 
 
 
 struct SymbolStackInfo
 {
-	Symbol* first;
-	Symbol* last;
+	Symbol* first;                      // first symbol in stack
+	Symbol* last;                       // last symbol in stack
 
-	struct SymbolStackInfo* prev;
-	struct SymbolStackInfo* next;
+	struct SymbolStackInfo* prev;       // previous stack
+	struct SymbolStackInfo* next;       // next stack
 
-	struct SymbolStackInfo* real_prev;
-	int nest;
+	struct SymbolStackInfo* real_prev;  // some stack may not use last symbol, espcially for inline funtions
+	int nest;                           // level of nesting
 };
 
 // TODO: Use hash table to optimize

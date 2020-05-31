@@ -2,6 +2,7 @@
 #define CC_TYPES_H
 enum SymbolAttributes
 {
+	// Storage Attributes
 	ATTR_NONE,
 	ATTR_REGISTER,
 	ATTR_AUTO,
@@ -10,13 +11,14 @@ enum SymbolAttributes
 	ATTR_TYPEDEF,
 
 	
-	
+	// function calling convention
 	ATTR_INLINE = 0x0100,
 	ATTR_STDCALL = 0x0200,
 	ATTR_CDECL = 0x0400,
 
 	ATTR_MASK_STORAGE = ATTR_INLINE -1,
 	
+	// type specifier
 	ATTR_CONST = 0x010000u,
 	ATTR_VOLATILE = 0x020000u,
 	ATTR_RESTRICT = 0x040000u, //  TODO: this is not supported
