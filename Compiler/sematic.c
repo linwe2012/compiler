@@ -562,7 +562,6 @@ LLVMValueRef eval_IfStmt(IfStmt* ast) {
 	LLVMBuildCondBr(sem_ctx.builder, condv, then_bb, else_bb);
 
 	LLVMPositionBuilderAtEnd(sem_ctx.builder, then_bb);		// 期望让builder的写指针指向then_bb的末尾，不知道是不是这个
-
 	LLVMValueRef thenv = eval_ast(ast->then);
 	if (thenv == NULL) {
 		return NULL;	
@@ -570,15 +569,17 @@ LLVMValueRef eval_IfStmt(IfStmt* ast) {
 	LLVMBuildBr(sem_ctx.builder, merge_bb);
 	// Codegen of 'Then' can change the current block, update ThenBB for the PHI.
 	then_bb = LLVMGetInsertBlock(sem_ctx.builder);
-	LLVMPositionBuilderAtEnd(sem_ctx.builder, merge_bb);
 
+	LLVMPositionBuilderAtEnd(sem_ctx.builder, else_bb);
 	LLVMValueRef elsev = eval_ast(ast->otherwise);
 	if (elsev == NULL) {
 		return NULL;
 	}
+	LLVMBuildBr(sem_ctx.builder, merge_bb);
+	else_bb = LLVMGetInsertBlock(sem_ctx.builder);
 	
 	LLVMValueRef phi_n = LLVMBuildPhi(sem_ctx.builder, LLVMFloatType(), "iftmp");
-	LLVMAddIncoming(phi_n, thenv, then_bb, 0);
+	LLVMAddIncoming(phi_n, thenv, then_bb, 0);		// constant 不清楚是不是填这两个
 	LLVMAddIncoming(phi_n, elsev, else_bb, 1);
   	return phi_n;
 }
@@ -640,6 +641,9 @@ LLVMValueRef eval_FunctionDefinitionStmt(FunctionDefinitionStmt* ast) {
 	} else {
 		// 如果符号表中已经有了函数，那么用那个符号
 		func = func_sym->value;
+		func_sym->func.body = ast->body;
+
+		// TODO 构建实参
 	}
 
 
