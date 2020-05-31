@@ -476,7 +476,6 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 	LLVMValueRef lhs, rhs;
 	if (ast->type & AST_NumberExpr)
 	{
-		NumberExpr* number;
 		TRY_CAST(NumberExpr, number, ast);
 		if (!number)
 		{
@@ -487,7 +486,6 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 	}
 	else if (ast->type & AST_IdentifierExpr)
 	{
-		IdentifierExpr* identifier;
 		TRY_CAST(IdentifierExpr, identifier, ast);
 		if (!identifier)
 		{
@@ -498,7 +496,6 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 	}
 	else if (ast->type & AST_OperatorExpr)
 	{
-		OperatorExpr* operator;
 		TRY_CAST(OperatorExpr, operator, ast);
 		if (!operator)
 		{

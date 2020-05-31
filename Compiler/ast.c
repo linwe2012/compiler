@@ -168,7 +168,6 @@ int check_ast(AST* ast)
 AST* ast_append(AST* leader, AST* follower)
 {
 	// assert()
-	leader->type = 
 	leader->next = follower;
 	follower->prev = leader;
 	return leader;
