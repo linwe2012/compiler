@@ -245,7 +245,7 @@ void _write_OperatorExpr(OperatorExpr *expr) {
 
 void _write_LabelStmt(LabelStmt *stmt) {
     //FIX: 更新了 ast
-    // fprintf(s_fp, "\"name\":\"(LABEL)%s\"", stmt->ref->label->name);
+    fprintf(s_fp, "\"name\":\"(LABEL)%s\"", stmt->ref->label.name);
     fputs(",\n\"children\": [", s_fp);
     if (stmt->condition) {
         _write_ast(stmt->condition);
@@ -384,13 +384,23 @@ void _write_SwitchCaseStmt(SwitchCaseStmt *stmt) {
 void _write_DeclaratorExpr(DeclaratorExpr *expr) {
     fprintf(s_fp, "\"name\":\"%s\"", expr->name);
     fputs(",\n\"children\": [", s_fp);
+    int has_child = 0;
     if (expr->init_value) {
         _write_ast(expr->init_value);
+        has_child = 1;
+    }
+    if (expr->type_spec && expr->type_spec->params) {
+        if (has_child) {
+            fputs(",\n", s_fp);
+        }
+        _write_ast(expr->type_spec->params);
     }
     fputs("]\n", s_fp);
 }
 
 void _write_TypeSpecifier(TypeSpecifier *expr) {
+    // char* name;
+    // char* field_name;
     switch (expr->type) {
     case TP_ARRAY:
         PRINT_NAME(array);
@@ -437,7 +447,6 @@ void _write_TypeSpecifier(TypeSpecifier *expr) {
     default:
         PRINT_NAME(UNK);
         break;
-
     }
 }
 
