@@ -2,7 +2,10 @@
 
 #include <stdio.h>
 
-#define PRINT_NAME(n) fputs("\"name\":\"" #n "\"", s_fp);
+#define PRINT_NAME(n) fputs("\"name\":\"" #n "\"", s_fp)
+#define START_NAME()  fputs("\"name\":\"", s_fp)
+#define APPEND_NAME(n) fputs(#n, s_fp)
+#define COMPLETE_NAME() fputs("\"", s_fp)
 
 FILE *s_fp = NULL;
 
