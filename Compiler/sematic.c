@@ -537,9 +537,59 @@ LLVMValueRef eval_EmptyExpr(EmptyExpr* ast)
 	return NULL;
 }
 
-LLVMValueRef eval_LoopStmt(LoopStmt* ast)
-{
-	NOT_IMPLEMENTED;
+// TODO: @wushuhui
+LLVMValueRef eval_LoopStmt(LoopStmt* ast) {
+	ctx_enter_block_scope(ctx);
+
+	LLVMValueRef enter = eval_ast(ast->enter);
+	if (enter == NULL) {	// FIX: enter确实没东西是什么样子的
+		return NULL;
+	}
+	LLVMValueRef func = LLVMGetBasicBlockParent(LLVMGetInsertBlock(sem_ctx.builder));
+	LLVMBasicBlockRef preheader_bb = LLVMGetInsertBlock(sem_ctx.builder);
+	LLVMBasicBlockRef cond_bb = LLVMAppendBasicBlock(func, "cond");
+	LLVMBasicBlockRef body_bb = LLVMAppendBasicBlock(func, "body");
+	LLVMBasicBlockRef step_bb = LLVMAppendBasicBlock(func, "step");
+	LLVMBasicBlockRef after_bb = LLVMAppendBasicBlock(func, "after");
+
+	// 1. preheader
+	LLVMBuildBr(sem_ctx.builder, cond_bb);
+
+	// 2. cond
+	LLVMPositionBuilderAtEnd(sem_ctx.builder, cond_bb);
+	// TODO: 可能不是这个样子的，可能要把cond转换成Op直接在这里估值
+	LLVMValueRef cond = eval_ast(ast->condition);
+	if (cond == NULL) {		// FIX: cond确实没东西是什么样子的
+		return NULL;
+	}
+	// TODO: 这里要加cond的br
+
+	// 3. body
+	// Emit the body of the loop.  This, like any other expr, can change the
+	// current BB.  Note that we ignore the value computed by the body, but don't
+	// allow an error.
+	LLVMPositionBuilderAtEnd(sem_ctx.builder, body_bb);
+	LLVMValueRef body = eval_ast(ast->body);
+	if (body == NULL) {		// FIX: body确实没东西是什么样子的
+		return NULL;
+	}
+	LLVMBuildBr(sem_ctx.builder, step_bb);
+
+	// 4. step
+	LLVMPositionBuilderAtEnd(sem_ctx.builder, step_bb);
+ 	LLVMValueRef step = eval_ast(ast->step);
+	if (step == NULL) {
+		return NULL;		// FIX
+	}
+	LLVMBuildBr(sem_ctx.builder, cond_bb);
+
+	// 5. after
+	ctx_leave_block_scope(ctx, 0);
+	LLVMPositionBuilderAtEnd(sem_ctx.builder, after_bb);
+
+	// for expr always returns 0.0.
+	// LLVM的demo里For是Expr
+	return LLVMConstReal(LLVMDoubleType(), 0.0);
 }
 
 // TODO: @wushuhui
