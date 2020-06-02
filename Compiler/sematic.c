@@ -569,6 +569,7 @@ LLVMValueRef eval_LoopStmt(LoopStmt* ast) {
 	// current BB.  Note that we ignore the value computed by the body, but don't
 	// allow an error.
 	LLVMPositionBuilderAtEnd(sem_ctx.builder, body_bb);
+	// TODO: body里面如何得知continue和break要跳到哪里去？
 	LLVMValueRef body = eval_ast(ast->body);
 	if (body == NULL) {		// FIX: body确实没东西是什么样子的
 		return NULL;
@@ -673,7 +674,6 @@ LLVMValueRef eval_FunctionDefinitionStmt(FunctionDefinitionStmt* ast) {
 	// TODO 构建实参
 	TypeSpecifier* cur = decl_ast->type_spec->params;
 	while (cur) {
-		
 		// symtbl_push(ctx->variables, )
 		cur = cur->super.next;
 	}
