@@ -25,6 +25,8 @@ struct SematicData
 	// LLVMValueRef val;
 	TypeInfo* type; // 第二个 pass 推导的类型信息
 
+	LLVMBasicBlockRef basic_block;
+
 	int dummy;
 };
 
@@ -32,6 +34,8 @@ struct SematicData
 struct SematicTempContext
 {
 	uint64_t temp_id; // llvm 临时变量的 id
+
+	struct SematicTempContext* prev;
 };
 
 struct SematicContext
@@ -313,7 +317,7 @@ LLVMValueRef eval_DeclareStmt(DeclareStmt* ast)
 			continue;
 		}
 
-
+		
 
 	}
 	NOT_IMPLEMENTED;
