@@ -199,11 +199,22 @@ TypeInfo* extract_type(TypeSpecifier* spec)
 	case TP_INT32:
 	case TP_INT64:
 	case TP_INT128:
+		if (spec->child)
+		{
+			log_error(SUPER(spec), "Incompatible type specifier");
+			break;
+		}
 		result = type_fetch_buildtin(spec->type);
 		break;
 
 	case TP_STRUCT: // fall through
 	case TP_UNION:
+		if (spec->child)
+		{
+			log_error(SUPER(spec), "Incompatible type specifier");
+			break;
+		}
+
 		name = str_concat(ty == TP_STRUCT ? "struct " : "union ", spec->name);
 		sym_in_tbl = symtbl_find(ctx->types, name);
 
@@ -302,6 +313,10 @@ TypeInfo* extract_type(TypeSpecifier* spec)
 
 LLVMValueRef eval_DeclareStmt(DeclareStmt* ast)
 {
+	TRY_CAST(TypeSpecifier, spec, ast->type);
+	LLVMValueRef last_value = NULL;
+
+
 	FOR_EACH(ast->identifiers, id_ast)
 	{
 		if (id_ast->type == AST_EmptyExpr)
@@ -311,16 +326,50 @@ LLVMValueRef eval_DeclareStmt(DeclareStmt* ast)
 		}
 
 		TRY_CAST(DeclaratorExpr, id, id_ast);
+		
+
 		if (!id)
 		{
 			log_error(id_ast, "Expected declarator");
 			continue;
 		}
 
-		
+		if (!id->name)
+		{
+			log_error(id_ast, "Expected name for declarator");
+			continue;
+		}
 
+		if (symtbl_find_in_current_scope(&ctx->variables, id->name))
+		{
+			log_error(id_ast, "Redeclaration of variable %s", id->name);
+			continue;
+		}
+
+		extend_declarator_with_specifier(id, spec);
+		TRY_CAST(TypeSpecifier, id_spec, id->type_spec);
+		if (id_spec == NULL)
+		{
+			log_error(id_ast, "Identifier has no type specifier");
+			continue;
+		}
+
+		// TODO: 检查合并 attributes 的时候问题
+		id->attributes |= ast->attributes;
+		LLVMValueRef value = NULL;
+		if (value)
+		{
+			value = eval_ast(id->init_value);
+			last_value = value;
+		}
+
+		TypeInfo* typeinfo = extract_type(id_spec);
+		Symbol* sym = symbol_create_variable(id->name, id->attributes, symbol_from_type_info(typeinfo), value, 0);
+
+
+		symtbl_push(&ctx->variables, sym);
 	}
-	NOT_IMPLEMENTED;
+	return last_value;
 }
 
 LLVMValueRef eval_EnumDeclareStmt(EnumDeclareStmt* ast)
@@ -372,6 +421,8 @@ LLVMValueRef eval_EnumDeclareStmt(EnumDeclareStmt* ast)
 			continue;
 		}
 
+		
+
 		//TODO: Check for duplicate enums
 		Symbol* enum_item = symbol_create_enum_item(
 			enum_type, last_enum_item, id->name, 
@@ -395,6 +446,9 @@ LLVMValueRef eval_EnumDeclareStmt(EnumDeclareStmt* ast)
 // TODO: Add type from symbol table
 LLVMValueRef eval_AggregateDeclareStmt(AggregateDeclareStmt* ast)
 {
+
+
+
 	/*
 	TypeInfo* first = NULL;
 	TypeInfo* last = NULL;

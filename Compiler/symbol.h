@@ -59,6 +59,10 @@ struct TypeInfo
 
 	union
 	{
+		struct Basic {
+			struct TypeInfo* child;
+		};
+
 		struct StructOrUnion
 		{
 			struct TypeInfo* child;
@@ -74,6 +78,7 @@ struct TypeInfo
 		{
 			struct TypeInfo* array_type;
 			uint64_t array_count;
+			int has_value;
 		} arr;
 		
 		struct Function
@@ -81,14 +86,17 @@ struct TypeInfo
 			struct TypeInfo* return_type;
 			struct TypeInfo* params;
 		} fn ;
-
+		/*
 		struct EnumItem
 		{
+			void* placeholder;
 			uint64_t val;
+			int has_value;
 		} enu;
-
+		*/
 		struct StructField
 		{
+			void* placeholder;
 			enum SymbolAttributes attrib;
 		} struc_field;
 	};
@@ -108,7 +116,7 @@ struct VariableInfo
 
 	enum SymbolAttributes attributes;
 	Symbol* type;     // Typeinfo of this symbol
-	int is_constant;  // is constant value
+	int is_constant;  // is constant value, c++ constexpr
 
 	struct VariableInfo* prev;
 	struct VariableInfo* next;
@@ -202,6 +210,7 @@ SymbolTable* symtbl_new();
 // Symbol.name 记录了 name 的信息
 void symtbl_push(SymbolTable* tbl, Symbol* c);
 Symbol* symtbl_find(SymbolTable* tbl, const char* name);
+Symbol* symtbl_find_in_current_scope(SymbolTable* tbl, const char* name);
 // 如果进入函数的话, 那么函数只能访问全局变量, 所以要 keep_global_only = true
 void symtbl_enter_scope(SymbolTable* tbl, int keep_global_only);
 void symtbl_leave_scope(SymbolTable* tbl, int free_all_symols);
@@ -217,12 +226,12 @@ Symbol* symbol_from_type_info(TypeInfo* info);
 Symbol* symbol_create_struct_or_union(TypeInfo* info, TypeInfo* child);
 Symbol* symbol_create_struct_or_union_incomplete(char* name, enum Types struct_or_union);
 Symbol* symbol_create_func(char* name, void* val, TypeInfo* ret, TypeInfo* params, struct AST* body);
-
+Symbol* symbol_create_variable(char* name, enum SymbolAttributes attributes, Symbol* type, void* value, int is_constant);
 
 // 类型管理 & 创建
 // ================================
 TypeInfo* type_create_array(uint64_t n, enum SymbolAttributes qualifers, TypeInfo* array_element_type);
-TypeInfo* type_create_struct_or_union(enum Types type, char* name);
+// TypeInfo* type_create_struct_or_union(enum Types type, char* name);
 TypeInfo* type_create_ptr(enum SymbolAttributes qualifers, struct TypeInfo* pointing);
 TypeInfo* type_create_func(struct TypeInfo* ret, char* name, struct TypeInfo* params);
 TypeInfo* create_struct_field(TypeInfo* type_info, enum SymbolAttributes attributes, char* field_name);

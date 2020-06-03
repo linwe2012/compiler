@@ -6,7 +6,7 @@
 
 STRUCT_TYPE(SymbolTableEntry);
 
-TypeInfo builtins[TP_NUM_BUILTINS + TP_NUM_BUILTIN_INTS + 2];
+Symbol builtins[TP_NUM_BUILTINS + TP_NUM_BUILTIN_INTS + 2];
 #define ERROR_TYPE_INDEX TP_NUM_BUILTINS + TP_NUM_BUILTIN_INTS + 1
 
 #ifndef max
@@ -57,6 +57,22 @@ Symbol* symtbl_find(SymbolTable* tbl, const char* name)
 {
 	Symbol* top = tbl->stack_top->last;
 	while (top != NULL)
+	{
+		while (!str_equal(top->name, name))
+		{
+			top->prev;
+		}
+	}
+
+	return top;
+}
+
+Symbol* symtbl_find_in_current_scope(SymbolTable* tbl, const char* name)
+{
+	Symbol* top = tbl->stack_top->last;
+	Symbol* bottom = tbl->stack_top->first;
+
+	while (top != bottom)
 	{
 		while (!str_equal(top->name, name))
 		{
@@ -211,6 +227,8 @@ void type_info_init(TypeInfo* info)
 	info->prev = NULL;
 	info->next = NULL;
 	info->incomplete = 0;
+	info->child = NULL;
+	info->arr.has_value = 0;
 }
 
 TypeInfo* type_create_array(uint64_t n, enum SymbolAttributes qualifers, TypeInfo* array_element_type)
@@ -223,19 +241,19 @@ TypeInfo* type_create_array(uint64_t n, enum SymbolAttributes qualifers, TypeInf
 	info->arr.array_count = n;
 	info->qualifiers = qualifers;
 	info->arr.array_type = array_element_type;
-
+	info->arr.has_value = 1;
 	return info;
 }
 
-TypeInfo* type_create_struct_or_union(enum Types type, char* name)
-{
-	NEW_STRUCT(TypeInfo, info);
-	type_info_init(info);
-
-	info->type = type;
-	info->type_name = name;
-	return info;
-}
+//TypeInfo* type_create_struct_or_union(enum Types type, char* name)
+//{
+//	NEW_STRUCT(TypeInfo, info);
+//	type_info_init(info);
+//
+//	info->type = type;
+//	info->type_name = name;
+//	return info;
+//}
 
 TypeInfo* type_create_ptr(enum SymbolAttributes qualifers, struct TypeInfo* pointing)
 {
@@ -303,15 +321,15 @@ void symbol_init_context(struct Context* context)
 	enum TypesHelper offset = 0;
 	const char* prefix = "";
 #define INIT(type__, name__, bits__, ...){ \
-	struct TypeInfo type;\
-	type_info_init(&type);\
-	type.aligned_size = bits__ / 8;\
-	type.alignment = bits__ / 8;\
+	struct Symbol sym;\
+	symbol_init_struct(&sym, str_concat(prefix, name__), Symbol_TypeInfo);\
+	type_info_init(&sym.type);\
+	sym.type.aligned_size = bits__ / 8;\
+	sym.type.alignment = bits__ / 8;\
 \
-	type.type_name = str_concat(prefix, name__);\
-	type.type = theor | TP_##type__;\
+	sym.type.type = theor | TP_##type__;\
 \
-	builtins[offset + TP_##type__] = type;}
+	builtins[offset + TP_##type__] = sym;}
 
 	INTERNAL_TYPE_LIST_MISC(INIT);
 	INTERNAL_TYPE_LIST_INT(INIT);
@@ -324,11 +342,12 @@ void symbol_init_context(struct Context* context)
 	INTERNAL_TYPE_LIST_INT(INIT);
 
 	{
-		struct TypeInfo type;
-		type_info_init(&type);
-		type.type_name = "<error type>";
-		type.type = TP_ERROR;
-		builtins[ERROR_TYPE_INDEX] = type;
+		struct Symbol sym;
+		symbol_init_struct(&sym, strdup("<error type>"), Symbol_TypeInfo);
+		type_info_init(&sym.type);
+		sym.type.type_name = "<error type>";
+		sym.type.type = TP_ERROR;
+		builtins[ERROR_TYPE_INDEX] = sym;
 	}
 
 }
@@ -361,14 +380,22 @@ TypeInfo* type_fetch_buildtin(enum Types type)
 	return NULL;
 }
 
-Symbol* new_symbol(char* name, enum SymbolTypes type)
+void symbol_init_struct(Symbol* sym, char* name, enum SymbolTypes type)
 {
-	NEW_STRUCT(Symbol, sym);
 	memset(sym, 0, sizeof(Symbol));
 
 	sym->name = name;
 	sym->usage = type;
+	sym->prev = NULL;
 
+	return sym;
+}
+
+Symbol* new_symbol(char* name, enum SymbolTypes type)
+{
+	NEW_STRUCT(Symbol, sym);
+	
+	symbol_init_struct(sym, name, type);
 	return sym;
 }
 
@@ -416,7 +443,7 @@ Symbol* symbol_create_enum_item(Symbol* type, Symbol* prev, char* name, void* va
 	sym->var.value = val;
 	sym->var.type = type;
 	sym->var.prev = &prev->var;
-
+	
 	return sym;
 }
 
@@ -430,13 +457,15 @@ void variable_append(Symbol* last, Symbol* new_last)
 
 Symbol* symbol_from_type_info(TypeInfo* info)
 {
-	Symbol* sym = new_symbol(info->type_name, Symbol_TypeInfo);
-	sym->type = *info;
-	if (info->next)
-	{
-		info->next->prev = &(sym->type);
-	}
-	return sym;
+	return (Symbol*)info;
+
+	// Symbol* sym = new_symbol(info->type_name, Symbol_TypeInfo);
+	// sym->type = *info;
+	// if (info->next)
+	// {
+	// 	info->next->prev = &(sym->type);
+	// }
+	// return sym;
 }
 
 union ConstantValue constant_cast(enum Types from, enum Types to, union ConstantValue src)
@@ -559,6 +588,18 @@ Symbol* symbol_create_func(char* name, void* val, TypeInfo* ret, TypeInfo* param
 	sym->func.params = params;
 	sym->func.return_type = ret;
 	sym->func.value = val;		// 这个值是LLVMValueRef吧?
+	return sym;
+}
+
+Symbol* symbol_create_variable(char* name, enum SymbolAttributes attributes, Symbol* type, void* value, int is_constant)
+{
+	Symbol* sym = new_symbol(name, Symbol_VariableInfo);
+	sym->var.value = value;
+	sym->var.attributes = attributes;
+	sym->var.is_constant = is_constant;
+	sym->var.type = type;
+	sym->var.prev = NULL;
+	sym->var.next = NULL;
 	return sym;
 }
 
