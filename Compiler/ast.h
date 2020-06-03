@@ -475,6 +475,12 @@ AST* make_return(AST* exp);
 
 #undef TYPECHECK
 
+// Helper functions for sematic analysis
+// ========================================
+
+void extend_declarator_with_specifier(DeclaratorExpr* decl, TypeSpecifier* spec);
+
+
 #endif
 
 
