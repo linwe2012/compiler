@@ -178,7 +178,7 @@ TypeInfo* extract_type(TypeSpecifier* spec)
 		log_error(SUPER(spec), "Incomplete type specifier");
 		break;
 
-	// Numeric & void types
+		// Numeric & void types
 	case TP_VOID:
 	case TP_FLOAT32:
 	case TP_FLOAT64:
@@ -189,7 +189,7 @@ TypeInfo* extract_type(TypeSpecifier* spec)
 			break;
 		}
 
-	// fall through
+		// fall through
 	case TP_INT8:
 	case TP_INT16:
 	case TP_INT32:
@@ -236,7 +236,7 @@ TypeInfo* extract_type(TypeSpecifier* spec)
 		// 提取函数参数类型
 		if (spec->params->type == TP_VOID)
 		{
-			if(spec->params->super.next)
+			if (spec->params->super.next)
 			{
 				log_error(SUPER(spec), "parameter cannot hav void type");
 				break;
@@ -260,7 +260,7 @@ TypeInfo* extract_type(TypeSpecifier* spec)
 			extract_type(spec->child), // 返回值
 			spec->name, // 函数名
 			first // 函数参数
-			);
+		);
 
 		break;
 
@@ -333,7 +333,7 @@ LLVMValueRef eval_EnumDeclareStmt(EnumDeclareStmt* ast)
 	{
 		TRY_CAST(OperatorExpr, op, enu_ast);
 		TRY_CAST(IdentifierExpr, id, enu_ast);
-		
+
 
 		if (!op && !id)
 		{
@@ -370,7 +370,7 @@ LLVMValueRef eval_EnumDeclareStmt(EnumDeclareStmt* ast)
 
 		//TODO: Check for duplicate enums
 		Symbol* enum_item = symbol_create_enum_item(
-			enum_type, last_enum_item, id->name, 
+			enum_type, last_enum_item, id->name,
 			LLVMConstInt(LLVMInt64Type(), enum_val, 1));
 
 		symtbl_push(ctx->variables, enum_item);
@@ -432,10 +432,6 @@ LLVMValueRef eval_FunctionCallExpr(FunctionCallExpr* ast)
 	NOT_IMPLEMENTED;
 }
 
-LLVMValueRef eval_IdentifierExpr(IdentifierExpr* ast)
-{
-	NOT_IMPLEMENTED;
-}
 
 LLVMOpcode eval_binary_opcode_llvm(enum Operators op)
 {
@@ -444,35 +440,37 @@ LLVMOpcode eval_binary_opcode_llvm(enum Operators op)
 
 	switch (op)
 	{
-		
+
 	}
 }
 
 static LLVMTypeKind llvm_is_float(LLVMValueRef v)
 {
-	return LLVMGetTypeKind(LLVMTypeOf(v));//这样好像可以判断类型
+	LLVMTypeKind kind = LLVMGetTypeKind(LLVMTypeOf(v));
+	return ((kind == LLVMHalfTypeKind) || (kind == LLVMFloatTypeKind) || (kind == LLVMDoubleTypeKind));
 }
 
-LLVMValueRef get_numberexpr_llvm_value(NumberExpr* number)
+LLVMValueRef eval_IdentifierExpr(IdentifierExpr* ast)
 {
-	if (number->number_type && TP_INT64)
+	Symbol* sym = symtbl_find(ctx->variables, ast->name);
+	return sym->var.value;
+}
+
+LLVMValueRef eval_NumberExpr(NumberExpr* ast) {
+	if (ast->number_type && TP_INT64)
 	{
-		return LLVMConstInt(LLVMInt64Type, number->i64, 1);
+		return LLVMConstInt(LLVMInt64Type(), ast->i64, 1);
 	}
 	else
 	{
-		return LLVMConstReal(LLVMDoubleType, number->f64);
+		return LLVMConstReal(LLVMDoubleType(), ast->f64);
 	}
-}
-
-LLVMValueRef get_identifierxpr_llvm_value(IdentifierExpr* identifier)
-{
-	Symbol* sym = symtbl_find(ctx->variables, identifier->name);
-	return sym->var.value;
 }
 
 LLVMValueRef eval_OperatorExpr(AST* ast)
 {
+	LLVMBasicBlockRef block;
+	if (!ast) return NULL;
 	LLVMValueRef lhs, rhs;
 	if (ast->type & AST_NumberExpr)
 	{
@@ -482,7 +480,7 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 			log_error(ast, "Expected NumberExpr");
 			return NULL;
 		}
-		return get_numberexpr_llvm_value(number);
+		return eval_NumberExpr(number);
 	}
 	else if (ast->type & AST_IdentifierExpr)
 	{
@@ -502,12 +500,124 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 			log_error(ast, "Expected OperatorExpr");
 			return NULL;
 		}
+		lhs = eval_OperatorExpr(operator->lhs);
+		rhs = eval_OperatorExpr(operator->rhs);
+		LLVMBuilderRef builder = LLVMCreateBuilder();
+		LLVMPositionBuilderAtEnd(builder, block);
+		LLVMValueRef tmp;
 		switch (operator->op)
 		{
+		// 一元运算符
+		case OP_INC:
+			if (!llvm_is_float(lhs))
+			{
+				tmp = LLVMBuildAdd(builder, lhs, LLVMConstInt(LLVMInt64Type(), 1, 1), NULL);
+			}
+			else
+			{
+				tmp = LLVMBuildFAdd(builder, lhs, LLVMConstInt(LLVMInt64Type(), 1, 1), NULL);
+			}
+			break;
+		case OP_DEC:
+			if (!llvm_is_float(lhs))
+			{
+				tmp = LLVMBuildAdd(builder, lhs, LLVMConstInt(LLVMInt64Type(), -1, 1), NULL);
+			}
+			else
+			{
+				tmp = LLVMBuildFAdd(builder, lhs, LLVMConstInt(LLVMInt64Type(), -1, 1), NULL);
+			}
+			break;
+		case OP_POSTFIX_INC:
+			if (!llvm_is_float(lhs))
+			{
+				tmp = LLVMBuildAdd(builder, lhs, LLVMConstInt(LLVMInt64Type(), 1, 1), NULL);
+			}
+			else
+			{
+				tmp = LLVMBuildFAdd(builder, lhs, LLVMConstInt(LLVMInt64Type(), 1, 1), NULL);
+			}
+			break;
+		case OP_POSTFIX_DEC:
+			if (!llvm_is_float(lhs))
+			{
+				tmp = LLVMBuildAdd(builder, lhs, LLVMConstInt(LLVMInt64Type(), -1, 1), NULL);
+			}
+			else
+			{
+				tmp = LLVMBuildFAdd(builder, lhs, LLVMConstInt(LLVMInt64Type(), -1, 1), NULL);
+			}
+			break;
+		// 二元运算符
 		case OP_ADD:
-			lhs = eval_OperatorExpr(operator->lhs);
-			rhs = eval_OperatorExpr(operator->rhs);
-			return LLVMConstAdd(lhs, rhs);
+			if (!(llvm_is_float(lhs) || llvm_is_float(rhs)))
+			{
+				tmp = LLVMBuildAdd(builder, lhs, rhs, NULL);
+			}
+			else
+			{
+				tmp = LLVMBuildFAdd(builder, lhs, rhs, NULL);
+			}
+			break;
+		case OP_SUB:
+			if (!(llvm_is_float(lhs) || llvm_is_float(rhs)))
+			{
+				tmp = LLVMBuildSub(builder, lhs, rhs, NULL);
+			}
+			else
+			{
+				tmp = LLVMBuildFSub(builder, lhs, rhs, NULL);
+			}
+			break;
+		case OP_MUL:
+			if (!(llvm_is_float(lhs) || llvm_is_float(rhs)))
+			{
+				tmp = LLVMBuildMul(builder, lhs, rhs, NULL);
+			}
+			else
+			{
+				tmp = LLVMBuildFMul(builder, lhs, rhs, NULL);
+			}
+			break;
+		case OP_DIV:
+			if (!(llvm_is_float(lhs) || llvm_is_float(rhs)))
+			{
+				tmp = LLVMBuildExactSDiv(builder, lhs, rhs, NULL); //默认为signed了 有需求再改吧
+			}
+			else
+			{
+				tmp = LLVMBuildFDiv(builder, lhs, rhs, NULL);
+			}
+			break;
+		case OP_MOD:
+			if (!(llvm_is_float(lhs) || llvm_is_float(rhs)))
+			{
+				tmp = LLVMBuildSRem(builder, lhs, rhs, NULL); 
+			}
+			else
+			{
+				tmp = LLVMBuildFRem(builder, lhs, rhs, NULL);
+			}
+			break;
+		case OP_SHIFT_LEFT:
+			if (!(llvm_is_float(lhs) || llvm_is_float(rhs)))
+			{
+				tmp = LLVMBuildShl(builder, lhs, rhs, NULL); 
+			}
+			else
+			{
+				log_error(ast, "SHIFT OP Expected INT TYPE");
+			}
+			break;
+		case OP_SHIFT_RIGHT:
+			if (!(llvm_is_float(lhs) || llvm_is_float(rhs)))
+			{
+				tmp = LLVMBuildAShr(builder, lhs, rhs, NULL); //算数移位
+			}
+			else
+			{
+				log_error(ast, "SHIFT OP Expected INT TYPE");
+			}
 			break;
 		default:
 			return NULL;
@@ -524,7 +634,7 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 LLVMValueRef eval_InitilizerListExpr(InitilizerListExpr* ast)
 {
 
-	
+
 	NOT_IMPLEMENTED;
 }
 
@@ -561,7 +671,7 @@ LLVMValueRef eval_IfStmt(IfStmt* ast) {
 	LLVMPositionBuilderAtEnd(sem_ctx.builder, then_bb);		// 期望让builder的写指针指向then_bb的末尾，不知道是不是这个
 	LLVMValueRef thenv = eval_ast(ast->then);
 	if (thenv == NULL) {
-		return NULL;	
+		return NULL;
 	}
 	LLVMBuildBr(sem_ctx.builder, merge_bb);
 	// Codegen of 'Then' can change the current block, update ThenBB for the PHI.
@@ -574,11 +684,11 @@ LLVMValueRef eval_IfStmt(IfStmt* ast) {
 	}
 	LLVMBuildBr(sem_ctx.builder, merge_bb);
 	else_bb = LLVMGetInsertBlock(sem_ctx.builder);
-	
+
 	LLVMValueRef phi_n = LLVMBuildPhi(sem_ctx.builder, LLVMFloatType(), "iftmp");
 	LLVMAddIncoming(phi_n, thenv, then_bb, 0);		// constant 不清楚是不是填这两个
 	LLVMAddIncoming(phi_n, elsev, else_bb, 1);
-  	return phi_n;
+	return phi_n;
 }
 
 // TODO: @wushuhui
@@ -610,11 +720,13 @@ LLVMValueRef eval_FunctionDefinitionStmt(FunctionDefinitionStmt* ast) {
 
 		func_sym = symbol_create_func(decl_ast->name, func, extract_type(type_ast), decl_ast->type_spec->params, ast->body);
 		symtbl_push(ctx->functions, func_sym);
-	} else if (func_sym->func.body != NULL) {
+	}
+	else if (func_sym->func.body != NULL) {
 		// 已经有定义了
 		log_error(SUPER(ast), "Function Redifinition");
 		return NULL;
-	} else {
+	}
+	else {
 		// 如果符号表中已经有了函数，那么用那个符号
 		func = func_sym->value;
 		func_sym->func.body = ast->body;
@@ -623,7 +735,7 @@ LLVMValueRef eval_FunctionDefinitionStmt(FunctionDefinitionStmt* ast) {
 	// TODO 构建实参
 	TypeSpecifier* cur = decl_ast->type_spec->params;
 	while (cur) {
-		
+
 		// symtbl_push(ctx->variables, )
 		cur = cur->super.next;
 	}
@@ -654,8 +766,5 @@ LLVMValueRef eval_TypeSpecifier(TypeSpecifier* ast)
 	NOT_IMPLEMENTED;
 }
 
-// Deprecated，为了不编译报错加的
-LLVMValueRef eval_NumberExpr(NumberExpr* ast) {
-	NOT_IMPLEMENTED;
-}
+
 
