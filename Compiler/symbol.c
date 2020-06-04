@@ -56,6 +56,7 @@ void symtbl_push(SymbolTable* tbl, Symbol* c)
 
 Symbol* symtbl_find(SymbolTable* tbl, const char* name)
 {
+	// FIX: 如果一个block内要访问block外定义的本地变量，现在这样会访问不到吧(last可能是NULL)
 	Symbol* top = tbl->stack_top->last;
 	while (top != NULL)
 	{

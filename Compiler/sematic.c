@@ -116,9 +116,9 @@ LLVMValueRef eval_list(AST* ast)
 }
 
 // bootstrapping
-void do_eval(AST* ast, struct Context* _ctx)
+void do_eval(AST* ast, struct Context* _ctx, char* module_name)
 {
-	sem_ctx.module = LLVMModuleCreateWithName("mini");
+	sem_ctx.module = LLVMModuleCreateWithName(module_name);
 	sem_ctx.builder = LLVMCreateBuilder();
 
 	ctx = _ctx;
