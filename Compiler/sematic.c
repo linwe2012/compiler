@@ -839,7 +839,7 @@ LLVMValueRef eval_SwitchCaseStmt(SwitchCaseStmt* ast) {
 	NOT_IMPLEMENTED;
 }
 
-// TODO: @wushuhui
+// @wushuhui
 LLVMValueRef eval_FunctionDefinitionStmt(FunctionDefinitionStmt* ast) {
 	TRY_CAST(DeclaratorExpr, decl_ast, ast->declarator);
 	if (decl_ast == NULL) {
@@ -892,7 +892,7 @@ LLVMValueRef eval_FunctionDefinitionStmt(FunctionDefinitionStmt* ast) {
 		func_sym->func.body = ast->body;
 	}
 
-	// TODO 构建实参
+	// 构建实参
 	tmp = decl_ast->type_spec->params;
 	while (tmp) {
 		// 这里和Declare是一致的
@@ -921,8 +921,12 @@ LLVMValueRef eval_FunctionDefinitionStmt(FunctionDefinitionStmt* ast) {
 		return NULL;
 	}
 
-	// TODO: RetVoid
-	LLVMBuildRet(sem_ctx.builder, body);
+	// RET
+	if (func_sym->func.return_type->type == TP_VOID) {
+		LLVMBuildRetVoid(sem_ctx.builder);
+	} else {
+		LLVMBuildRet(sem_ctx.builder, body);
+	}
 
 	ctx_leave_function_scope(ctx);
 	return func;
