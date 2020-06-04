@@ -797,7 +797,7 @@ LLVMValueRef eval_IfStmt(IfStmt* ast) {
 	LLVMValueRef func = LLVMGetBasicBlockParent(LLVMGetInsertBlock(sem_ctx.builder));
 	LLVMBasicBlockRef then_bb = LLVMAppendBasicBlock(func, "then");
 	LLVMBasicBlockRef else_bb = LLVMAppendBasicBlock(func, "else");
-	LLVMBasicBlockRef merge_bb = LLVMAppendBasicBlock(func, "ifcont");	// 这里应该有两种操作，一种是创建bb并写入，还有一种是创建但不写入
+	LLVMBasicBlockRef merge_bb = LLVMAppendBasicBlock(func, "ifcont");
 
 	// 似乎clang的标准并不允许double作为条件的值，会有下述warning：
 	// implicit conversion from 'double' to '_Bool' changes value from 1.111 to true
@@ -807,31 +807,31 @@ LLVMValueRef eval_IfStmt(IfStmt* ast) {
 		fprintf(stderr, "Double value as if condition is not allowed, implicit converted to true\n");
 		LLVMBuildBr(sem_ctx.builder, then_bb);
 	} else {
-		condv = LLVMBuildFCmp(sem_ctx.builder, LLVMIntEQ, condv, LLVMConstInt(LLVMTypeOf(condv), 0, 1), "ifcond");
+		condv = LLVMBuildICmp(sem_ctx.builder, LLVMIntNE, condv, LLVMConstInt(LLVMTypeOf(condv), 0, 1), "ifcond");
 		LLVMBuildCondBr(sem_ctx.builder, condv, then_bb, else_bb);
 	}
 
-	LLVMPositionBuilderAtEnd(sem_ctx.builder, then_bb);		// 期望让builder的写指针指向then_bb的末尾，不知道是不是这个
-	LLVMValueRef thenv = eval_ast(ast->then);
-	if (thenv == NULL) {
-		return NULL;
+	LLVMPositionBuilderAtEnd(sem_ctx.builder, then_bb);
+	// 有可能then里面没有东西
+	if (ast->then->type != AST_EmptyExpr) {
+		eval_ast(ast->then);
 	}
 	LLVMBuildBr(sem_ctx.builder, merge_bb);
 	// Codegen of 'Then' can change the current block, update ThenBB for the PHI.
 	then_bb = LLVMGetInsertBlock(sem_ctx.builder);
 
 	LLVMPositionBuilderAtEnd(sem_ctx.builder, else_bb);
-	LLVMValueRef elsev = eval_ast(ast->otherwise);
-	if (elsev == NULL) {
-		return NULL;
+	// otherwise不一定有, clang有一个优化，如果没有otherwise就不生成这个BB，这里为了方便也生成了(代码大小问题不是问题)
+	if (ast->otherwise && ast->otherwise->type != AST_EmptyExpr) {
+		eval_ast(ast->otherwise);
 	}
 	LLVMBuildBr(sem_ctx.builder, merge_bb);
 	else_bb = LLVMGetInsertBlock(sem_ctx.builder);
 
-	LLVMValueRef phi_n = LLVMBuildPhi(sem_ctx.builder, LLVMFloatType(), "iftmp");
-	LLVMAddIncoming(phi_n, thenv, then_bb, 0);		// constant 不清楚是不是填这两个
-	LLVMAddIncoming(phi_n, elsev, else_bb, 1);
-	return phi_n;
+	LLVMPositionBuilderAtEnd(sem_ctx.builder, merge_bb);
+
+	// TODO: PHI，或者说用哪个变量可以不依赖phi解决？
+	return NULL;
 }
 
 // TODO: @wushuhui
@@ -916,13 +916,9 @@ LLVMValueRef eval_FunctionDefinitionStmt(FunctionDefinitionStmt* ast) {
 	LLVMPositionBuilderAtEnd(sem_ctx.builder, entry_bb);
 
 	LLVMValueRef body = eval_ast(ast->body);
-	if (body == NULL) {
-		LLVMDeleteFunction(func);
-		return NULL;
-	}
 
 	// RET
-	if (func_sym->func.return_type->type == TP_VOID) {
+	if (func_sym->func.return_type->type == TP_VOID || body == NULL) {
 		LLVMBuildRetVoid(sem_ctx.builder);
 	} else {
 		LLVMBuildRet(sem_ctx.builder, body);

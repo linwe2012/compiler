@@ -37,7 +37,7 @@ void symtbl_push(SymbolTable* tbl, Symbol* c)
 	// 如果是这个 scope 的第一个元素
 	if (tbl->stack_top->first == NULL)
 	{
-		tbl->stack_top->first = c;
+		tbl->stack_top->first = tbl->stack_top->last = c;	// NOTE: 这里应该是改成这样吧
 		if (tbl->stack_top->prev)
 		{
 			c->prev = tbl->stack_top->prev->last;

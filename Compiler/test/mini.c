@@ -1,4 +1,3 @@
-int foo(int x) {
-    if (1.1) {} else {}
-    return 0;
+void foo(int x) {
+    if (1);
 }
