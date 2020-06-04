@@ -118,7 +118,7 @@ LLVMValueRef eval_list(AST* ast)
 // bootstrapping
 void do_eval(AST* ast, struct Context* _ctx)
 {
-	sem_ctx.module = LLVMModuleCreateWithName("test");
+	sem_ctx.module = LLVMModuleCreateWithName("module-test");
 	sem_ctx.builder = LLVMCreateBuilder();
 
 	ctx = _ctx;
@@ -794,15 +794,20 @@ LLVMValueRef eval_IfStmt(IfStmt* ast) {
 	if (condv == NULL) {
 		return NULL;
 	}
-	// 将condv和0比较, LLVMRealOEQ是否合适, NAN应该是false吧
-	// 要Cast吗?
-	condv = LLVMBuildFCmp(sem_ctx.builder, LLVMRealOEQ, condv, LLVMConstReal(LLVMDoubleType(), 0.0), "ifcond");
 	LLVMValueRef func = LLVMGetBasicBlockParent(LLVMGetInsertBlock(sem_ctx.builder));
 	LLVMBasicBlockRef then_bb = LLVMAppendBasicBlock(func, "then");
 	LLVMBasicBlockRef else_bb = LLVMAppendBasicBlock(func, "else");
 	LLVMBasicBlockRef merge_bb = LLVMAppendBasicBlock(func, "ifcont");	// 这里应该有两种操作，一种是创建bb并写入，还有一种是创建但不写入
 
-	LLVMBuildCondBr(sem_ctx.builder, condv, then_bb, else_bb);
+	// 似乎clang的标准并不允许double作为条件的值，会有下述warning：
+	// implicit conversion from 'double' to '_Bool' changes value from 1.111 to true
+	if (llvm_is_float(condv)) {
+		log_warning(ast, "Double value as if condition is not allowed, implicit converted to true");
+		LLVMBuildBr(sem_ctx.builder, then_bb);
+	} else {
+		condv = LLVMBuildFCmp(sem_ctx.builder, LLVMIntEQ, condv, LLVMConstInt(LLVMTypeOf(condv), 0, 1), "ifcond");
+		LLVMBuildCondBr(sem_ctx.builder, condv, then_bb, else_bb);
+	}
 
 	LLVMPositionBuilderAtEnd(sem_ctx.builder, then_bb);		// 期望让builder的写指针指向then_bb的末尾，不知道是不是这个
 	LLVMValueRef thenv = eval_ast(ast->then);
@@ -833,7 +838,6 @@ LLVMValueRef eval_SwitchCaseStmt(SwitchCaseStmt* ast) {
 }
 
 // TODO: @wushuhui
-// main要特殊处理吗?
 LLVMValueRef eval_FunctionDefinitionStmt(FunctionDefinitionStmt* ast) {
 	TRY_CAST(DeclaratorExpr, decl_ast, ast->declarator);
 	if (decl_ast == NULL) {
@@ -907,7 +911,7 @@ LLVMValueRef eval_FunctionDefinitionStmt(FunctionDefinitionStmt* ast) {
 	}
 
 	LLVMBasicBlockRef entry_bb = LLVMAppendBasicBlock(func, "entry");
-	// 将参数加入
+	LLVMPositionBuilderAtEnd(sem_ctx.builder, entry_bb);
 
 	LLVMValueRef body = eval_ast(ast->body);
 	if (body == NULL) {
@@ -915,8 +919,8 @@ LLVMValueRef eval_FunctionDefinitionStmt(FunctionDefinitionStmt* ast) {
 		return NULL;
 	}
 
+	// TODO: RetVoid
 	LLVMBuildRet(sem_ctx.builder, body);
-	// 没有verify吗?
 
 	ctx_leave_function_scope(ctx);
 	return func;

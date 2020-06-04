@@ -1,5 +1,5 @@
 int foo(int x) {
-    if (1) {
+    if (1.1) {
         int a;
     } else {
     }
