@@ -118,8 +118,20 @@ LLVMValueRef eval_list(AST* ast)
 // bootstrapping
 void do_eval(AST* ast, struct Context* _ctx)
 {
+	sem_ctx.module = LLVMModuleCreateWithName("test");
+	sem_ctx.builder = LLVMCreateBuilder();
+
 	ctx = _ctx;
 	eval_list(ast);
+
+	char** msg = NULL;
+	LLVMBool res = LLVMPrintModuleToFile(sem_ctx.module, "mini.ll", msg);
+	if (res != 0) {
+		printf("LLVM error: %s\n", msg);
+		LLVMDisposeMessage(*msg);
+	}
+	LLVMDisposeBuilder(sem_ctx.builder);
+	LLVMDisposeModule(sem_ctx.module);
 }
 
 
@@ -146,6 +158,20 @@ struct SematicData* sematic_data_new() {
 	sem->type = NULL;
 	return sem;
 }
+
+// 测试用，只作了简单的几个
+LLVMTypeRef extract_llvm_type(TypeSpecifier* spec) {
+	switch (spec->type) {
+	case TP_INT32:
+		return LLVMInt32Type();
+	case TP_VOID:
+		return LLVMVoidType();
+	default:
+		break;
+	}
+	return NULL;
+}
+
 
 TypeInfo* extract_type(TypeSpecifier* spec)
 {
@@ -340,14 +366,14 @@ LLVMValueRef eval_DeclareStmt(DeclareStmt* ast)
 			continue;
 		}
 
-		if (symtbl_find_in_current_scope(&ctx->variables, id->name))
+		if (symtbl_find_in_current_scope(ctx->variables, id->name))
 		{
 			log_error(id_ast, "Redeclaration of variable %s", id->name);
 			continue;
 		}
 
 		extend_declarator_with_specifier(id, spec);
-		TRY_CAST(TypeSpecifier, id_spec, id->type_spec);
+		TRY_CAST(TypeSpecifier, id_spec, (SUPER(id->type_spec)));
 		if (id_spec == NULL)
 		{
 			log_error(id_ast, "Identifier has no type specifier");
@@ -367,7 +393,7 @@ LLVMValueRef eval_DeclareStmt(DeclareStmt* ast)
 		Symbol* sym = symbol_create_variable(id->name, id->attributes, symbol_from_type_info(typeinfo), value, 0);
 
 
-		symtbl_push(&ctx->variables, sym);
+		symtbl_push(ctx->variables, sym);
 	}
 	return last_value;
 }
@@ -472,7 +498,7 @@ LLVMValueRef eval_AggregateDeclareStmt(AggregateDeclareStmt* ast)
 LLVMValueRef eval_BlockExpr(BlockExpr* ast)
 {
 	ctx_enter_block_scope(ctx);
-	LLVMValueRef last = eval_list(SUPER(ast));
+	LLVMValueRef last = eval_list(ast->first_child);
 	ctx_leave_block_scope(ctx, 0);
 
 	return last;
@@ -548,7 +574,8 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 			log_error(ast, "Expected IdentifierExpr");
 			return NULL;
 		}
-		return get_identifierxpr_llvm_value(identifier);
+		// FIX: 没有get_identifierxpr_llvm_value，为了过编译先注释了
+		// return get_identifierxpr_llvm_value(identifier);
 	}
 	else if (ast->type & AST_OperatorExpr)
 	{
@@ -561,7 +588,7 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 		lhs = eval_OperatorExpr(operator->lhs);
 		rhs = eval_OperatorExpr(operator->rhs);
 		LLVMBuilderRef builder = LLVMCreateBuilder();
-		LLVMPositionBuilderAtEnd(builder, block);
+		// LLVMPositionBuilderAtEnd(builder, block);	// FIX: uninit block. 为了过编译先注释了
 		LLVMValueRef tmp;
 		switch (operator->op)
 		{
@@ -820,11 +847,29 @@ LLVMValueRef eval_FunctionDefinitionStmt(FunctionDefinitionStmt* ast) {
 	ctx_enter_function_scope(ctx);
 
 	LLVMValueRef func;
+	TypeSpecifier* tmp;
 
 	Symbol* func_sym = symtbl_find(ctx->functions, decl_ast->name);
 	if (func_sym == NULL) {
 		// 没有声明，那么定义和声明在一起
-		LLVMTypeRef func_type = eval_TypeSpecifier(type_ast);
+		LLVMTypeRef ret_type = extract_llvm_type(type_ast);
+		LLVMTypeRef* func_args = NULL;
+		int arg_num = 0;
+		// 构建形参
+		tmp = decl_ast->type_spec->params;
+		for (arg_num = 0; tmp != NULL; ++arg_num, tmp = tmp->super.next);
+		func_args = (LLVMTypeRef*)malloc(arg_num * sizeof(LLVMTypeRef));
+		tmp = decl_ast->type_spec->params;
+		for (int i = 0; i < arg_num; ++i) {
+			func_args[i] = extract_llvm_type(tmp);
+			tmp = tmp->super.next;
+		}
+		LLVMTypeRef func_type = LLVMFunctionType(
+			ret_type,	// 返回类型
+			func_args,	// 形参数组
+			arg_num,	// 形参数量
+			0			// TODO 支持...
+		);
 		func = LLVMAddFunction(sem_ctx.module, decl_ast->name, func_type);
 
 		func_sym = symbol_create_func(decl_ast->name, func, extract_type(type_ast), decl_ast->type_spec->params, ast->body);
@@ -842,10 +887,23 @@ LLVMValueRef eval_FunctionDefinitionStmt(FunctionDefinitionStmt* ast) {
 	}
 
 	// TODO 构建实参
-	TypeSpecifier* cur = decl_ast->type_spec->params;
-	while (cur) {
-		// symtbl_push(ctx->variables, )
-		cur = cur->super.next;
+	tmp = decl_ast->type_spec->params;
+	while (tmp) {
+		// 这里和Declare是一致的
+		DeclareStmt pseudo_stmt;
+		DeclaratorExpr pseudo_expr;
+		ast_init(&pseudo_stmt, AST_DeclareStmt);
+		ast_init(&pseudo_expr, AST_DeclaratorExpr);
+		pseudo_stmt.type = tmp;
+		pseudo_stmt.identifiers = &pseudo_expr;
+		pseudo_stmt.attributes = ATTR_NONE;			// TODO C支不支持const参数来着
+		pseudo_expr.attributes = ATTR_NONE;
+		pseudo_expr.bitfield = NULL;
+		pseudo_expr.init_value = NULL;
+		pseudo_expr.name = tmp->field_name;
+		pseudo_expr.type_spec = pseudo_expr.type_spec_last = NULL;
+		eval_DeclareStmt(&pseudo_stmt);
+		tmp = tmp->super.next;
 	}
 
 	LLVMBasicBlockRef entry_bb = LLVMAppendBasicBlock(func, "entry");

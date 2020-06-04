@@ -32,6 +32,8 @@ int main()
 	// AST* ast = make_block(parser_result);// yylval.val;
 	ast_to_json(parser_result, "test/out.json");
 
+	do_eval(parser_result, &ctx);
+
 	printf("done");
 	return res;
 }

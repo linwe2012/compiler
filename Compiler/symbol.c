@@ -14,6 +14,7 @@ Symbol builtins[TP_NUM_BUILTINS + TP_NUM_BUILTIN_INTS + 2];
 #endif // !max
 
 Symbol* new_symbol(char* name, enum SymbolTypes type);
+void symbol_init_struct(Symbol* sym, char* name, enum SymbolTypes type);
 
 void symtbl_init(SymbolTable* tbl)
 {
