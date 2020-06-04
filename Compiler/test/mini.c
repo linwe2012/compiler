@@ -1,7 +1,4 @@
 int foo(int x) {
-    if (1.1) {
-        int a;
-    } else {
-    }
+    if (1.1) {} else {}
     return 0;
 }

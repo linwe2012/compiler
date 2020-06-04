@@ -481,8 +481,8 @@ postfix_expression
 primary_expression
 	: IDENTIFIER       { $$ = make_identifier($1); }
 	| NUM_INT            { $$ = make_number_int($1, TP_INT64); }
-	| NUM_FLOAT32           { $$ = make_number_int($1, 32); }
-	| NUM_FLOAT64           { $$ = make_number_int($1, 64); }
+	| NUM_FLOAT32           { $$ = make_number_float($1, 32); }
+	| NUM_FLOAT64           { $$ = make_number_float($1, 64); }
 	| STRING_LITERAL      { $$ = make_string($1); }  
 	| '(' expression ')'  { $$ = make_list_expr($2); }
 	;

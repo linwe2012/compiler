@@ -118,7 +118,7 @@ LLVMValueRef eval_list(AST* ast)
 // bootstrapping
 void do_eval(AST* ast, struct Context* _ctx)
 {
-	sem_ctx.module = LLVMModuleCreateWithName("module-test");
+	sem_ctx.module = LLVMModuleCreateWithName("mini");
 	sem_ctx.builder = LLVMCreateBuilder();
 
 	ctx = _ctx;
@@ -541,7 +541,7 @@ LLVMValueRef eval_IdentifierExpr(IdentifierExpr* ast)
 }
 
 LLVMValueRef eval_NumberExpr(NumberExpr* ast) {
-	if (ast->number_type && TP_INT64)
+	if ((ast->number_type & 0xFu) == TP_INT64)		// NOTE：我改成mask了
 	{
 		return LLVMConstInt(LLVMInt64Type(), ast->i64, 1);
 	}
@@ -802,7 +802,9 @@ LLVMValueRef eval_IfStmt(IfStmt* ast) {
 	// 似乎clang的标准并不允许double作为条件的值，会有下述warning：
 	// implicit conversion from 'double' to '_Bool' changes value from 1.111 to true
 	if (llvm_is_float(condv)) {
-		log_warning(ast, "Double value as if condition is not allowed, implicit converted to true");
+		// log_warning(ast, "Double value as if condition is not allowed, implicit converted to true");
+		// TODO: 用上面那个warning会终止，手动输出了
+		fprintf(stderr, "Double value as if condition is not allowed, implicit converted to true\n");
 		LLVMBuildBr(sem_ctx.builder, then_bb);
 	} else {
 		condv = LLVMBuildFCmp(sem_ctx.builder, LLVMIntEQ, condv, LLVMConstInt(LLVMTypeOf(condv), 0, 1), "ifcond");
