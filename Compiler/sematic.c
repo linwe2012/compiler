@@ -125,7 +125,7 @@ void do_eval(AST* ast, struct Context* _ctx)
 	eval_list(ast);
 
 	char** msg = NULL;
-	LLVMBool res = LLVMPrintModuleToFile(sem_ctx.module, "mini.ll", msg);
+	LLVMBool res = LLVMPrintModuleToFile(sem_ctx.module, "test/mini.ll", msg);
 	if (res != 0) {
 		printf("LLVM error: %s\n", msg);
 		LLVMDisposeMessage(*msg);
