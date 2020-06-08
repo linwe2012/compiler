@@ -452,10 +452,12 @@ LLVMValueRef eval_DeclareStmt(DeclareStmt* ast)
 		// TODO: 检查合并 attributes 的时候问题
 		id->attributes |= ast->attributes;
 		LLVMValueRef value = NULL;
-		if (value)
+		if (id->init_value)
 		{
 			value = eval_ast(id->init_value);
 			last_value = value;
+		} else {
+			// TODO: 能不能没有初始化也alloca一个值
 		}
 
 		TypeInfo* typeinfo = extract_type(id_spec);
@@ -620,6 +622,14 @@ LLVMValueRef eval_NumberExpr(NumberExpr* ast) {
 	}
 }
 
+LLVMValueRef get_identifierxpr_llvm_value(IdentifierExpr* expr) {
+	Symbol* sym = symtbl_find(ctx->variables, expr->name);
+	if (sym == NULL) {
+		return NULL;
+	}
+	return sym->value;
+}
+
 LLVMValueRef eval_OperatorExpr(AST* ast)
 {
 	LLVMBasicBlockRef block;
@@ -643,8 +653,7 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 			log_error(ast, "Expected IdentifierExpr");
 			return NULL;
 		}
-		// FIX: 没有get_identifierxpr_llvm_value，为了过编译先注释了
-		// return get_identifierxpr_llvm_value(identifier);
+		return get_identifierxpr_llvm_value(identifier);
 	}
 	else if (ast->type == AST_OperatorExpr)
 	{
@@ -656,7 +665,7 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 		}
 		lhs = eval_OperatorExpr(operator->lhs);
 		rhs = eval_OperatorExpr(operator->rhs);
-		LLVMValueRef tmp;
+		LLVMValueRef tmp = NULL;
 		switch (operator->op)
 		{
 		// 一元运算符
@@ -771,10 +780,20 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 				log_error(ast, "SHIFT OP Expected INT TYPE");
 			}
 			break;
+		case OP_LESS:
+			// TODO: 要不要设计一个cast？这样float和int之间也能操作，也不需要判断是不是都是float
+			if (llvm_is_float(lhs) && llvm_is_float(rhs)) {
+				tmp = LLVMBuildFCmp(sem_ctx.builder, LLVMRealOLE, lhs, rhs, NULL);
+			} else {
+				// TODO: 还需要判断是否是signed
+				tmp = LLVMBuildICmp(sem_ctx.builder, LLVMIntSLE, lhs, rhs, NULL);
+			}
+			break;
 		default:
 			return NULL;
 			break;
 		}
+		return tmp;
 	}
 	else
 	{
@@ -936,10 +955,6 @@ LLVMValueRef eval_SwitchCaseStmt(SwitchCaseStmt* ast) {
 }
 
 // @wushuhui
-// FIX: 这里会存在一个bug。FunctionDef的时候是会创建一个scope的
-//		但是function的body自己又会创建一个scope，
-//		而在body内定义变量的时候只检查current scope内有没有重名，也就是说会出现body内定义的变量覆盖函数实参的情况
-//		要么算了？当作一个feature好了
 LLVMValueRef eval_FunctionDefinitionStmt(FunctionDefinitionStmt* ast) {
 	TRY_CAST(DeclaratorExpr, decl_ast, ast->declarator);
 	if (decl_ast == NULL) {
@@ -1015,7 +1030,16 @@ LLVMValueRef eval_FunctionDefinitionStmt(FunctionDefinitionStmt* ast) {
 	LLVMBasicBlockRef entry_bb = LLVMAppendBasicBlock(func, "entry");
 	LLVMPositionBuilderAtEnd(sem_ctx.builder, entry_bb);
 
-	LLVMValueRef body = eval_ast(ast->body);
+	// NOTE: 这里不能直接用Block，要hack一下。FunctionDef的时候是会创建一个scope的
+	//		如果function的body自己又创建一个scope，
+	//		而在body内定义变量的时候只检查current scope内有没有重名，也就是说会出现body内定义的变量覆盖函数实参的情况
+	TRY_CAST(BlockExpr, body_ast, ast->body);
+	LLVMValueRef body;
+	if (body_ast != NULL) {
+		body = eval_list(body_ast->first_child);
+	} else {
+		return NULL;
+	}
 
 	// RET
 	// FIX：这里要作一个约定，判断前面有没有return过，哪怕是不带return value的return。
