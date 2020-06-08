@@ -470,6 +470,37 @@ TypeInfo* extract_type(TypeSpecifier* spec)
 	return result;
 }
 
+// 返回函数符号
+static Symbol* eval_FuncDeclareStmt(AST* ast, TypeSpecifier* ret_typesp, const char* name, TypeSpecifier* paramsp) {
+	Symbol* func_sym = symtbl_find(ctx->functions, name);
+	if (func_sym != NULL) {
+		log_error(ast, "Function redeclaration");
+		return NULL;
+	}
+	LLVMTypeRef ret_type = extract_llvm_type(ret_typesp);
+	LLVMTypeRef* func_args = NULL;
+	int arg_num = 0;
+	// 构建形参
+	TypeSpecifier* tmp = paramsp;
+	for (arg_num = 0; tmp != NULL; ++arg_num, tmp = tmp->super.next);
+	func_args = (LLVMTypeRef*)malloc(arg_num * sizeof(LLVMTypeRef));
+	tmp = paramsp;
+	for (int i = 0; i < arg_num; ++i) {
+		func_args[i] = extract_llvm_type(tmp);
+		tmp = tmp->super.next;
+	}
+	LLVMTypeRef func_type = LLVMFunctionType(
+		ret_type,	// 返回类型
+		func_args,	// 形参数组
+		arg_num,	// 形参数量
+		0			// TODO 支持...
+	);
+	LLVMValueRef func = LLVMAddFunction(sem_ctx.module, name, func_type);
+
+	func_sym = symbol_create_func(name, func, ret_type, paramsp, NULL);
+	symtbl_push(ctx->functions, func_sym);
+	return func_sym;
+}
 
 LLVMValueRef eval_DeclareStmt(DeclareStmt* ast)
 {
@@ -477,59 +508,57 @@ LLVMValueRef eval_DeclareStmt(DeclareStmt* ast)
 	LLVMValueRef last_value = NULL;
 
 
-	FOR_EACH(ast->identifiers, id_ast)
-	{
-		if (id_ast->type == AST_EmptyExpr)
-		{
+	FOR_EACH(ast->identifiers, id_ast) {
+		if (id_ast->type == AST_EmptyExpr) {
 			eval_EmptyExpr((EmptyExpr*)id_ast);
 			continue;
 		}
 
 		TRY_CAST(DeclaratorExpr, id, id_ast);
 		
-
-		if (!id)
-		{
+		if (!id) {
 			log_error(id_ast, "Expected declarator");
 			continue;
-		}
-
-		if (!id->name)
-		{
+		} else if (!id->name) {
 			log_error(id_ast, "Expected name for declarator");
 			continue;
 		}
 
-		if (symtbl_find_in_current_scope(ctx->variables, id->name))
-		{
-			log_error(id_ast, "Redeclaration of variable %s", id->name);
-			continue;
-		}
-
-		extend_declarator_with_specifier(id, spec);
-		TRY_CAST(TypeSpecifier, id_spec, (SUPER(id->type_spec)));
-		if (id_spec == NULL)
-		{
-			log_error(id_ast, "Identifier has no type specifier");
-			continue;
-		}
-
-		// TODO: 检查合并 attributes 的时候问题
-		id->attributes |= ast->attributes;
-		LLVMValueRef value = NULL;
-		if (id->init_value)
-		{
-			value = eval_ast(id->init_value);
-			last_value = value;
+		if (id->type_spec != NULL) {
+			// 应该是这样区分函数和变量的吧
+			eval_FuncDeclareStmt(ast, spec, id->name, id->type_spec->params);
+			last_value = NULL;
 		} else {
-			// TODO: 能不能没有初始化也alloca一个值
+			if (symtbl_find_in_current_scope(ctx->variables, id->name)) {
+				log_error(id_ast, "Redeclaration of variable %s", id->name);
+				continue;
+			}
+
+			extend_declarator_with_specifier(id, spec);
+			TRY_CAST(TypeSpecifier, id_spec, (SUPER(id->type_spec)));
+			if (id_spec == NULL)
+			{
+				log_error(id_ast, "Identifier has no type specifier");
+				continue;
+			}
+
+			// TODO: 检查合并 attributes 的时候问题
+			id->attributes |= ast->attributes;
+			LLVMValueRef value = NULL;
+			if (id->init_value)
+			{
+				value = eval_ast(id->init_value);
+				last_value = value;
+			} else {
+				// TODO: 能不能没有初始化也alloca一个值
+			}
+
+			TypeInfo* typeinfo = extract_type(id_spec);
+			Symbol* sym = symbol_create_variable(id->name, id->attributes, symbol_from_type_info(typeinfo), value, 0);
+
+
+			symtbl_push(ctx->variables, sym);
 		}
-
-		TypeInfo* typeinfo = extract_type(id_spec);
-		Symbol* sym = symbol_create_variable(id->name, id->attributes, symbol_from_type_info(typeinfo), value, 0);
-
-
-		symtbl_push(ctx->variables, sym);
 	}
 	return last_value;
 }
@@ -1102,35 +1131,13 @@ LLVMValueRef eval_FunctionDefinitionStmt(FunctionDefinitionStmt* ast) {
 	Symbol* func_sym = symtbl_find(ctx->functions, decl_ast->name);
 	if (func_sym == NULL) {
 		// 没有声明，那么定义和声明在一起
-		LLVMTypeRef ret_type = extract_llvm_type(type_ast);
-		LLVMTypeRef* func_args = NULL;
-		int arg_num = 0;
-		// 构建形参
-		tmp = decl_ast->type_spec->params;
-		for (arg_num = 0; tmp != NULL; ++arg_num, tmp = tmp->super.next);
-		func_args = (LLVMTypeRef*)malloc(arg_num * sizeof(LLVMTypeRef));
-		tmp = decl_ast->type_spec->params;
-		for (int i = 0; i < arg_num; ++i) {
-			func_args[i] = extract_llvm_type(tmp);
-			tmp = tmp->super.next;
-		}
-		LLVMTypeRef func_type = LLVMFunctionType(
-			ret_type,	// 返回类型
-			func_args,	// 形参数组
-			arg_num,	// 形参数量
-			0			// TODO 支持...
-		);
-		func = LLVMAddFunction(sem_ctx.module, decl_ast->name, func_type);
-
-		func_sym = symbol_create_func(decl_ast->name, func, ret_type, decl_ast->type_spec->params, ast->body);
-		symtbl_push(ctx->functions, func_sym);
-	}
-	else if (func_sym->func.body != NULL) {
+		func_sym = eval_FuncDeclareStmt(ast, type_ast, decl_ast->name, decl_ast->type_spec->params);
+		func = func_sym->func.value;
+	} else if (func_sym->func.body != NULL) {
 		// 已经有定义了
 		log_error(SUPER(ast), "Function Redifinition");
 		return NULL;
-	}
-	else {
+	} else {
 		// 如果符号表中已经有了函数，那么用那个符号
 		func = func_sym->value;
 		func_sym->func.body = ast->body;
