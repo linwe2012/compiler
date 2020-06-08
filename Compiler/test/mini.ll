@@ -13,13 +13,11 @@ entry:
 
 "4":                                              ; preds = %"1"
   ret i32 2
-  br label %"6"
 
 "5":                                              ; preds = %"1"
   ret i32 3
-  br label %"6"
 
-"6":                                              ; preds = %"5", %"4"
+"6":                                              ; No predecessors!
   br label %"0"
 
 "2":                                              ; preds = %"0"

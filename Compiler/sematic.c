@@ -165,9 +165,11 @@ LLVMValueRef eval_ast(AST* ast)
 LLVMValueRef eval_list(AST* ast)
 {
 	LLVMValueRef last = NULL;
-	while (ast)
-	{
+	while (ast) {
 		last = eval_ast(ast);
+		if (LLVMIsAReturnInst(last)) {
+			break;		// 如果有ret，直接中断同一层后续ast的编译
+		}
 		ast = ast->next;
 	}
 
@@ -885,8 +887,10 @@ void eval_WhileStmt(LoopStmt* ast) {
 	append_bb(&sem_ctx.after_bb, after_bb);
 	// 3. body
 	LLVMPositionBuilderAtEnd(sem_ctx.builder, body_bb);
-	eval_BlockExprNoScope(ast->body);
-	LLVMBuildBr(sem_ctx.builder, cond_bb);
+	LLVMValueRef bodyv = eval_BlockExprNoScope(ast->body);
+	if (!LLVMIsAReturnInst(bodyv)) {	// 如果最后一条指令是ret，不能构建br
+		LLVMBuildBr(sem_ctx.builder, cond_bb);
+	}
 
 	// 4. after
 	ctx_leave_block_scope(ctx, 0);
@@ -934,8 +938,10 @@ void eval_ForStmt(LoopStmt* ast) {
 	// current BB.  Note that we ignore the value computed by the body, but don't
 	// allow an error.
 	LLVMPositionBuilderAtEnd(sem_ctx.builder, body_bb);
-	eval_BlockExprNoScope(ast->body);
-	LLVMBuildBr(sem_ctx.builder, step_bb);
+	LLVMValueRef bodyv = eval_BlockExprNoScope(ast->body);
+	if (!LLVMIsAReturnInst(bodyv)) {	// 如果最后一条指令是ret，不能构建br
+		LLVMBuildBr(sem_ctx.builder, step_bb);
+	}
 
 	// 4. step
 	LLVMPositionBuilderAtEnd(sem_ctx.builder, step_bb);
@@ -993,26 +999,32 @@ LLVMValueRef eval_IfStmt(IfStmt* ast) {
 
 	LLVMPositionBuilderAtEnd(sem_ctx.builder, then_bb);
 	// 有可能then里面没有东西
+	LLVMValueRef innerv = NULL;
 	if (!ast->then) {
 		log_error(ast, "if.then is empty");
 		return NULL;
 	} else if (ast->then->type != AST_EmptyExpr) {
 		append_bb(&sem_ctx.after_bb, else_bb);
-		eval_ast(ast->then);
+		innerv = eval_ast(ast->then);
 		pop_bb(&sem_ctx.after_bb);
 	}
-	LLVMBuildBr(sem_ctx.builder, after_bb);
+	if (innerv == NULL || (innerv != NULL && !LLVMIsAReturnInst(innerv))) {	// 如果最后一条指令是ret，不能构建br
+		LLVMBuildBr(sem_ctx.builder, after_bb);
+	}
 	// Codegen of 'Then' can change the current block, update ThenBB for the PHI.
 	then_bb = LLVMGetInsertBlock(sem_ctx.builder);
 
 	LLVMPositionBuilderAtEnd(sem_ctx.builder, else_bb);
+	innerv = NULL;
 	// otherwise不一定有, clang有一个优化，如果没有otherwise就不生成这个BB，这里为了方便也生成了(代码大小问题不是问题)
 	if (ast->otherwise && ast->otherwise->type != AST_EmptyExpr) {
 		append_bb(&sem_ctx.after_bb, else_bb);
-		eval_ast(ast->otherwise);
+		innerv = eval_ast(ast->otherwise);
 		pop_bb(&sem_ctx.after_bb);
 	}
-	LLVMBuildBr(sem_ctx.builder, after_bb);
+	if (innerv == NULL || (innerv != NULL && !LLVMIsAReturnInst(innerv))) {	// 如果最后一条指令是ret，不能构建br
+		LLVMBuildBr(sem_ctx.builder, after_bb);
+	}
 	else_bb = LLVMGetInsertBlock(sem_ctx.builder);
 
 	LLVMPositionBuilderAtEnd(sem_ctx.builder, after_bb);
@@ -1126,7 +1138,7 @@ LLVMValueRef eval_FunctionDefinitionStmt(FunctionDefinitionStmt* ast) {
 	sem_ctx.cur_func_sym = NULL;
 	leave_sematic_temp_context();
 	ctx_leave_function_scope(ctx);
-	return func;
+	return NULL;
 }
 
 LLVMValueRef eval_DeclaratorExpr(DeclaratorExpr* ast)
