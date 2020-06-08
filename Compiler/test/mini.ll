@@ -5,12 +5,12 @@ define i32 @foo(i32, i32) {
 entry:
   br label %cond
 
-cond:                                             ; preds = %entry
-  ret void
+cond:                                             ; preds = %body, %entry
+  br i1 true, label %body, label %after
 
-body:                                             ; No predecessors!
+body:                                             ; preds = %cond
+  br label %cond
 
-step:                                             ; No predecessors!
-
-after:                                            ; No predecessors!
+after:                                            ; preds = %cond
+  ret i64 0
 }

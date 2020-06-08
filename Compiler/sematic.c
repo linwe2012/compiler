@@ -212,7 +212,33 @@ LLVMValueRef eval_LabelStmt(LabelStmt* ast)
 
 LLVMValueRef eval_JumpStmt(JumpStmt* ast)
 {
-	NOT_IMPLEMENTED;
+	switch (ast->type) {
+	case JUMP_BREAK:
+		if (sem_ctx.breakable_last == NULL) {
+			log_error(ast, "No loop to break");
+		} else {
+			LLVMBuildBr(sem_ctx.builder, sem_ctx.breakable_last->block);
+		}
+		break;
+	case JUMP_CONTINUE:
+		if (sem_ctx.continue_last == NULL) {
+			log_error(ast, "No loop to continue");
+		} else {
+			LLVMBuildBr(sem_ctx.builder, sem_ctx.continue_last->block);
+		}
+		break;
+	case JUMP_RET:
+		if (ast->target) {
+			LLVMValueRef ret = eval_ast(ast->target);
+			LLVMBuildRet(sem_ctx.builder, ret);
+		} else {
+			LLVMBuildRetVoid(sem_ctx.builder);
+		}
+		break;
+	case JUMP_GOTO:
+	default:
+		break;
+	}
 }
 
 
@@ -575,6 +601,15 @@ LLVMValueRef eval_BlockExpr(BlockExpr* ast)
 	return last;
 }
 
+// FunctionDefinition和ForLoop的scope是手动创建的
+LLVMValueRef eval_BlockExprNoScope(AST* ast) {
+	TRY_CAST(BlockExpr, body_ast, ast);
+	if (body_ast == NULL) {
+		return NULL;
+	}
+	return eval_list(body_ast->first_child);
+}
+
 
 
 LLVMValueRef eval_ListExpr(ListExpr* ast)
@@ -818,10 +853,49 @@ LLVMValueRef eval_EmptyExpr(EmptyExpr* ast)
 	return NULL;
 }
 
+// TODO: @wushuhui
 void eval_WhileStmt(LoopStmt* ast) {
+	ctx_enter_block_scope(ctx);
 
+	LLVMValueRef func = LLVMGetBasicBlockParent(LLVMGetInsertBlock(sem_ctx.builder));
+	LLVMBasicBlockRef preheader_bb = LLVMGetInsertBlock(sem_ctx.builder);
+	LLVMBasicBlockRef cond_bb = LLVMAppendBasicBlock(func, "cond");
+	LLVMBasicBlockRef body_bb = LLVMAppendBasicBlock(func, "body");
+	LLVMBasicBlockRef after_bb = LLVMAppendBasicBlock(func, "after");
+
+	// 1. preheader
+	LLVMBuildBr(sem_ctx.builder, cond_bb);
+
+	// 2. cond
+	LLVMPositionBuilderAtEnd(sem_ctx.builder, cond_bb);
+	LLVMValueRef condv = eval_ast(ast->condition);
+	if (condv == NULL) {
+		return NULL;
+	} else {
+		if (llvm_is_float(condv)) {
+			fprintf(stderr, "Double value as if condition is not allowed, implicit converted to true\n");
+			LLVMBuildBr(sem_ctx.builder, body_bb);
+		} else {
+			condv = LLVMBuildICmp(sem_ctx.builder, LLVMIntNE, condv, LLVMConstInt(LLVMTypeOf(condv), 0, 1), "ifcond");
+			LLVMBuildCondBr(sem_ctx.builder, condv, body_bb, after_bb);
+		}
+	}
+
+	append_break_bb(after_bb);
+	append_contine_bb(cond_bb);
+	// 3. body
+	LLVMPositionBuilderAtEnd(sem_ctx.builder, body_bb);
+	eval_BlockExprNoScope(ast->body);
+	LLVMBuildBr(sem_ctx.builder, cond_bb);
+
+	// 4. after
+	ctx_leave_block_scope(ctx, 0);
+	remove_break_bb();
+	remove_continue_bb();
+	LLVMPositionBuilderAtEnd(sem_ctx.builder, after_bb);
 }
 
+// TODO: @wushuhui
 void eval_ForStmt(LoopStmt* ast) {
 	ctx_enter_block_scope(ctx);
 
@@ -859,10 +933,7 @@ void eval_ForStmt(LoopStmt* ast) {
 	// current BB.  Note that we ignore the value computed by the body, but don't
 	// allow an error.
 	LLVMPositionBuilderAtEnd(sem_ctx.builder, body_bb);
-	LLVMValueRef body = eval_ast(ast->body);
-	if (body == NULL) {		// FIX: body确实没东西是什么样子的
-		return NULL;
-	}
+	eval_BlockExprNoScope(ast->body);
 	LLVMBuildBr(sem_ctx.builder, step_bb);
 
 	// 4. step
@@ -890,7 +961,7 @@ LLVMValueRef eval_LoopStmt(LoopStmt* ast) {
 		eval_WhileStmt(ast);
 		break;
 	default:
-		// 要么不支持do while好了
+		// 不支持do while
 		break;
 	}
 	return LLVMConstReal(LLVMDoubleType(), 0.0);
@@ -1033,18 +1104,12 @@ LLVMValueRef eval_FunctionDefinitionStmt(FunctionDefinitionStmt* ast) {
 	// NOTE: 这里不能直接用Block，要hack一下。FunctionDef的时候是会创建一个scope的
 	//		如果function的body自己又创建一个scope，
 	//		而在body内定义变量的时候只检查current scope内有没有重名，也就是说会出现body内定义的变量覆盖函数实参的情况
-	TRY_CAST(BlockExpr, body_ast, ast->body);
-	LLVMValueRef body;
-	if (body_ast != NULL) {
-		body = eval_list(body_ast->first_child);
-	} else {
-		return NULL;
-	}
+	LLVMValueRef bodyv = eval_BlockExprNoScope(ast->body);
 
 	// RET
 	// FIX：这里要作一个约定，判断前面有没有return过，哪怕是不带return value的return。
 	// 或者说强制要求return？LLVM IR不return应该不行吧
-	if (func_sym->func.return_type->type == TP_VOID || body == NULL) {
+	if (func_sym->func.return_type->type == TP_VOID || bodyv == NULL) {
 		LLVMBuildRetVoid(sem_ctx.builder);
 	}
 

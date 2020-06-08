@@ -1,8 +1,8 @@
 // void bar();
 
 int foo(int x, int y) {
-    for (int i = 0; i < x; ++i) {
-        // bar();
+    while (1) {
+
     }
-    return x + y;
+    return 0;
 }
