@@ -1,6 +1,7 @@
-// void bar();
+void bar(int a, int b, int c);
 
-int foo(int x, int y) {
+int foo() {
+    int a = 10;
     while (1) {
         if (1) {
             return 2;

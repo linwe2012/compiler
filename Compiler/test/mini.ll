@@ -1,7 +1,9 @@
 ; ModuleID = 'mini.c'
 source_filename = "mini.c"
 
-define i32 @foo(i32, i32) {
+declare void @bar(i32, i32, i32)
+
+define i32 @foo() {
 entry:
   br label %"0"
 

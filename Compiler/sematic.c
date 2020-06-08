@@ -524,7 +524,7 @@ LLVMValueRef eval_DeclareStmt(DeclareStmt* ast)
 			continue;
 		}
 
-		if (id->type_spec != NULL) {
+		if (id->type_spec != NULL && id->type_spec->type == TP_FUNC) {
 			// 应该是这样区分函数和变量的吧
 			eval_FuncDeclareStmt(ast, spec, id->name, id->type_spec->params);
 			last_value = NULL;
