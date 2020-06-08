@@ -587,13 +587,13 @@ Symbol* symbol_create_struct_or_union_incomplete(char* name, enum Types struct_o
 	return sym;
 }
 
-Symbol* symbol_create_func(char* name, void* val, TypeInfo* ret, TypeInfo* params, AST* body) {
+Symbol* symbol_create_func(char* name, LLVMValueRef f, LLVMTypeRef ret_type, TypeInfo* params, AST* body) {
 	Symbol* sym = new_symbol(name, Symbol_FunctionInfo);
 	sym->func.name = name;
 	sym->func.body = body;
 	sym->func.params = params;
-	sym->func.return_type = ret;
-	sym->func.value = val;		// 这个值是LLVMValueRef吧?
+	sym->func.value = f;
+	sym->func.ret_type = ret_type;
 	return sym;
 }
 

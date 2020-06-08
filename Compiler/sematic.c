@@ -49,11 +49,10 @@ struct SematicContext
 	struct SematicTempContext* tmp_bottom;
 	struct SematicTempContext* tmp_top;
 
-	BBListNode* breakable_first;
-	BBListNode* breakable_last;
-
-	BBListNode* continue_first;
-	BBListNode* continue_last;
+	BBListNode* breakable_last;		// 栈顶
+	BBListNode* continue_last;		// 栈顶
+	
+	Symbol* cur_func_sym;		// 这个是从symtbl里面查出来的
 
 	LLVMBuilderRef builder;
 	LLVMModuleRef module;
@@ -62,8 +61,8 @@ struct SematicContext
 void append_break_bb(LLVMBasicBlockRef bb) {
 	BBListNode* breakable = (BBListNode*)calloc(1, sizeof(BBListNode));
 	breakable->block = bb;
-	if (sem_ctx.breakable_first == NULL) {
-		sem_ctx.breakable_first = sem_ctx.breakable_last = breakable;
+	if (sem_ctx.breakable_last == NULL) {
+		sem_ctx.breakable_last = breakable;
 	} else {
 		breakable->prev = sem_ctx.breakable_last;
 		sem_ctx.breakable_last->next = breakable;
@@ -75,9 +74,7 @@ void remove_break_bb() {
 	BBListNode* new_last = sem_ctx.breakable_last->prev;
 	free(sem_ctx.breakable_last);
 	sem_ctx.breakable_last = new_last;
-	if (new_last == NULL) {
-		sem_ctx.breakable_first = NULL;
-	} else {
+	if (new_last != NULL) {
 		new_last->next = NULL;
 	}
 }
@@ -86,8 +83,8 @@ void append_contine_bb(LLVMBasicBlockRef bb) {
 	BBListNode* continuable = (BBListNode*)calloc(1, sizeof(BBListNode));
 	continuable->next = NULL;
 	continuable->block = bb;
-	if (sem_ctx.continue_first == NULL) {
-		sem_ctx.continue_first = sem_ctx.continue_last = continuable;
+	if (sem_ctx.continue_last == NULL) {
+		sem_ctx.continue_last = continuable;
 	} else {
 		continuable->prev = sem_ctx.continue_last;
 		sem_ctx.continue_last->next = continuable;
@@ -99,9 +96,7 @@ void remove_continue_bb() {
 	BBListNode* new_last = sem_ctx.continue_last->prev;
 	free(sem_ctx.continue_last);
 	sem_ctx.continue_last = new_last;
-	if (new_last == NULL) {
-		sem_ctx.continue_first = NULL;
-	} else {
+	if (new_last != NULL) {
 		new_last->next = NULL;
 	}
 }
@@ -179,7 +174,7 @@ void do_eval(AST* ast, struct Context* _ctx, char* module_name)
 {
 	sem_ctx.module = LLVMModuleCreateWithName(module_name);
 	sem_ctx.builder = LLVMCreateBuilder();
-	sem_ctx.breakable_first = sem_ctx.breakable_last = sem_ctx.continue_first = sem_ctx.continue_last = NULL;
+	sem_ctx.cur_func_sym = sem_ctx.breakable_last = sem_ctx.continue_last = NULL;
 
 	ctx = _ctx;
 	eval_list(ast);
@@ -191,13 +186,16 @@ void do_eval(AST* ast, struct Context* _ctx, char* module_name)
 		LLVMDisposeMessage(*msg);
 	}
 	// 应该在离开循环之后自行析构，但是防止出错这里还是析构一下
-	while (sem_ctx.breakable_first != NULL) {
-		free(sem_ctx.breakable_first);
-		sem_ctx.breakable_first = sem_ctx.breakable_first->next;
+	BBListNode* tmp;
+	while (sem_ctx.breakable_last != NULL) {
+		tmp = sem_ctx.breakable_last;
+		sem_ctx.breakable_last = sem_ctx.breakable_last->prev;
+		free(tmp);
 	}
-	while (sem_ctx.continue_first != NULL) {
-		free(sem_ctx.continue_first);
-		sem_ctx.continue_first = sem_ctx.continue_first->next;
+	while (sem_ctx.continue_last != NULL) {
+		tmp = sem_ctx.continue_last;
+		sem_ctx.continue_last = sem_ctx.continue_last->prev;
+		free(tmp);
 	}
 	LLVMDisposeBuilder(sem_ctx.builder);
 	LLVMDisposeModule(sem_ctx.module);
@@ -230,6 +228,10 @@ LLVMValueRef eval_JumpStmt(JumpStmt* ast)
 	case JUMP_RET:
 		if (ast->target) {
 			LLVMValueRef ret = eval_ast(ast->target);
+			// 如果类型不同，强制trunc，这段代码依然有问题
+			if (LLVMTypeOf(ret) != sem_ctx.cur_func_sym->func.ret_type) {	
+				ret = LLVMBuildTrunc(sem_ctx.builder, ret, sem_ctx.cur_func_sym->func.ret_type, "trunc");
+			}
 			LLVMBuildRet(sem_ctx.builder, ret);
 		} else {
 			LLVMBuildRetVoid(sem_ctx.builder);
@@ -1064,7 +1066,7 @@ LLVMValueRef eval_FunctionDefinitionStmt(FunctionDefinitionStmt* ast) {
 		);
 		func = LLVMAddFunction(sem_ctx.module, decl_ast->name, func_type);
 
-		func_sym = symbol_create_func(decl_ast->name, func, extract_type(type_ast), decl_ast->type_spec->params, ast->body);
+		func_sym = symbol_create_func(decl_ast->name, func, ret_type, decl_ast->type_spec->params, ast->body);
 		symtbl_push(ctx->functions, func_sym);
 	}
 	else if (func_sym->func.body != NULL) {
@@ -1077,6 +1079,7 @@ LLVMValueRef eval_FunctionDefinitionStmt(FunctionDefinitionStmt* ast) {
 		func = func_sym->value;
 		func_sym->func.body = ast->body;
 	}
+	sem_ctx.cur_func_sym = func_sym;
 
 	// 构建实参
 	tmp = decl_ast->type_spec->params;
@@ -1109,10 +1112,11 @@ LLVMValueRef eval_FunctionDefinitionStmt(FunctionDefinitionStmt* ast) {
 	// RET
 	// FIX：这里要作一个约定，判断前面有没有return过，哪怕是不带return value的return。
 	// 或者说强制要求return？LLVM IR不return应该不行吧
-	if (func_sym->func.return_type->type == TP_VOID || bodyv == NULL) {
+	if (func_sym->func.ret_type == LLVMVoidType()|| bodyv == NULL) {
 		LLVMBuildRetVoid(sem_ctx.builder);
 	}
 
+	sem_ctx.cur_func_sym = NULL;
 	ctx_leave_function_scope(ctx);
 	return func;
 }
