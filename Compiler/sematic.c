@@ -124,6 +124,42 @@ static LLVMBasicBlockRef alloc_bb() {
 	}
 }
 
+// 支持printf, 方便测试的时候用
+static void build_printf() {
+	// 0. extern int printf(char*, ...)
+	// 代码是参考的，这个pointer的space填0吗？不会吧不会吧
+	LLVMTypeRef PrintfArgsTyList[] = { LLVMPointerType(LLVMInt8Type(), 0) };
+	LLVMTypeRef PrintfTy = LLVMFunctionType(
+		LLVMInt32Type(),
+		PrintfArgsTyList,
+		1,
+		1 // 是否是可变参数
+	);
+
+	// 添加printf函数到模块中
+	LLVMValueRef PrintfFunction = LLVMAddFunction(sem_ctx.module, "printf", PrintfTy);
+	Symbol* func_sym = symbol_create_func("printf", PrintfTy, PrintfArgsTyList, NULL, NULL);
+	symtbl_push(ctx->functions, func_sym);
+
+	//LLVMValueRef Format = LLVMBuildGlobalStringPtr(
+	//	sem_ctx.builder,
+	//	"Hello, %s.\n",
+	//	"format"
+	//), World = LLVMBuildGlobalStringPtr(
+	//	sem_ctx.builder,
+	//	"World",
+	//	"world"
+	//);
+	//LLVMValueRef PrintfArgs[] = { Format, World };
+	//LLVMBuildCall(
+	//	sem_ctx.builder,
+	//	PrintfFunction,
+	//	PrintfArgs,
+	//	2,
+	//	"printf"
+	//);
+}
+
 STRUCT_TYPE(SematicData);
 
 
@@ -185,6 +221,7 @@ void do_eval(AST* ast, struct Context* _ctx, char* module_name)
 	sem_ctx.tmp_top = NULL;
 
 	ctx = _ctx;
+	// build_printf();		// 内建printf
 	eval_list(ast);
 
 	char** msg = NULL;
