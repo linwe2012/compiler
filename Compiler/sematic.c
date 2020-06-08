@@ -31,12 +31,12 @@ struct SematicData
 };
 
 
-struct SematicTempContext
-{
+typedef struct SematicTempContext {
 	uint64_t temp_id; // llvm 临时变量的 id
 
 	struct SematicTempContext* prev;
-};
+	struct SematicTempContext* next;
+} SematicTempContext;
 
 typedef struct BBListNode {
 	LLVMBasicBlockRef block;
@@ -46,11 +46,11 @@ typedef struct BBListNode {
 
 struct SematicContext
 {
-	struct SematicTempContext* tmp_bottom;
-	struct SematicTempContext* tmp_top;
+	SematicTempContext* tmp_top;
 
-	BBListNode* breakable_last;		// 栈顶
-	BBListNode* continue_last;		// 栈顶
+	BBListNode* breakable_last;		// break栈
+	BBListNode* continue_last;		// continue栈
+	BBListNode* after_bb;			// 不能简单使用AppendBasicBlock
 	
 	Symbol* cur_func_sym;		// 这个是从symtbl里面查出来的
 
@@ -58,65 +58,70 @@ struct SematicContext
 	LLVMModuleRef module;
 } sem_ctx;
 
-void append_break_bb(LLVMBasicBlockRef bb) {
+static void append_bb(BBListNode** top, LLVMBasicBlockRef bb) {
 	BBListNode* breakable = (BBListNode*)calloc(1, sizeof(BBListNode));
 	breakable->block = bb;
-	if (sem_ctx.breakable_last == NULL) {
-		sem_ctx.breakable_last = breakable;
+	if (*top == NULL) {
+		*top = breakable;
 	} else {
-		breakable->prev = sem_ctx.breakable_last;
-		sem_ctx.breakable_last->next = breakable;
-		sem_ctx.breakable_last = breakable;
+		breakable->prev = *top;
+		(*top)->next = breakable;
+		*top = breakable;
 	}
 }
 
-void remove_break_bb() {
-	BBListNode* new_last = sem_ctx.breakable_last->prev;
-	free(sem_ctx.breakable_last);
-	sem_ctx.breakable_last = new_last;
+static void pop_bb(BBListNode** top) {
+	BBListNode* new_last = (*top)->prev;
+	free(*top);
+	*top = new_last;
 	if (new_last != NULL) {
 		new_last->next = NULL;
 	}
 }
 
-void append_contine_bb(LLVMBasicBlockRef bb) {
-	BBListNode* continuable = (BBListNode*)calloc(1, sizeof(BBListNode));
-	continuable->next = NULL;
-	continuable->block = bb;
-	if (sem_ctx.continue_last == NULL) {
-		sem_ctx.continue_last = continuable;
-	} else {
-		continuable->prev = sem_ctx.continue_last;
-		sem_ctx.continue_last->next = continuable;
-		sem_ctx.continue_last = continuable;
+static void free_bb_stack(BBListNode** top) {
+	BBListNode* tmp;
+	while (*top != NULL) {
+		tmp = *top;
+		*top = (*top)->prev;
+		free(tmp);
 	}
 }
 
-void remove_continue_bb() {
-	BBListNode* new_last = sem_ctx.continue_last->prev;
-	free(sem_ctx.continue_last);
-	sem_ctx.continue_last = new_last;
-	if (new_last != NULL) {
-		new_last->next = NULL;
-	}
-}
-
-char* next_temp_id_str()
-{
+static char* next_temp_id_str() {
 	uint64_t id = sem_ctx.tmp_top->temp_id++;
 	char* buf = (char*)malloc(32);
 	snprintf(buf, 32, "%lld", id);
 	return buf;
 }
 
-static void enter_sematic_temp_context()
-{
-
+static void enter_sematic_temp_context() {
+	SematicTempContext* new_seman = (SematicTempContext*)calloc(1, sizeof(SematicTempContext));
+	if (sem_ctx.tmp_top == NULL) {
+		sem_ctx.tmp_top = new_seman;
+	} else {
+		new_seman->prev = sem_ctx.tmp_top;
+		sem_ctx.tmp_top->next = new_seman;
+		sem_ctx.tmp_top = new_seman;
+	}
 }
 
-static void leave_sematic_temp_context()
-{
+static void leave_sematic_temp_context() {
+	BBListNode* new_last = sem_ctx.tmp_top->prev;
+	free(sem_ctx.tmp_top);
+	sem_ctx.tmp_top = new_last;
+	if (new_last != NULL) {
+		new_last->next = NULL;
+	}
+}
 
+static LLVMBasicBlockRef alloc_bb() {
+	char* name = next_temp_id_str();
+	if (sem_ctx.after_bb) {
+		return LLVMInsertBasicBlock(sem_ctx.after_bb->block, name);
+	} else {
+		return LLVMAppendBasicBlock(LLVMGetBasicBlockParent(LLVMGetInsertBlock(sem_ctx.builder)), name);
+	}
 }
 
 STRUCT_TYPE(SematicData);
@@ -175,6 +180,7 @@ void do_eval(AST* ast, struct Context* _ctx, char* module_name)
 	sem_ctx.module = LLVMModuleCreateWithName(module_name);
 	sem_ctx.builder = LLVMCreateBuilder();
 	sem_ctx.cur_func_sym = sem_ctx.breakable_last = sem_ctx.continue_last = NULL;
+	sem_ctx.tmp_top = NULL;
 
 	ctx = _ctx;
 	eval_list(ast);
@@ -186,17 +192,9 @@ void do_eval(AST* ast, struct Context* _ctx, char* module_name)
 		LLVMDisposeMessage(*msg);
 	}
 	// 应该在离开循环之后自行析构，但是防止出错这里还是析构一下
-	BBListNode* tmp;
-	while (sem_ctx.breakable_last != NULL) {
-		tmp = sem_ctx.breakable_last;
-		sem_ctx.breakable_last = sem_ctx.breakable_last->prev;
-		free(tmp);
-	}
-	while (sem_ctx.continue_last != NULL) {
-		tmp = sem_ctx.continue_last;
-		sem_ctx.continue_last = sem_ctx.continue_last->prev;
-		free(tmp);
-	}
+	free_bb_stack(&sem_ctx.breakable_last);
+	free_bb_stack(&sem_ctx.continue_last);
+	free_bb_stack(&sem_ctx.after_bb);
 	LLVMDisposeBuilder(sem_ctx.builder);
 	LLVMDisposeModule(sem_ctx.module);
 }
@@ -230,7 +228,7 @@ LLVMValueRef eval_JumpStmt(JumpStmt* ast)
 			LLVMValueRef ret = eval_ast(ast->target);
 			// 如果类型不同，强制trunc，这段代码依然有问题
 			if (LLVMTypeOf(ret) != sem_ctx.cur_func_sym->func.ret_type) {	
-				ret = LLVMBuildTrunc(sem_ctx.builder, ret, sem_ctx.cur_func_sym->func.ret_type, "trunc");
+				ret = LLVMBuildTrunc(sem_ctx.builder, ret, sem_ctx.cur_func_sym->func.ret_type, next_temp_id_str());
 			}
 			LLVMBuildRet(sem_ctx.builder, ret);
 		} else {
@@ -859,11 +857,10 @@ LLVMValueRef eval_EmptyExpr(EmptyExpr* ast)
 void eval_WhileStmt(LoopStmt* ast) {
 	ctx_enter_block_scope(ctx);
 
-	LLVMValueRef func = LLVMGetBasicBlockParent(LLVMGetInsertBlock(sem_ctx.builder));
 	LLVMBasicBlockRef preheader_bb = LLVMGetInsertBlock(sem_ctx.builder);
-	LLVMBasicBlockRef cond_bb = LLVMAppendBasicBlock(func, "cond");
-	LLVMBasicBlockRef body_bb = LLVMAppendBasicBlock(func, "body");
-	LLVMBasicBlockRef after_bb = LLVMAppendBasicBlock(func, "after");
+	LLVMBasicBlockRef cond_bb = alloc_bb();
+	LLVMBasicBlockRef body_bb = alloc_bb();
+	LLVMBasicBlockRef after_bb = alloc_bb();
 
 	// 1. preheader
 	LLVMBuildBr(sem_ctx.builder, cond_bb);
@@ -878,13 +875,14 @@ void eval_WhileStmt(LoopStmt* ast) {
 			fprintf(stderr, "Double value as if condition is not allowed, implicit converted to true\n");
 			LLVMBuildBr(sem_ctx.builder, body_bb);
 		} else {
-			condv = LLVMBuildICmp(sem_ctx.builder, LLVMIntNE, condv, LLVMConstInt(LLVMTypeOf(condv), 0, 1), "ifcond");
+			condv = LLVMBuildICmp(sem_ctx.builder, LLVMIntNE, condv, LLVMConstInt(LLVMTypeOf(condv), 0, 1), next_temp_id_str());
 			LLVMBuildCondBr(sem_ctx.builder, condv, body_bb, after_bb);
 		}
 	}
 
-	append_break_bb(after_bb);
-	append_contine_bb(cond_bb);
+	append_bb(&sem_ctx.breakable_last, after_bb);
+	append_bb(&sem_ctx.continue_last, cond_bb);
+	append_bb(&sem_ctx.after_bb, after_bb);
 	// 3. body
 	LLVMPositionBuilderAtEnd(sem_ctx.builder, body_bb);
 	eval_BlockExprNoScope(ast->body);
@@ -892,8 +890,9 @@ void eval_WhileStmt(LoopStmt* ast) {
 
 	// 4. after
 	ctx_leave_block_scope(ctx, 0);
-	remove_break_bb();
-	remove_continue_bb();
+	pop_bb(&sem_ctx.breakable_last);
+	pop_bb(&sem_ctx.continue_last);
+	pop_bb(&sem_ctx.after_bb);
 	LLVMPositionBuilderAtEnd(sem_ctx.builder, after_bb);
 }
 
@@ -903,12 +902,11 @@ void eval_ForStmt(LoopStmt* ast) {
 
 	LLVMValueRef enter = eval_ast(ast->enter);
 
-	LLVMValueRef func = LLVMGetBasicBlockParent(LLVMGetInsertBlock(sem_ctx.builder));
 	LLVMBasicBlockRef preheader_bb = LLVMGetInsertBlock(sem_ctx.builder);
-	LLVMBasicBlockRef cond_bb = LLVMAppendBasicBlock(func, "cond");
-	LLVMBasicBlockRef body_bb = LLVMAppendBasicBlock(func, "body");
-	LLVMBasicBlockRef step_bb = LLVMAppendBasicBlock(func, "step");
-	LLVMBasicBlockRef after_bb = LLVMAppendBasicBlock(func, "after");
+	LLVMBasicBlockRef cond_bb = alloc_bb();
+	LLVMBasicBlockRef body_bb = alloc_bb();
+	LLVMBasicBlockRef step_bb = alloc_bb();
+	LLVMBasicBlockRef after_bb = alloc_bb();
 
 	// 1. preheader
 	LLVMBuildBr(sem_ctx.builder, cond_bb);
@@ -923,13 +921,14 @@ void eval_ForStmt(LoopStmt* ast) {
 			fprintf(stderr, "Double value as if condition is not allowed, implicit converted to true\n");
 			LLVMBuildBr(sem_ctx.builder, body_bb);
 		} else {
-			condv = LLVMBuildICmp(sem_ctx.builder, LLVMIntNE, condv, LLVMConstInt(LLVMTypeOf(condv), 0, 1), "ifcond");
+			condv = LLVMBuildICmp(sem_ctx.builder, LLVMIntNE, condv, LLVMConstInt(LLVMTypeOf(condv), 0, 1), next_temp_id_str());
 			LLVMBuildCondBr(sem_ctx.builder, condv, body_bb, after_bb);
 		}
 	}
 
-	append_break_bb(after_bb);
-	append_contine_bb(step_bb);
+	append_bb(&sem_ctx.breakable_last, after_bb);
+	append_bb(&sem_ctx.continue_last, step_bb);
+	append_bb(&sem_ctx.after_bb, after_bb);
 	// 3. body
 	// Emit the body of the loop.  This, like any other expr, can change the
 	// current BB.  Note that we ignore the value computed by the body, but don't
@@ -948,8 +947,9 @@ void eval_ForStmt(LoopStmt* ast) {
 
 	// 5. after
 	ctx_leave_block_scope(ctx, 0);
-	remove_break_bb();
-	remove_continue_bb();
+	pop_bb(&sem_ctx.breakable_last);
+	pop_bb(&sem_ctx.continue_last);
+	pop_bb(&sem_ctx.after_bb);
 	LLVMPositionBuilderAtEnd(sem_ctx.builder, after_bb);
 }
 
@@ -975,10 +975,9 @@ LLVMValueRef eval_IfStmt(IfStmt* ast) {
 	if (condv == NULL) {
 		return NULL;
 	}
-	LLVMValueRef func = LLVMGetBasicBlockParent(LLVMGetInsertBlock(sem_ctx.builder));
-	LLVMBasicBlockRef then_bb = LLVMAppendBasicBlock(func, "then");
-	LLVMBasicBlockRef else_bb = LLVMAppendBasicBlock(func, "else");
-	LLVMBasicBlockRef merge_bb = LLVMAppendBasicBlock(func, "ifcont");
+	LLVMBasicBlockRef then_bb = alloc_bb();
+	LLVMBasicBlockRef else_bb = alloc_bb();
+	LLVMBasicBlockRef after_bb = alloc_bb();
 
 	// 似乎clang的标准并不允许double作为条件的值，会有下述warning：
 	// implicit conversion from 'double' to '_Bool' changes value from 1.111 to true
@@ -988,42 +987,49 @@ LLVMValueRef eval_IfStmt(IfStmt* ast) {
 		fprintf(stderr, "Double value as if condition is not allowed, implicit converted to true\n");
 		LLVMBuildBr(sem_ctx.builder, then_bb);
 	} else {
-		condv = LLVMBuildICmp(sem_ctx.builder, LLVMIntNE, condv, LLVMConstInt(LLVMTypeOf(condv), 0, 1), "ifcond");
+		condv = LLVMBuildICmp(sem_ctx.builder, LLVMIntNE, condv, LLVMConstInt(LLVMTypeOf(condv), 0, 1), next_temp_id_str());
 		LLVMBuildCondBr(sem_ctx.builder, condv, then_bb, else_bb);
 	}
 
 	LLVMPositionBuilderAtEnd(sem_ctx.builder, then_bb);
 	// 有可能then里面没有东西
-	if (ast->then->type != AST_EmptyExpr) {
+	if (!ast->then) {
+		log_error(ast, "if.then is empty");
+		return NULL;
+	} else if (ast->then->type != AST_EmptyExpr) {
+		append_bb(&sem_ctx.after_bb, else_bb);
 		eval_ast(ast->then);
+		pop_bb(&sem_ctx.after_bb);
 	}
-	LLVMBuildBr(sem_ctx.builder, merge_bb);
+	LLVMBuildBr(sem_ctx.builder, after_bb);
 	// Codegen of 'Then' can change the current block, update ThenBB for the PHI.
 	then_bb = LLVMGetInsertBlock(sem_ctx.builder);
 
 	LLVMPositionBuilderAtEnd(sem_ctx.builder, else_bb);
 	// otherwise不一定有, clang有一个优化，如果没有otherwise就不生成这个BB，这里为了方便也生成了(代码大小问题不是问题)
 	if (ast->otherwise && ast->otherwise->type != AST_EmptyExpr) {
+		append_bb(&sem_ctx.after_bb, else_bb);
 		eval_ast(ast->otherwise);
+		pop_bb(&sem_ctx.after_bb);
 	}
-	LLVMBuildBr(sem_ctx.builder, merge_bb);
+	LLVMBuildBr(sem_ctx.builder, after_bb);
 	else_bb = LLVMGetInsertBlock(sem_ctx.builder);
 
-	LLVMPositionBuilderAtEnd(sem_ctx.builder, merge_bb);
+	LLVMPositionBuilderAtEnd(sem_ctx.builder, after_bb);
 
 	// TODO: PHI，或者说用哪个变量可以不依赖phi解决？
 	return NULL;
 }
 
-// TODO: @wushuhui
+// TODO: @wushuhui 优先级低，暂时先不实现
 LLVMValueRef eval_SwitchCaseStmt(SwitchCaseStmt* ast) {
-	LLVMValueRef condv = eval_ast(ast->switch_value);
-	if (condv == NULL) {
-		return NULL;
-	}
-	LLVMValueRef func = LLVMGetBasicBlockParent(LLVMGetInsertBlock(sem_ctx.builder));
-	LLVMBasicBlockRef else_bb = LLVMAppendBasicBlock(func, "else");
-	LLVMValueRef v = LLVMBuildSwitch(sem_ctx.builder, condv, else_bb, 5);
+	//LLVMValueRef condv = eval_ast(ast->switch_value);
+	//if (condv == NULL) {
+	//	return NULL;
+	//}
+	//LLVMValueRef func = LLVMGetBasicBlockParent(LLVMGetInsertBlock(sem_ctx.builder));
+	//LLVMBasicBlockRef else_bb = LLVMAppendBasicBlock(func, "else");
+	//LLVMValueRef v = LLVMBuildSwitch(sem_ctx.builder, condv, else_bb, 5);
 	NOT_IMPLEMENTED;
 }
 
@@ -1039,6 +1045,7 @@ LLVMValueRef eval_FunctionDefinitionStmt(FunctionDefinitionStmt* ast) {
 	}
 
 	ctx_enter_function_scope(ctx);
+	enter_sematic_temp_context();
 
 	LLVMValueRef func;
 	TypeSpecifier* tmp;
@@ -1117,6 +1124,7 @@ LLVMValueRef eval_FunctionDefinitionStmt(FunctionDefinitionStmt* ast) {
 	}
 
 	sem_ctx.cur_func_sym = NULL;
+	leave_sematic_temp_context();
 	ctx_leave_function_scope(ctx);
 	return func;
 }

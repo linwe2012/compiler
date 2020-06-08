@@ -3,25 +3,25 @@ source_filename = "mini.c"
 
 define i32 @foo(i32, i32) {
 entry:
-  br label %cond
+  br label %"0"
 
-cond:                                             ; preds = %ifcont, %entry
-  br i1 true, label %body, label %after
+"0":                                              ; preds = %"6", %entry
+  br i1 true, label %"1", label %"2"
 
-body:                                             ; preds = %cond
-  br i1 true, label %then, label %else
+"1":                                              ; preds = %"0"
+  br i1 true, label %"4", label %"5"
 
-after:                                            ; preds = %cond
-  ret i32 0
-
-then:                                             ; preds = %body
+"4":                                              ; preds = %"1"
   ret i32 2
-  br label %ifcont
+  br label %"6"
 
-else:                                             ; preds = %body
+"5":                                              ; preds = %"1"
   ret i32 3
-  br label %ifcont
+  br label %"6"
 
-ifcont:                                           ; preds = %else, %then
-  br label %cond
+"6":                                              ; preds = %"5", %"4"
+  br label %"0"
+
+"2":                                              ; preds = %"0"
+  ret i32 0
 }
