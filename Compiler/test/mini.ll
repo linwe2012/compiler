@@ -1,27 +1,27 @@
 ; ModuleID = 'mini.c'
 source_filename = "mini.c"
 
-declare void @bar(i32, i32, i32)
-
-define i32 @foo() {
+define i32 @foo(i32 %"0") {
 entry:
-  br label %"0"
+  br label %"1"
 
-"0":                                              ; preds = %"6", %entry
-  br i1 true, label %"1", label %"2"
+"1":                                              ; preds = %"7", %entry
+  br i1 true, label %"2", label %"3"
 
-"1":                                              ; preds = %"0"
-  br i1 true, label %"4", label %"5"
+"2":                                              ; preds = %"1"
+  br i1 true, label %"5", label %"6"
 
-"4":                                              ; preds = %"1"
+"5":                                              ; preds = %"2"
   ret i32 2
 
-"5":                                              ; preds = %"1"
+"6":                                              ; preds = %"2"
   ret i32 3
 
-"6":                                              ; No predecessors!
-  br label %"0"
+"7":                                              ; No predecessors!
+  br label %"1"
 
-"2":                                              ; preds = %"0"
+"3":                                              ; preds = %"1"
   ret i32 0
 }
+
+declare void @bar(i32, i32, i32)

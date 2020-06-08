@@ -1122,9 +1122,6 @@ LLVMValueRef eval_FunctionDefinitionStmt(FunctionDefinitionStmt* ast) {
 		return NULL;
 	}
 
-	ctx_enter_function_scope(ctx);
-	enter_sematic_temp_context();
-
 	LLVMValueRef func;
 	TypeSpecifier* tmp;
 
@@ -1132,6 +1129,7 @@ LLVMValueRef eval_FunctionDefinitionStmt(FunctionDefinitionStmt* ast) {
 	if (func_sym == NULL) {
 		// 没有声明，那么定义和声明在一起
 		func_sym = eval_FuncDeclareStmt(ast, type_ast, decl_ast->name, decl_ast->type_spec->params);
+		func_sym->func.body = ast;
 		func = func_sym->func.value;
 	} else if (func_sym->func.body != NULL) {
 		// 已经有定义了
@@ -1143,6 +1141,9 @@ LLVMValueRef eval_FunctionDefinitionStmt(FunctionDefinitionStmt* ast) {
 		func_sym->func.body = ast->body;
 	}
 	sem_ctx.cur_func_sym = func_sym;
+
+	ctx_enter_function_scope(ctx);
+	enter_sematic_temp_context();
 
 	// 构建实参
 	tmp = decl_ast->type_spec->params;
@@ -1162,6 +1163,13 @@ LLVMValueRef eval_FunctionDefinitionStmt(FunctionDefinitionStmt* ast) {
 		pseudo_expr.type_spec = pseudo_expr.type_spec_last = NULL;
 		eval_DeclareStmt(&pseudo_stmt);
 		tmp = tmp->super.next;
+	}
+	unsigned int n_params = LLVMCountParams(func);
+	LLVMValueRef* params = malloc(sizeof(LLVMValueRef) * n_params);
+	LLVMGetParams(func, params);
+	for (int i = 0; i < n_params; ++i) {
+		LLVMSetValueName(params[i], next_temp_id_str());
+		// TODO build alloca和store
 	}
 
 	LLVMBasicBlockRef entry_bb = LLVMAppendBasicBlock(func, "entry");
