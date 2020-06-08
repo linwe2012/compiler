@@ -64,8 +64,10 @@ void _write_FunctionCallExpr(FunctionCallExpr *expr) {
     fprintf(s_fp, "\"name\":\"(CALL)\"");
     fputs(",\n\"children\": [", s_fp);
     _write_ast(expr->function);
-    fputs(",\n", s_fp);
-    _write_ast(expr->params);
+    if (expr->params != NULL) { // 参数可能没有  bar();
+        fputs(",\n", s_fp);
+        _write_ast(expr->params);
+    }
     fputs("]\n", s_fp);
 }
 

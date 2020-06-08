@@ -58,12 +58,8 @@ Symbol* symtbl_find(SymbolTable* tbl, const char* name)
 {
 	// FIX: 如果一个block内要访问block外定义的本地变量，现在这样会访问不到吧(last可能是NULL)
 	Symbol* top = tbl->stack_top->last;
-	while (top != NULL)
-	{
-		while (!str_equal(top->name, name))
-		{
-			top->prev;
-		}
+	while (top != NULL && !str_equal(top->name, name)) {
+		top = top->prev;
 	}
 
 	return top;
@@ -74,11 +70,19 @@ Symbol* symtbl_find_in_current_scope(SymbolTable* tbl, const char* name)
 	Symbol* top = tbl->stack_top->last;
 	Symbol* bottom = tbl->stack_top->first;
 
-	while (top != bottom)
-	{
-		while (!str_equal(top->name, name))
-		{
-			top->prev;
+	if (top == NULL) {
+		return NULL;
+	}
+
+	while (top != bottom && !str_equal(top->name, name)) {
+		top = top->prev;
+	}
+
+	if (top == bottom) {
+		if (str_equal(top->name, name)) {
+			return top;
+		} else {
+			return NULL;
 		}
 	}
 
@@ -583,13 +587,13 @@ Symbol* symbol_create_struct_or_union_incomplete(char* name, enum Types struct_o
 	return sym;
 }
 
-Symbol* symbol_create_func(char* name, void* val, TypeInfo* ret, TypeInfo* params, AST* body) {
+Symbol* symbol_create_func(char* name, LLVMValueRef f, LLVMTypeRef ret_type, TypeInfo* params, AST* body) {
 	Symbol* sym = new_symbol(name, Symbol_FunctionInfo);
 	sym->func.name = name;
 	sym->func.body = body;
 	sym->func.params = params;
-	sym->func.return_type = ret;
-	sym->func.value = val;		// 这个值是LLVMValueRef吧?
+	sym->func.value = f;
+	sym->func.ret_type = ret_type;
 	return sym;
 }
 

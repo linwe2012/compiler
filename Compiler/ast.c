@@ -520,14 +520,7 @@ void notify_loop(enum LoopType type)
 
 AST* make_loop(AST* condition, AST* before_loop, AST* loop_body, AST* loop_step, enum LoopType loop_type)
 {
-	AST_DATA(data);
-	struct AST* item = astlist_pop(&data->breakable);
-	if (item == NULL)
-	{
-		log_internal_error(item, "corrupted ast data");
-	}
-
-	CAST(LoopStmt, ast, item);
+	NEW_AST(LoopStmt, ast);
 
 	ast->body = loop_body;
 	ast->condition = condition;

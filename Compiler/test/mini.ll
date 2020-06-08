@@ -1,16 +1,25 @@
-; ModuleID = 'mini'
-source_filename = "mini"
+; ModuleID = 'mini.c'
+source_filename = "mini.c"
 
-define void @foo(i32) {
+define i32 @foo(i32, i32) {
 entry:
-  br i1 true, label %then, label %else
+  br label %"0"
 
-then:                                             ; preds = %entry
-  br label %ifcont
+"0":                                              ; preds = %"6", %entry
+  br i1 true, label %"1", label %"2"
 
-else:                                             ; preds = %entry
-  br label %ifcont
+"1":                                              ; preds = %"0"
+  br i1 true, label %"4", label %"5"
 
-ifcont:                                           ; preds = %else, %then
-  ret void
+"4":                                              ; preds = %"1"
+  ret i32 2
+
+"5":                                              ; preds = %"1"
+  ret i32 3
+
+"6":                                              ; No predecessors!
+  br label %"0"
+
+"2":                                              ; preds = %"0"
+  ret i32 0
 }
