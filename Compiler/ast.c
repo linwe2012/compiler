@@ -669,7 +669,7 @@ AST* make_extent_direct_declarator(AST* direct, enum Types type, AST* wrapped)
 		NEW_AST(TypeSpecifier, spec);
 		init_type_specifier(spec, TypeSpecifier_Exclusive);
 		spec->params = first;
-		
+		spec->type = TP_FUNC;
 		// 如果不是 abstract declarator
 		if (direct != NULL)
 		{
