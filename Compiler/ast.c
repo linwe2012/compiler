@@ -582,7 +582,7 @@ int ast_merge_type_qualifier(int a, int b)
 
 // Declarators
 // ======================================
-AST* makr_init_direct_declarator(const char* name)
+AST* make_init_direct_declarator(const char* name)
 {
 	NEW_AST(DeclaratorExpr, ast);
 	if (name)
@@ -662,7 +662,7 @@ AST* make_extent_direct_declarator(AST* direct, enum Types type, AST* wrapped)
 		NEW_AST(TypeSpecifier, spec);
 		init_type_specifier(spec, TypeSpecifier_Exclusive);
 		spec->params = first;
-		
+		spec->type = TP_FUNC;
 		// 如果不是 abstract declarator
 		if (direct != NULL)
 		{
@@ -733,7 +733,7 @@ AST* make_ptr(int type_qualifier_list, AST* pointing)
 	if (pointing == NULL)
 	{
 		// 利用这个函数帮我们初始化
-		DeclaratorExpr* ast = (DeclaratorExpr*) makr_init_direct_declarator(NULL);
+		DeclaratorExpr* ast = (DeclaratorExpr*) make_init_direct_declarator(NULL);
 		ast->type_spec = ast->type_spec_last = spec;
 
 		return SUPER(ast);
@@ -942,7 +942,7 @@ AST* make_list_expr(AST* child)
 
 AST* make_paramter_ellipse()
 {
-	DeclaratorExpr* decl = (DeclaratorExpr*)makr_init_direct_declarator(NULL);
+	DeclaratorExpr* decl = (DeclaratorExpr*)make_init_direct_declarator(NULL);
 	NEW_AST(TypeSpecifier, spec);
 	init_type_specifier(spec, TypeSpecifier_Exclusive);
 	spec->type = TP_ELLIPSIS;
@@ -1129,7 +1129,7 @@ AST* make_parameter_declaration(AST* declaration_specifiers, AST* declarator)
 	DeclaratorExpr* gdecl = NULL;
 	if (!declarator)
 	{
-		gdecl = (DeclaratorExpr*)(makr_init_direct_declarator(NULL));
+		gdecl = (DeclaratorExpr*)(make_init_direct_declarator(NULL));
 	}
 	else {
 		CAST(DeclaratorExpr, decl, declarator);

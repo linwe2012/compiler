@@ -409,7 +409,7 @@ AST* make_declaration(AST* declaration_specifiers, enum SymbolAttributes attribu
 
 // direct_declarator
 //     : IDENTIFIER
-AST* makr_init_direct_declarator(const char * name);
+AST* make_init_direct_declarator(const char * name);
 
 // direct_declarator:
 //     : direct_declarator (wrapped)

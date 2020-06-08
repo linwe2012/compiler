@@ -148,7 +148,7 @@ declarator
     ;
 
 direct_declarator
-    : IDENTIFIER                     { $$ = makr_init_direct_declarator($1); }
+    : IDENTIFIER                     { $$ = make_init_direct_declarator($1); }
 	| '(' declarator ')'             { $$ = $2; }
     | direct_declarator '(' ')'      { $$ = make_extent_direct_declarator($1, TP_FUNC, NULL); }
     | direct_declarator '(' parameter_list ')'      { $$ = make_extent_direct_declarator($1, TP_FUNC, $3); }
