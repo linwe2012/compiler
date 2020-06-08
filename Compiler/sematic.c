@@ -836,6 +836,13 @@ LLVMValueRef eval_IfStmt(IfStmt* ast) {
 
 // TODO: @wushuhui
 LLVMValueRef eval_SwitchCaseStmt(SwitchCaseStmt* ast) {
+	LLVMValueRef condv = eval_ast(ast->switch_value);
+	if (condv == NULL) {
+		return NULL;
+	}
+	LLVMValueRef func = LLVMGetBasicBlockParent(LLVMGetInsertBlock(sem_ctx.builder));
+	LLVMBasicBlockRef else_bb = LLVMAppendBasicBlock(func, "else");
+	LLVMValueRef v = LLVMBuildSwitch(sem_ctx.builder, condv, else_bb, 5);
 	NOT_IMPLEMENTED;
 }
 
