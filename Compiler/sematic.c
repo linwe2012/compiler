@@ -38,14 +38,73 @@ struct SematicTempContext
 	struct SematicTempContext* prev;
 };
 
+typedef struct BBListNode {
+	LLVMBasicBlockRef block;
+	struct BBListNode* next;
+	struct BBListNode* prev;
+} BBListNode;
+
 struct SematicContext
 {
 	struct SematicTempContext* tmp_bottom;
 	struct SematicTempContext* tmp_top;
 
+	BBListNode* breakable_first;
+	BBListNode* breakable_last;
+
+	BBListNode* continue_first;
+	BBListNode* continue_last;
+
 	LLVMBuilderRef builder;
-	LLVMModuleRef module;		// FIX: 同上
+	LLVMModuleRef module;
 } sem_ctx;
+
+void append_break_bb(LLVMBasicBlockRef bb) {
+	BBListNode* breakable = (BBListNode*)calloc(1, sizeof(BBListNode));
+	breakable->block = bb;
+	if (sem_ctx.breakable_first == NULL) {
+		sem_ctx.breakable_first = sem_ctx.breakable_last = breakable;
+	} else {
+		breakable->prev = sem_ctx.breakable_last;
+		sem_ctx.breakable_last->next = breakable;
+		sem_ctx.breakable_last = breakable;
+	}
+}
+
+void remove_break_bb() {
+	BBListNode* new_last = sem_ctx.breakable_last->prev;
+	free(sem_ctx.breakable_last);
+	sem_ctx.breakable_last = new_last;
+	if (new_last == NULL) {
+		sem_ctx.breakable_first = NULL;
+	} else {
+		new_last->next = NULL;
+	}
+}
+
+void append_contine_bb(LLVMBasicBlockRef bb) {
+	BBListNode* continuable = (BBListNode*)calloc(1, sizeof(BBListNode));
+	continuable->next = NULL;
+	continuable->block = bb;
+	if (sem_ctx.continue_first == NULL) {
+		sem_ctx.continue_first = sem_ctx.continue_last = continuable;
+	} else {
+		continuable->prev = sem_ctx.continue_last;
+		sem_ctx.continue_last->next = continuable;
+		sem_ctx.continue_last = continuable;
+	}
+}
+
+void remove_continue_bb() {
+	BBListNode* new_last = sem_ctx.continue_last->prev;
+	free(sem_ctx.continue_last);
+	sem_ctx.continue_last = new_last;
+	if (new_last == NULL) {
+		sem_ctx.continue_first = NULL;
+	} else {
+		new_last->next = NULL;
+	}
+}
 
 char* next_temp_id_str()
 {
@@ -120,15 +179,25 @@ void do_eval(AST* ast, struct Context* _ctx, char* module_name)
 {
 	sem_ctx.module = LLVMModuleCreateWithName(module_name);
 	sem_ctx.builder = LLVMCreateBuilder();
+	sem_ctx.breakable_first = sem_ctx.breakable_last = sem_ctx.continue_first = sem_ctx.continue_last = NULL;
 
 	ctx = _ctx;
 	eval_list(ast);
 
 	char** msg = NULL;
 	LLVMBool res = LLVMPrintModuleToFile(sem_ctx.module, "test/mini.ll", msg);
-	if (res != 0) {
+	if (res != 0 && msg != NULL) {
 		printf("LLVM error: %s\n", msg);
 		LLVMDisposeMessage(*msg);
+	}
+	// 应该在离开循环之后自行析构，但是防止出错这里还是析构一下
+	while (sem_ctx.breakable_first != NULL) {
+		free(sem_ctx.breakable_first);
+		sem_ctx.breakable_first = sem_ctx.breakable_first->next;
+	}
+	while (sem_ctx.continue_first != NULL) {
+		free(sem_ctx.continue_first);
+		sem_ctx.continue_first = sem_ctx.continue_first->next;
 	}
 	LLVMDisposeBuilder(sem_ctx.builder);
 	LLVMDisposeModule(sem_ctx.module);
@@ -556,7 +625,7 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 	LLVMBasicBlockRef block;
 	if (!ast) return NULL;
 	LLVMValueRef lhs, rhs;
-	if (ast->type & AST_NumberExpr)
+	if (ast->type == AST_NumberExpr)
 	{
 		TRY_CAST(NumberExpr, number, ast);
 		if (!number)
@@ -566,7 +635,7 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 		}
 		return eval_NumberExpr(number);
 	}
-	else if (ast->type & AST_IdentifierExpr)
+	else if (ast->type == AST_IdentifierExpr)
 	{
 		TRY_CAST(IdentifierExpr, identifier, ast);
 		if (!identifier)
@@ -577,7 +646,7 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 		// FIX: 没有get_identifierxpr_llvm_value，为了过编译先注释了
 		// return get_identifierxpr_llvm_value(identifier);
 	}
-	else if (ast->type & AST_OperatorExpr)
+	else if (ast->type == AST_OperatorExpr)
 	{
 		TRY_CAST(OperatorExpr, operator, ast);
 		if (!operator)
@@ -587,8 +656,6 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 		}
 		lhs = eval_OperatorExpr(operator->lhs);
 		rhs = eval_OperatorExpr(operator->rhs);
-		LLVMBuilderRef builder = LLVMCreateBuilder();
-		// LLVMPositionBuilderAtEnd(builder, block);	// FIX: uninit block. 为了过编译先注释了
 		LLVMValueRef tmp;
 		switch (operator->op)
 		{
@@ -596,98 +663,98 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 		case OP_INC:
 			if (!llvm_is_float(lhs))
 			{
-				tmp = LLVMBuildAdd(builder, lhs, LLVMConstInt(LLVMInt64Type(), 1, 1), NULL);
+				tmp = LLVMBuildAdd(sem_ctx.builder, lhs, LLVMConstInt(LLVMInt64Type(), 1, 1), NULL);
 			}
 			else
 			{
-				tmp = LLVMBuildFAdd(builder, lhs, LLVMConstInt(LLVMInt64Type(), 1, 1), NULL);
+				tmp = LLVMBuildFAdd(sem_ctx.builder, lhs, LLVMConstInt(LLVMInt64Type(), 1, 1), NULL);
 			}
 			break;
 		case OP_DEC:
 			if (!llvm_is_float(lhs))
 			{
-				tmp = LLVMBuildAdd(builder, lhs, LLVMConstInt(LLVMInt64Type(), -1, 1), NULL);
+				tmp = LLVMBuildAdd(sem_ctx.builder, lhs, LLVMConstInt(LLVMInt64Type(), -1, 1), NULL);
 			}
 			else
 			{
-				tmp = LLVMBuildFAdd(builder, lhs, LLVMConstInt(LLVMInt64Type(), -1, 1), NULL);
+				tmp = LLVMBuildFAdd(sem_ctx.builder, lhs, LLVMConstInt(LLVMInt64Type(), -1, 1), NULL);
 			}
 			break;
 		case OP_POSTFIX_INC:
 			if (!llvm_is_float(lhs))
 			{
-				tmp = LLVMBuildAdd(builder, lhs, LLVMConstInt(LLVMInt64Type(), 1, 1), NULL);
+				tmp = LLVMBuildAdd(sem_ctx.builder, lhs, LLVMConstInt(LLVMInt64Type(), 1, 1), NULL);
 			}
 			else
 			{
-				tmp = LLVMBuildFAdd(builder, lhs, LLVMConstInt(LLVMInt64Type(), 1, 1), NULL);
+				tmp = LLVMBuildFAdd(sem_ctx.builder, lhs, LLVMConstInt(LLVMInt64Type(), 1, 1), NULL);
 			}
 			break;
 		case OP_POSTFIX_DEC:
 			if (!llvm_is_float(lhs))
 			{
-				tmp = LLVMBuildAdd(builder, lhs, LLVMConstInt(LLVMInt64Type(), -1, 1), NULL);
+				tmp = LLVMBuildAdd(sem_ctx.builder, lhs, LLVMConstInt(LLVMInt64Type(), -1, 1), NULL);
 			}
 			else
 			{
-				tmp = LLVMBuildFAdd(builder, lhs, LLVMConstInt(LLVMInt64Type(), -1, 1), NULL);
+				tmp = LLVMBuildFAdd(sem_ctx.builder, lhs, LLVMConstInt(LLVMInt64Type(), -1, 1), NULL);
 			}
 			break;
 		// 二元运算符
 		case OP_ADD:
 			if (!(llvm_is_float(lhs) || llvm_is_float(rhs)))
 			{
-				tmp = LLVMBuildAdd(builder, lhs, rhs, NULL);
+				tmp = LLVMBuildAdd(sem_ctx.builder, lhs, rhs, NULL);
 			}
 			else
 			{
-				tmp = LLVMBuildFAdd(builder, lhs, rhs, NULL);
+				tmp = LLVMBuildFAdd(sem_ctx.builder, lhs, rhs, NULL);
 			}
 			break;
 		case OP_SUB:
 			if (!(llvm_is_float(lhs) || llvm_is_float(rhs)))
 			{
-				tmp = LLVMBuildSub(builder, lhs, rhs, NULL);
+				tmp = LLVMBuildSub(sem_ctx.builder, lhs, rhs, NULL);
 			}
 			else
 			{
-				tmp = LLVMBuildFSub(builder, lhs, rhs, NULL);
+				tmp = LLVMBuildFSub(sem_ctx.builder, lhs, rhs, NULL);
 			}
 			break;
 		case OP_MUL:
 			if (!(llvm_is_float(lhs) || llvm_is_float(rhs)))
 			{
-				tmp = LLVMBuildMul(builder, lhs, rhs, NULL);
+				tmp = LLVMBuildMul(sem_ctx.builder, lhs, rhs, NULL);
 			}
 			else
 			{
-				tmp = LLVMBuildFMul(builder, lhs, rhs, NULL);
+				tmp = LLVMBuildFMul(sem_ctx.builder, lhs, rhs, NULL);
 			}
 			break;
 		case OP_DIV:
 			if (!(llvm_is_float(lhs) || llvm_is_float(rhs)))
 			{
-				tmp = LLVMBuildExactSDiv(builder, lhs, rhs, NULL); //默认为signed了 有需求再改吧
+				tmp = LLVMBuildExactSDiv(sem_ctx.builder, lhs, rhs, NULL); //默认为signed了 有需求再改吧
 			}
 			else
 			{
-				tmp = LLVMBuildFDiv(builder, lhs, rhs, NULL);
+				tmp = LLVMBuildFDiv(sem_ctx.builder, lhs, rhs, NULL);
 			}
 			break;
 		case OP_MOD:
 			if (!(llvm_is_float(lhs) || llvm_is_float(rhs)))
 			{
-				tmp = LLVMBuildSRem(builder, lhs, rhs, NULL); 
+				tmp = LLVMBuildSRem(sem_ctx.builder, lhs, rhs, NULL);
 			}
 			else
 			{
-				tmp = LLVMBuildFRem(builder, lhs, rhs, NULL);
+				tmp = LLVMBuildFRem(sem_ctx.builder, lhs, rhs, NULL);
 			}
 			break;
 		case OP_SHIFT_LEFT:
 			if (!(llvm_is_float(lhs) || llvm_is_float(rhs)))
 			{
-				tmp = LLVMBuildShl(builder, lhs, rhs, NULL); 
+				tmp = LLVMBuildShl(sem_ctx.builder, lhs, rhs, NULL);
 			}
 			else
 			{
@@ -697,7 +764,7 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 		case OP_SHIFT_RIGHT:
 			if (!(llvm_is_float(lhs) || llvm_is_float(rhs)))
 			{
-				tmp = LLVMBuildAShr(builder, lhs, rhs, NULL); //算数移位
+				tmp = LLVMBuildAShr(sem_ctx.builder, lhs, rhs, NULL); //算数移位
 			}
 			else
 			{
@@ -732,14 +799,15 @@ LLVMValueRef eval_EmptyExpr(EmptyExpr* ast)
 	return NULL;
 }
 
-// TODO: @wushuhui
-LLVMValueRef eval_LoopStmt(LoopStmt* ast) {
+void eval_WhileStmt(LoopStmt* ast) {
+
+}
+
+void eval_ForStmt(LoopStmt* ast) {
 	ctx_enter_block_scope(ctx);
 
 	LLVMValueRef enter = eval_ast(ast->enter);
-	if (enter == NULL) {	// FIX: enter确实没东西是什么样子的
-		return NULL;
-	}
+
 	LLVMValueRef func = LLVMGetBasicBlockParent(LLVMGetInsertBlock(sem_ctx.builder));
 	LLVMBasicBlockRef preheader_bb = LLVMGetInsertBlock(sem_ctx.builder);
 	LLVMBasicBlockRef cond_bb = LLVMAppendBasicBlock(func, "cond");
@@ -752,19 +820,26 @@ LLVMValueRef eval_LoopStmt(LoopStmt* ast) {
 
 	// 2. cond
 	LLVMPositionBuilderAtEnd(sem_ctx.builder, cond_bb);
-	// TODO: 可能不是这个样子的，可能要把cond转换成Op直接在这里估值
-	LLVMValueRef cond = eval_ast(ast->condition);
-	if (cond == NULL) {		// FIX: cond确实没东西是什么样子的
+	LLVMValueRef condv = eval_ast(ast->condition);
+	if (condv == NULL) {
 		return NULL;
+	} else {
+		if (llvm_is_float(condv)) {
+			fprintf(stderr, "Double value as if condition is not allowed, implicit converted to true\n");
+			LLVMBuildBr(sem_ctx.builder, body_bb);
+		} else {
+			condv = LLVMBuildICmp(sem_ctx.builder, LLVMIntNE, condv, LLVMConstInt(LLVMTypeOf(condv), 0, 1), "ifcond");
+			LLVMBuildCondBr(sem_ctx.builder, condv, body_bb, after_bb);
+		}
 	}
-	// TODO: 这里要加cond的br
 
+	append_break_bb(after_bb);
+	append_contine_bb(step_bb);
 	// 3. body
 	// Emit the body of the loop.  This, like any other expr, can change the
 	// current BB.  Note that we ignore the value computed by the body, but don't
 	// allow an error.
 	LLVMPositionBuilderAtEnd(sem_ctx.builder, body_bb);
-	// TODO: body里面如何得知continue和break要跳到哪里去？
 	LLVMValueRef body = eval_ast(ast->body);
 	if (body == NULL) {		// FIX: body确实没东西是什么样子的
 		return NULL;
@@ -773,7 +848,7 @@ LLVMValueRef eval_LoopStmt(LoopStmt* ast) {
 
 	// 4. step
 	LLVMPositionBuilderAtEnd(sem_ctx.builder, step_bb);
- 	LLVMValueRef step = eval_ast(ast->step);
+	LLVMValueRef step = eval_ast(ast->step);
 	if (step == NULL) {
 		return NULL;		// FIX
 	}
@@ -781,10 +856,24 @@ LLVMValueRef eval_LoopStmt(LoopStmt* ast) {
 
 	// 5. after
 	ctx_leave_block_scope(ctx, 0);
+	remove_break_bb();
+	remove_continue_bb();
 	LLVMPositionBuilderAtEnd(sem_ctx.builder, after_bb);
+}
 
-	// for expr always returns 0.0.
-	// LLVM的demo里For是Expr
+// TODO: @wushuhui
+LLVMValueRef eval_LoopStmt(LoopStmt* ast) {
+	switch (ast->loop_type) {
+	case LOOP_FOR:
+		eval_ForStmt(ast);
+		break;
+	case LOOP_WHILE:
+		eval_WhileStmt(ast);
+		break;
+	default:
+		// 要么不支持do while好了
+		break;
+	}
 	return LLVMConstReal(LLVMDoubleType(), 0.0);
 }
 
@@ -847,6 +936,10 @@ LLVMValueRef eval_SwitchCaseStmt(SwitchCaseStmt* ast) {
 }
 
 // @wushuhui
+// FIX: 这里会存在一个bug。FunctionDef的时候是会创建一个scope的
+//		但是function的body自己又会创建一个scope，
+//		而在body内定义变量的时候只检查current scope内有没有重名，也就是说会出现body内定义的变量覆盖函数实参的情况
+//		要么算了？当作一个feature好了
 LLVMValueRef eval_FunctionDefinitionStmt(FunctionDefinitionStmt* ast) {
 	TRY_CAST(DeclaratorExpr, decl_ast, ast->declarator);
 	if (decl_ast == NULL) {
@@ -925,10 +1018,10 @@ LLVMValueRef eval_FunctionDefinitionStmt(FunctionDefinitionStmt* ast) {
 	LLVMValueRef body = eval_ast(ast->body);
 
 	// RET
+	// FIX：这里要作一个约定，判断前面有没有return过，哪怕是不带return value的return。
+	// 或者说强制要求return？LLVM IR不return应该不行吧
 	if (func_sym->func.return_type->type == TP_VOID || body == NULL) {
 		LLVMBuildRetVoid(sem_ctx.builder);
-	} else {
-		LLVMBuildRet(sem_ctx.builder, body);
 	}
 
 	ctx_leave_function_scope(ctx);

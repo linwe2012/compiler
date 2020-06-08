@@ -74,11 +74,19 @@ Symbol* symtbl_find_in_current_scope(SymbolTable* tbl, const char* name)
 	Symbol* top = tbl->stack_top->last;
 	Symbol* bottom = tbl->stack_top->first;
 
-	while (top != bottom)
-	{
-		while (!str_equal(top->name, name))
-		{
-			top->prev;
+	if (top == NULL) {
+		return NULL;
+	}
+
+	while (top != bottom && !str_equal(top->name, name)) {
+		top = top->prev;
+	}
+
+	if (top == bottom) {
+		if (str_equal(top->name, name)) {
+			return top;
+		} else {
+			return NULL;
 		}
 	}
 

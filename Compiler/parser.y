@@ -328,17 +328,14 @@ selection_statement
 
 
 iteration_statement
-	: WHILE { notify_loop(LOOP_WHILE); } '(' expression ')' statement                                         { $$ = make_loop($4, NULL, $6, NULL, LOOP_WHILE); }
-	| DO    { notify_loop(LOOP_DOWHILE); }   statement WHILE '(' expression ')' ';'                           { $$ = make_loop($6, NULL, $3, NULL, LOOP_DOWHILE); }
-	| FOR   notify_loop '(' expression_statement expression_statement ')' statement            { $$ = make_loop($5, $4, $7, NULL, LOOP_FOR); }
-	| FOR   notify_loop '(' expression_statement expression_statement expression ')' statement { $$ = make_loop($5, $4, $8, $6, LOOP_FOR); }
-	| FOR   notify_loop '(' declaration expression_statement ')' statement                     { $$ = make_loop($5, $4, $7, NULL, LOOP_FOR); }
-	| FOR   notify_loop '(' declaration expression_statement expression ')' statement          { $$ = make_loop($5, $4, $8, $6, LOOP_FOR); }
+	: WHILE '(' expression ')' statement											{ $$ = make_loop($3, NULL, $5, NULL, LOOP_WHILE); }
+	| DO statement WHILE '(' expression ')' ';'										{ $$ = make_loop($5, NULL, $2, NULL, LOOP_DOWHILE); }
+	| FOR '(' expression_statement expression_statement ')' statement				{ $$ = make_loop($4, $3, $6, NULL, LOOP_FOR); }
+	| FOR '(' expression_statement expression_statement expression ')' statement	{ $$ = make_loop($4, $3, $7, $5, LOOP_FOR); }
+	| FOR '(' declaration expression_statement ')' statement						{ $$ = make_loop($4, $3, $6, NULL, LOOP_FOR); }
+	| FOR '(' declaration expression_statement expression ')' statement				{ $$ = make_loop($4, $3, $7, $5, LOOP_FOR); }
 	;
 
-notify_loop
-	: { notify_loop(LOOP_FOR); }
-	;
 jump_statement
 	: GOTO IDENTIFIER ';'   { $$ = make_jump(JUMP_GOTO, $2, NULL); }
 	| CONTINUE ';'          { $$ = make_jump(JUMP_CONTINUE, NULL, NULL); }

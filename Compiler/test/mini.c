@@ -1,8 +1,8 @@
-void putc(int x);
+// void bar();
 
 int foo(int x, int y) {
     for (int i = 0; i < x; ++i) {
-        putc(i + y);
+        // bar();
     }
     return x + y;
 }
