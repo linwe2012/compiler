@@ -18,14 +18,13 @@ while.body:                                       ; preds = %while.cond
   br i1 true, label %if.then, label %if.else
 
 if.then:                                          ; preds = %while.body
-  %test_val = alloca i32
-  store i32 1, i32* %test_val
   %"4" = call i32 @bar(i32 1, i32 2, i32 3)
   ret i32 %"4"
 
 if.else:                                          ; preds = %while.body
   %load_val = load i32, i32* %a
-  %add_res = add i32 %load_val, 3
+  %mul_res = mul i32 %load_val, 3
+  %add_res = add i32 %mul_res, 3
   ret i32 %add_res
 
 if.after:                                         ; No predecessors!

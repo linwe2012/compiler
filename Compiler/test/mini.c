@@ -9,7 +9,7 @@ int foo(int x) {
 			return bar(1, 2, 3);
 		}
 		else {
-			return a + 3;
+			return a * 3 + 3;
 		}
 	}
 	return 0;

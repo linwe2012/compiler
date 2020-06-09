@@ -716,6 +716,11 @@ static int llvm_is_int(LLVMValueRef v)
 	return LLVMTypeOf(v) == LLVMInt32Type();
 }
 
+static int llvm_is_bit(LLVMValueRef v)
+{
+	return LLVMTypeOf(v) == LLVMInt1Type();
+}
+
 LLVMValueRef eval_IdentifierExpr(IdentifierExpr* ast)
 {
 	Symbol* sym = symtbl_find(ctx->variables, ast->name);
@@ -1129,10 +1134,12 @@ LLVMValueRef eval_LoopStmt(LoopStmt* ast) {
 //增加临时测试代码的地方，贫穷.jpg
 void sentence_test()
 {
-	LLVMValueRef v1 = LLVMConstInt(LLVMInt1Type(), 1, 1);
-	LLVMValueRef v2 = LLVMBuildCast(sem_ctx.builder, LLVMZExt, v1, LLVMInt32Type(), "bit_cast");
-	LLVMValueRef v4 = LLVMBuildAlloca(sem_ctx.builder, LLVMInt32Type(), "test_val");
-	LLVMBuildStore(sem_ctx.builder, v2, v4);
+	LLVMValueRef v1 = LLVMConstInt(LLVMInt32Type(), 1, 1);
+	LLVMValueRef v2 = LLVMConstInt(LLVMInt32Type(), 2, 1);
+	LLVMValueRef v4 = LLVMBuildAlloca(sem_ctx.builder, LLVMInt32Type(), "test_val");	
+	LLVMValueRef v5 = LLVMBuildStore(sem_ctx.builder, v2, v4);
+	LLVMValueRef v6 = LLVMBuildLoad(sem_ctx.builder, v4, "fuck");
+	printf("fuck!fuck!:%d\n", LLVMTypeOf(v6) == LLVMInt32Type());
 }
 
 // TODO: @wushuhui
