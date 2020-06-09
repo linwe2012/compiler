@@ -205,10 +205,6 @@ void do_eval(AST* ast, struct Context* _ctx, char* module_name)
 		printf("LLVM error: %s\n", msg);
 		LLVMDisposeMessage(*msg);
 	}
-	// 应该在离开循环之后自行析构，但是防止出错这里还是析构一下
-	free_bb_stack(&sem_ctx.breakable_last);
-	free_bb_stack(&sem_ctx.continue_last);
-	free_bb_stack(&sem_ctx.after_bb);
 	LLVMDisposeBuilder(sem_ctx.builder);
 	LLVMDisposeModule(sem_ctx.module);
 }
@@ -702,7 +698,7 @@ LLVMOpcode eval_binary_opcode_llvm(enum Operators op)
 	}
 }
 
-static LLVMTypeKind llvm_is_float(LLVMValueRef v)
+static int llvm_is_float(LLVMValueRef v)
 {
 	return LLVMTypeOf(v) == LLVMFloatType();
 }
@@ -974,10 +970,11 @@ void eval_WhileStmt(LoopStmt* ast) {
 
 	LLVMValueRef condv = eval_ast(ast->condition);
 	if (condv == NULL) {
+		log_error(ast, "while.cond is not expr");
 		return NULL;
 	} else {
 		if (llvm_is_float(condv)) {
-			fprintf(stderr, "Double value as if condition is not allowed, implicit converted to true\n");
+			fprintf(stderr, "Double value as if.cond is not allowed, implicit converted to true\n");
 			LLVMBuildBr(sem_ctx.builder, body_bb);
 		} else {
 			condv = LLVMBuildICmp(sem_ctx.builder, LLVMIntNE, condv, LLVMConstInt(LLVMTypeOf(condv), 0, 1), next_temp_id_str());
@@ -1022,6 +1019,7 @@ void eval_ForStmt(LoopStmt* ast) {
 	LLVMPositionBuilderAtEnd(sem_ctx.builder, cond_bb);
 	LLVMValueRef condv = eval_ast(ast->condition);
 	if (condv == NULL) {
+		log_error(ast, "for.cond is not expr");
 		return NULL;
 	} else {
 		if (llvm_is_float(condv)) {
@@ -1093,6 +1091,7 @@ void sentence_test()
 LLVMValueRef eval_IfStmt(IfStmt* ast) {
 	LLVMValueRef condv = eval_ast(ast->condition);
 	if (condv == NULL) {
+		log_error(ast, "if.cond is not expr");
 		return NULL;
 	}
 	LLVMBasicBlockRef then_bb = alloc_bb("if.then");
@@ -1146,14 +1145,49 @@ LLVMValueRef eval_IfStmt(IfStmt* ast) {
 
 // TODO: @wushuhui 优先级低，暂时先不实现
 LLVMValueRef eval_SwitchCaseStmt(SwitchCaseStmt* ast) {
+	//if (ast->cases == NULL) {
+	//	log_error(ast, "switch.body should not be empty");
+	//	return NULL;
+	//}
+	//ctx_enter_block_scope(ctx);
 	//LLVMValueRef condv = eval_ast(ast->switch_value);
 	//if (condv == NULL) {
+	//	log_error(ast, "switch.cond is not expr");
 	//	return NULL;
 	//}
 	//LLVMValueRef func = LLVMGetBasicBlockParent(LLVMGetInsertBlock(sem_ctx.builder));
 	//LLVMBasicBlockRef else_bb = LLVMAppendBasicBlock(func, "else");
-	//LLVMValueRef v = LLVMBuildSwitch(sem_ctx.builder, condv, else_bb, 5);
-	NOT_IMPLEMENTED;
+	//AST* case_ast = ((BlockExpr*)ast->cases)->first_child;
+	//unsigned int casec = 0;
+	//for (; case_ast != NULL; case_ast = case_ast->next, ++casec);
+	//LLVMValueRef switchv = LLVMBuildSwitch(sem_ctx.builder, condv, else_bb, casec);
+	//append_bb(&sem_ctx.breakable_last, else_bb);
+	//append_bb(&sem_ctx.after_bb, else_bb);
+
+	//char* last_id;
+	//for (case_ast = ((BlockExpr*)ast->cases)->first_child; case_ast != NULL; case_ast = case_ast->next) {
+	//	TRY_CAST(LabelStmt, case_stmt, case_ast);
+	//	if (case_stmt == NULL) {
+	//		continue;
+	//	} else if (case_stmt->type == LABEL_CASE) {
+	//		// 
+	//	} else if (case_stmt->type == LABEL_DEFAULT) {
+
+	//	} else {
+	//		continue;
+	//	}
+	//	last_id = next_temp_id_str();
+	//	LLVMBasicBlockRef case_bb = alloc_bb(last_id);
+	//	LLVMPositionBuilderAtEnd(sem_ctx.builder, case_bb);
+	//	eval_ast(case_stmt->target);
+	//	// TODO 理论上cond只能是可以计算出来的常数
+	//	LLVMAddCase(switchv, eval_ast(case_stmt->condition), case_bb);
+	//}
+
+	//pop_bb(&sem_ctx.breakable_last);
+	//pop_bb(&sem_ctx.after_bb);
+	//ctx_leave_block_scope(ctx, 0);
+
 }
 
 // @wushuhui
@@ -1210,10 +1244,17 @@ LLVMValueRef eval_FunctionDefinitionStmt(FunctionDefinitionStmt* ast) {
 	LLVMValueRef bodyv = eval_BlockExprNoScope(ast->body);
 
 	// RET
-	// 这里要作一个约定，判断前面有没有return过，哪怕是不带return value的return。
-	if (func_sym->func.ret_type == LLVMVoidType()|| bodyv == NULL) {
-		LLVMBuildRetVoid(sem_ctx.builder);
+	// 如果前面的指令没有return，需要额外构建return
+	if (bodyv == NULL || !LLVMIsAReturnInst(bodyv)) {
+		if (func_sym->func.ret_type == LLVMVoidType()) {
+			LLVMBuildRetVoid(sem_ctx.builder);
+		} else if (llvm_is_float(func_sym->func.ret_type)) {
+			LLVMBuildRet(sem_ctx.builder, LLVMConstReal(func_sym->func.ret_type, 0));
+		} else {
+			LLVMBuildRet(sem_ctx.builder, LLVMConstInt(func_sym->func.ret_type, 0, 1));
+		}
 	}
+
 
 	sem_ctx.cur_func_sym = NULL;
 	leave_sematic_temp_context();

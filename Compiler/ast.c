@@ -382,23 +382,19 @@ AST* make_label(char* name, AST* statement)
 
 AST* make_label_case(AST* constant, AST* statements)
 {
-	AST_DATA(data);
-	struct AST* item = astlist_pop(&data->pending_labels);
-	CAST(LabelStmt, ast, item);
-
+	NEW_AST(LabelStmt, ast);
 	ast->target = statements;
 	ast->condition = constant;
+	ast->type = LABEL_CASE;
 	return SUPER(ast);
 }
 
 AST* make_label_default(AST* statement)
 {
-	AST_DATA(data);
-	struct AST* item = astlist_pop(&data->pending_labels);
-	CAST(LabelStmt, ast, item);
+	NEW_AST(LabelStmt, ast);
 
 	ast->target = statement;
-
+	ast->type = LABEL_DEFAULT;
 	return SUPER(ast);
 }
 
@@ -419,49 +415,10 @@ AST* make_jump_goto(char* name)
 
 AST* make_jump_cont_or_break(enum JumpType type)
 {
-	AST_DATA(data);
-	struct ASTListItem* item = data->breakable.last;
-
-	if (type == JUMP_CONTINUE)
-	{
-		while (item)
-		{
-			if (item->ast->type == AST_LoopStmt)
-			{
-				break;
-			}
-			item = item->prev;
-		}
-	}
-
-	if (item == NULL)
-	{
-		log_error(NULL, "continue or break must be in a loop or switch case");
-	}
 
 	NEW_AST(JumpStmt, ast);
 	ast->target = NULL;
 	ast->type = type;
-
-	if (item->ast->type == AST_LoopStmt)
-	{
-		CAST(LoopStmt, loop, item->ast);
-		uint64_t id;
-
-		if (type == JUMP_CONTINUE)
-		{
-			id = loop->step_label;
-		}
-		else {
-			id = loop->exit_label;
-		}
-
-		ast->ref = symbol_create_label(NULL, id, 1);
-	}
-	else {
-		CAST(SwitchCaseStmt, sc, item->ast);
-		ast->ref = symbol_create_label(NULL, sc->exit_label, 1);
-	}
 
 	return SUPER(ast);
 }

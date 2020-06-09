@@ -249,8 +249,11 @@ void _write_OperatorExpr(OperatorExpr *expr) {
 }
 
 void _write_LabelStmt(LabelStmt *stmt) {
-    //FIX: 更新了 ast
-    fprintf(s_fp, "\"name\":\"(LABEL)%s\"", stmt->ref->label.name);
+    if (stmt->ref) {
+        fprintf(s_fp, "\"name\":\"(LABEL)%s\"", stmt->ref->label.name);
+    } else {
+        PRINT_NAME((LABEL));
+    }
     fputs(",\n\"children\": [", s_fp);
     if (stmt->condition) {
         _write_ast(stmt->condition);
