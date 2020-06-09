@@ -734,14 +734,14 @@ LLVMValueRef get_identifierxpr_llvm_value(IdentifierExpr* expr) {
 	}
 	return  LLVMBuildLoad(sem_ctx.builder,sym->value,"load_val");
 }
-
+// 比较暴力，直接将int转换成float类型
 LLVMValueRef cast_float(LLVMValueRef val)
 {
 	if (llvm_is_float(val))
 		return val;
 	return LLVMBuildSIToFP(sem_ctx.builder, val, LLVMFloatType(), "cast_float");
 }
-
+// 因为llvm的运算符要求lhs和rhs类型完全一致，因此目前OperatorExpr 仅支持int和float两种类型 + signed
 LLVMValueRef eval_OperatorExpr(AST* ast)
 {
 	LLVMBasicBlockRef block;
@@ -877,13 +877,15 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 			}
 			else
 			{
+				lhs = cast_float(lhs);
+				rhs = cast_float(rhs);
 				tmp = LLVMBuildFRem(sem_ctx.builder, lhs, rhs, NULL);
 			}
 			break;
 		case OP_SHIFT_LEFT:
 			if (!(llvm_is_float(lhs) || llvm_is_float(rhs)))
 			{
-				tmp = LLVMBuildShl(sem_ctx.builder, lhs, rhs, NULL);
+				tmp = LLVMBuildShl(sem_ctx.builder, lhs, rhs, "sll_res");
 			}
 			else
 			{
@@ -893,13 +895,14 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 		case OP_SHIFT_RIGHT:
 			if (!(llvm_is_float(lhs) || llvm_is_float(rhs)))
 			{
-				tmp = LLVMBuildAShr(sem_ctx.builder, lhs, rhs, NULL); //算数移位
+				tmp = LLVMBuildAShr(sem_ctx.builder, lhs, rhs, "sra_res"); //算数移位
 			}
 			else
 			{
 				log_error(ast, "SHIFT OP Expected INT TYPE");
 			}
 			break;
+		//这五个返回的是INT_1类型，这边正常返回没事，但是和其他一起运算我需要另一个函数转换成INT_32，还没有实现
 		case OP_LESS:
 			lhs = cast_float(lhs);
 			rhs = cast_float(rhs);
@@ -1082,7 +1085,7 @@ void sentence_test()
 	v1 = cast_float(v1);
 	v2 = cast_float(v2);
 	LLVMValueRef v3 = LLVMBuildFCmp(sem_ctx.builder, LLVMRealOEQ, v1, v2, "test");
-	LLVMValueRef v4 = LLVMBuildAlloca(sem_ctx.builder, LLVMInt32Type(), "test_val");
+	LLVMValueRef v4 = LLVMBuildAlloca(sem_ctx.builder, LLVMInt1Type(), "test_val");
 	LLVMBuildStore(sem_ctx.builder, v3, v4);
 }
 
@@ -1109,7 +1112,7 @@ LLVMValueRef eval_IfStmt(IfStmt* ast) {
 	}
 
 	LLVMPositionBuilderAtEnd(sem_ctx.builder, then_bb);
-	sentence_test();
+	// sentence_test(); // 1号测试坑
 	// 有可能then里面没有东西
 	LLVMValueRef innerv = NULL;
 	if (!ast->then) {
