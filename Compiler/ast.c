@@ -248,7 +248,7 @@ V(64, "lld")
 AST* make_string(char* c)
 {
 	NEW_AST(NumberExpr, ast);
-	ast->number_type = TP_INT32;
+	ast->number_type = TP_STR;
 	ast->str = c;
 
 	return SUPER(ast);

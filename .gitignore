@@ -13,6 +13,11 @@
 **/parser.h
 **/lexer.c
 
+*.out
+*.exe
+*.obj
+*.o
+
 3rdparty/bin
 3rdparty/d3/data.json
 

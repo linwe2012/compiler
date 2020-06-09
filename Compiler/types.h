@@ -38,6 +38,8 @@ enum Types
 	TP_FLOAT64, // double
 	TP_FLOAT128,
 
+	TP_STR,		// string literal
+
 	TP_ELLIPSIS, // ... <- 函数调用的时候
 	TP_ERROR,
 

@@ -123,40 +123,16 @@ static LLVMBasicBlockRef alloc_bb(char* name) {
 	}
 }
 
-// 支持printf, 方便测试的时候用
-static void build_printf() {
-	// 0. extern int printf(char*, ...)
-	// 代码是参考的，这个pointer的space填0吗？不会吧不会吧
-	LLVMTypeRef PrintfArgsTyList[] = { LLVMPointerType(LLVMInt8Type(), 0) };
-	LLVMTypeRef PrintfTy = LLVMFunctionType(
-		LLVMInt32Type(),
-		PrintfArgsTyList,
-		1,
-		1 // 是否是可变参数
-	);
+// 支持putchar, 方便测试的时候用
+static void build_putchar() {
+	// int putchar(int c);
+	LLVMTypeRef* argv = malloc(sizeof(LLVMTypeRef));
+	argv[0] = LLVMInt32Type();
+	LLVMTypeRef func_tp = LLVMFunctionType(LLVMInt32Type(), argv, 1, 0);
 
-	// 添加printf函数到模块中
-	LLVMValueRef PrintfFunction = LLVMAddFunction(sem_ctx.module, "printf", PrintfTy);
-	Symbol* func_sym = symbol_create_func("printf", PrintfTy, PrintfArgsTyList, NULL, NULL);
+	LLVMValueRef func = LLVMAddFunction(sem_ctx.module, "putchar", func_tp);
+	Symbol* func_sym = symbol_create_func("putchar", func, LLVMInt32Type(), argv, NULL);
 	symtbl_push(ctx->functions, func_sym);
-
-	//LLVMValueRef Format = LLVMBuildGlobalStringPtr(
-	//	sem_ctx.builder,
-	//	"Hello, %s.\n",
-	//	"format"
-	//), World = LLVMBuildGlobalStringPtr(
-	//	sem_ctx.builder,
-	//	"World",
-	//	"world"
-	//);
-	//LLVMValueRef PrintfArgs[] = { Format, World };
-	//LLVMBuildCall(
-	//	sem_ctx.builder,
-	//	PrintfFunction,
-	//	PrintfArgs,
-	//	2,
-	//	"printf"
-	//);
 }
 
 STRUCT_TYPE(SematicData);
@@ -220,7 +196,7 @@ void do_eval(AST* ast, struct Context* _ctx, char* module_name)
 	sem_ctx.tmp_top = NULL;
 
 	ctx = _ctx;
-	// build_printf();		// 内建printf
+	build_putchar();		// 内建printf
 	eval_list(ast);
 
 	char** msg = NULL;
@@ -476,26 +452,29 @@ static Symbol* eval_FuncDeclareStmt(AST* ast, TypeSpecifier* ret_typesp, const c
 		return NULL;
 	}
 	LLVMTypeRef ret_type = extract_llvm_type(ret_typesp);
-	LLVMTypeRef* func_args = NULL;
-	int arg_num = 0;
+	LLVMTypeRef* argv = NULL;
+	int argc = 0;
 	// 构建形参
-	TypeSpecifier* tmp = paramsp;
-	for (arg_num = 0; tmp != NULL; ++arg_num, tmp = tmp->super.next);
-	func_args = (LLVMTypeRef*)malloc(arg_num * sizeof(LLVMTypeRef));
-	tmp = paramsp;
-	for (int i = 0; i < arg_num; ++i) {
-		func_args[i] = extract_llvm_type(tmp);
-		tmp = tmp->super.next;
+	// 如果第一个参数是void，代表无参数, TODO：检查void后面还跟了参数的情况(低优先级)
+	if (paramsp != NULL && paramsp->type != TP_VOID) {
+		TypeSpecifier* tmp = paramsp;
+		for (argc = 0; tmp != NULL; ++argc, tmp = tmp->super.next);
+		argv = (LLVMTypeRef*)malloc(argc * sizeof(LLVMTypeRef));
+		tmp = paramsp;
+		for (int i = 0; i < argc; ++i) {
+			argv[i] = extract_llvm_type(tmp);
+			tmp = tmp->super.next;
+		}
 	}
 	LLVMTypeRef func_type = LLVMFunctionType(
 		ret_type,	// 返回类型
-		func_args,	// 形参数组
-		arg_num,	// 形参数量
+		argv,		// 形参数组
+		argc,		// 形参数量
 		0			// TODO 支持...
 	);
 	LLVMValueRef func = LLVMAddFunction(sem_ctx.module, name, func_type);
 
-	func_sym = symbol_create_func(name, func, ret_type, func_args, NULL);
+	func_sym = symbol_create_func(name, func, ret_type, argv, NULL);
 	symtbl_push(ctx->functions, func_sym);
 	return func_sym;
 }
@@ -540,6 +519,9 @@ LLVMValueRef eval_DeclareStmt(DeclareStmt* ast)
 				continue;
 			}
 
+			// TODO 更加复杂的构建
+			LLVMValueRef ptr = LLVMBuildAlloca(sem_ctx.builder, extract_llvm_type(id_spec), id->name);
+
 			// TODO: 检查合并 attributes 的时候问题
 			id->attributes |= ast->attributes;
 			LLVMValueRef value = NULL;
@@ -547,12 +529,10 @@ LLVMValueRef eval_DeclareStmt(DeclareStmt* ast)
 			{
 				value = eval_ast(id->init_value);
 				last_value = value;
-			} else {
-				// TODO: 能不能没有初始化也alloca一个值
+				LLVMBuildStore(sem_ctx.builder, value, ptr);
 			}
-
 			TypeInfo* typeinfo = extract_type(id_spec);
-			Symbol* sym = symbol_create_variable(id->name, id->attributes, symbol_from_type_info(typeinfo), value, 0);
+			Symbol* sym = symbol_create_variable(id->name, id->attributes, symbol_from_type_info(typeinfo), ptr, 0);
 
 
 			symtbl_push(ctx->variables, sym);
@@ -694,23 +674,15 @@ LLVMValueRef eval_FunctionCallExpr(FunctionCallExpr* ast) {
 		log_error(ast, "Called function not declared");
 		return NULL;
 	}
-	unsigned int argc = LLVMCountParams(func_sym->func.value);
-	LLVMValueRef* argv = malloc(argc * sizeof(LLVMValueRef));
+	unsigned int argc = 0;
 	AST* arg = ast->params;
-	for (int i = 0; i < argc; ++i) {
-		if (arg == NULL) {
-			log_error(ast, "funcation call arg not match");
-			return NULL;
-		}
-
-		if (arg->type == AST_IdentifierExpr) {
-			// TODO 如果是id拿到变量的ptr，并且load，然后加载
-			// TODO 变量的Trunc
-		} else if (arg->type == AST_NumberExpr) {
-			// TODO 常数的隐式类型转换
-			argv[i] = eval_NumberExpr(arg);
-		} else {
-			log_error(ast, "Unknown func call arg ast type");
+	for (; arg != NULL; arg = arg->next, ++argc);
+	LLVMValueRef* argv = calloc(argc, sizeof(LLVMValueRef));
+	arg = ast->params;
+	for (int i = 0; arg != NULL; ++i) {
+		argv[i] = eval_ast(arg);
+		if (argv[i] == NULL) {
+			log_error(ast, "Pass null value to function call");
 			return NULL;
 		}
 		arg = arg->next;
@@ -739,7 +711,7 @@ static LLVMTypeKind llvm_is_float(LLVMValueRef v)
 LLVMValueRef eval_IdentifierExpr(IdentifierExpr* ast)
 {
 	Symbol* sym = symtbl_find(ctx->variables, ast->name);
-	return sym->var.value;
+	return LLVMBuildLoad(sem_ctx.builder, sym->var.value, next_temp_id_str());
 }
 
 LLVMValueRef eval_NumberExpr(NumberExpr* ast) {
@@ -749,6 +721,8 @@ LLVMValueRef eval_NumberExpr(NumberExpr* ast) {
 		return LLVMConstInt(LLVMInt64Type(), ast->i64, 1);
 	case TP_INT32:
 		return LLVMConstInt(LLVMInt32Type(), ast->i32, 1);
+	case TP_STR:
+		return LLVMBuildGlobalStringPtr(sem_ctx.builder, ast->str, next_temp_id_str());
 	default:
 		return LLVMConstReal(LLVMDoubleType(), ast->f64);
 	}
