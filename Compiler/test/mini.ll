@@ -8,15 +8,14 @@ entry:
   br label %while.cond
 
 while.cond:                                       ; preds = %if.after, %entry
-  %a = alloca i32
-  store i32 1, i32* %a
   br i1 true, label %while.body, label %while.after
 
 while.body:                                       ; preds = %while.cond
   br i1 true, label %if.then, label %if.else
 
 if.then:                                          ; preds = %while.body
-  ret i32 2
+  %"4" = call i32 @bar(i32 1, i32 2, i32 3)
+  ret i32 %"4"
 
 if.else:                                          ; preds = %while.body
   ret i32 3
@@ -28,4 +27,4 @@ while.after:                                      ; preds = %while.cond
   ret i32 0
 }
 
-declare void @bar(i32, i32, i32)
+declare i32 @bar(i32, i32, i32)

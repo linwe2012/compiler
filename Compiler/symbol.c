@@ -54,10 +54,13 @@ void symtbl_push(SymbolTable* tbl, Symbol* c)
 	
 }
 
-Symbol* symtbl_find(SymbolTable* tbl, const char* name)
-{
-	// FIX: 如果一个block内要访问block外定义的本地变量，现在这样会访问不到吧(last可能是NULL)
+Symbol* symtbl_find(SymbolTable* tbl, const char* name) {
 	Symbol* top = tbl->stack_top->last;
+	struct SymbolStackInfo* prev_stack = tbl->stack_top->prev;
+	while (top == NULL && prev_stack != NULL) {	// 当前栈帧为空，但是先前栈依然可能有内容，不断向前搜索
+		top = prev_stack->last;
+		prev_stack = prev_stack->prev;
+	}
 	while (top != NULL && !str_equal(top->name, name)) {
 		top = top->prev;
 	}

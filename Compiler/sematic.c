@@ -244,8 +244,7 @@ LLVMValueRef eval_LabelStmt(LabelStmt* ast)
 	NOT_IMPLEMENTED;
 }
 
-LLVMValueRef eval_JumpStmt(JumpStmt* ast)
-{
+LLVMValueRef eval_JumpStmt(JumpStmt* ast) {
 	switch (ast->type) {
 	case JUMP_BREAK:
 		if (sem_ctx.breakable_last == NULL) {
@@ -684,9 +683,39 @@ LLVMValueRef eval_ListExpr(ListExpr* ast)
 	NOT_IMPLEMENTED;
 }
 
-LLVMValueRef eval_FunctionCallExpr(FunctionCallExpr* ast)
-{
-	NOT_IMPLEMENTED;
+LLVMValueRef eval_FunctionCallExpr(FunctionCallExpr* ast) {
+	TRY_CAST(IdentifierExpr, func_ast, ast->function);
+	if (func_ast == NULL) {
+		log_error(ast, "Empty function identifier ast");
+		return NULL;
+	}
+	Symbol* func_sym = symtbl_find(ctx->functions, func_ast->name);
+	if (func_sym == NULL) {
+		log_error(ast, "Called function not declared");
+		return NULL;
+	}
+	unsigned int argc = LLVMCountParams(func_sym->func.value);
+	LLVMValueRef* argv = malloc(argc * sizeof(LLVMValueRef));
+	AST* arg = ast->params;
+	for (int i = 0; i < argc; ++i) {
+		if (arg == NULL) {
+			log_error(ast, "funcation call arg not match");
+			return NULL;
+		}
+
+		if (arg->type == AST_IdentifierExpr) {
+			// TODO 如果是id拿到变量的ptr，并且load，然后加载
+			// TODO 变量的Trunc
+		} else if (arg->type == AST_NumberExpr) {
+			// TODO 常数的隐式类型转换
+			argv[i] = eval_NumberExpr(arg);
+		} else {
+			log_error(ast, "Unknown func call arg ast type");
+			return NULL;
+		}
+		arg = arg->next;
+	}
+	return LLVMBuildCall(sem_ctx.builder, func_sym->func.value, argv, argc, next_temp_id_str());
 }
 
 
@@ -714,12 +743,13 @@ LLVMValueRef eval_IdentifierExpr(IdentifierExpr* ast)
 }
 
 LLVMValueRef eval_NumberExpr(NumberExpr* ast) {
-	if ((ast->number_type & 0xFu) == TP_INT64)		// NOTE：我改成mask了
-	{
+	enum Types type = (ast->number_type & 0xFu);
+	switch (type) {
+	case TP_INT64:
 		return LLVMConstInt(LLVMInt64Type(), ast->i64, 1);
-	}
-	else
-	{
+	case TP_INT32:
+		return LLVMConstInt(LLVMInt32Type(), ast->i32, 1);
+	default:
 		return LLVMConstReal(LLVMDoubleType(), ast->f64);
 	}
 }
@@ -1038,7 +1068,7 @@ LLVMValueRef eval_LoopStmt(LoopStmt* ast) {
 		// 不支持do while
 		break;
 	}
-	return LLVMConstReal(LLVMDoubleType(), 0.0);
+	return NULL;
 }
 
 // TODO: @wushuhui
@@ -1077,8 +1107,6 @@ LLVMValueRef eval_IfStmt(IfStmt* ast) {
 	if (innerv == NULL || (innerv != NULL && !LLVMIsAReturnInst(innerv))) {	// 如果最后一条指令是ret，不能构建br
 		LLVMBuildBr(sem_ctx.builder, after_bb);
 	}
-	// Codegen of 'Then' can change the current block, update ThenBB for the PHI.
-	then_bb = LLVMGetInsertBlock(sem_ctx.builder);
 
 	LLVMPositionBuilderAtEnd(sem_ctx.builder, else_bb);
 	innerv = NULL;
@@ -1091,11 +1119,9 @@ LLVMValueRef eval_IfStmt(IfStmt* ast) {
 	if (innerv == NULL || (innerv != NULL && !LLVMIsAReturnInst(innerv))) {	// 如果最后一条指令是ret，不能构建br
 		LLVMBuildBr(sem_ctx.builder, after_bb);
 	}
-	else_bb = LLVMGetInsertBlock(sem_ctx.builder);
 
 	LLVMPositionBuilderAtEnd(sem_ctx.builder, after_bb);
 
-	// TODO: PHI，或者说用哪个变量可以不依赖phi解决？
 	return NULL;
 }
 
@@ -1123,7 +1149,6 @@ LLVMValueRef eval_FunctionDefinitionStmt(FunctionDefinitionStmt* ast) {
 	}
 
 	LLVMValueRef func;
-	TypeSpecifier* tmp;
 
 	Symbol* func_sym = symtbl_find(ctx->functions, decl_ast->name);
 	if (func_sym == NULL) {
