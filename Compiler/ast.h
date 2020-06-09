@@ -174,6 +174,7 @@ struct LabelStmt
 	AST super;
 	AST* target;
 	AST* condition; // < swtich case 中的 condition
+	enum LabelType type;
 
 	Symbol* ref;
 };

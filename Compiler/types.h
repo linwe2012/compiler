@@ -267,7 +267,11 @@ enum Operators
 };
 
 
-
+enum LabelType {
+	LABEL_CASE,
+	LABEL_DEFAULT
+	// TODO goto的label
+};
 
 enum JumpType
 {
