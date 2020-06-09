@@ -587,7 +587,7 @@ Symbol* symbol_create_struct_or_union_incomplete(char* name, enum Types struct_o
 	return sym;
 }
 
-Symbol* symbol_create_func(char* name, LLVMValueRef f, LLVMTypeRef ret_type, TypeInfo* params, AST* body) {
+Symbol* symbol_create_func(char* name, LLVMValueRef f, LLVMTypeRef ret_type, LLVMTypeRef* params, AST* body) {
 	Symbol* sym = new_symbol(name, Symbol_FunctionInfo);
 	sym->func.name = name;
 	sym->func.body = body;

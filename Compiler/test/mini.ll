@@ -3,24 +3,28 @@ source_filename = "mini.c"
 
 define i32 @foo(i32 %"0") {
 entry:
-  br label %"1"
+  %"1" = alloca i32
+  store i32 %"0", i32* %"1"
+  br label %while.cond
 
-"1":                                              ; preds = %"7", %entry
-  br i1 true, label %"2", label %"3"
+while.cond:                                       ; preds = %if.after, %entry
+  %a = alloca i32
+  store i32 1, i32* %a
+  br i1 true, label %while.body, label %while.after
 
-"2":                                              ; preds = %"1"
-  br i1 true, label %"5", label %"6"
+while.body:                                       ; preds = %while.cond
+  br i1 true, label %if.then, label %if.else
 
-"5":                                              ; preds = %"2"
+if.then:                                          ; preds = %while.body
   ret i32 2
 
-"6":                                              ; preds = %"2"
+if.else:                                          ; preds = %while.body
   ret i32 3
 
-"7":                                              ; No predecessors!
-  br label %"1"
+if.after:                                         ; No predecessors!
+  br label %while.cond
 
-"3":                                              ; preds = %"1"
+while.after:                                      ; preds = %while.cond
   ret i32 0
 }
 

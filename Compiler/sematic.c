@@ -115,8 +115,7 @@ static void leave_sematic_temp_context() {
 	}
 }
 
-static LLVMBasicBlockRef alloc_bb() {
-	char* name = next_temp_id_str();
+static LLVMBasicBlockRef alloc_bb(char* name) {
 	if (sem_ctx.after_bb) {
 		return LLVMInsertBasicBlock(sem_ctx.after_bb->block, name);
 	} else {
@@ -497,7 +496,7 @@ static Symbol* eval_FuncDeclareStmt(AST* ast, TypeSpecifier* ret_typesp, const c
 	);
 	LLVMValueRef func = LLVMAddFunction(sem_ctx.module, name, func_type);
 
-	func_sym = symbol_create_func(name, func, ret_type, paramsp, NULL);
+	func_sym = symbol_create_func(name, func, ret_type, func_args, NULL);
 	symtbl_push(ctx->functions, func_sym);
 	return func_sym;
 }
@@ -926,15 +925,16 @@ void eval_WhileStmt(LoopStmt* ast) {
 	ctx_enter_block_scope(ctx);
 
 	LLVMBasicBlockRef preheader_bb = LLVMGetInsertBlock(sem_ctx.builder);
-	LLVMBasicBlockRef cond_bb = alloc_bb();
-	LLVMBasicBlockRef body_bb = alloc_bb();
-	LLVMBasicBlockRef after_bb = alloc_bb();
+	LLVMBasicBlockRef cond_bb = alloc_bb("while.cond");
+	LLVMBasicBlockRef body_bb = alloc_bb("while.body");
+	LLVMBasicBlockRef after_bb = alloc_bb("while.after");
 
 	// 1. preheader
 	LLVMBuildBr(sem_ctx.builder, cond_bb);
 
 	// 2. cond
 	LLVMPositionBuilderAtEnd(sem_ctx.builder, cond_bb);
+
 	LLVMValueRef condv = eval_ast(ast->condition);
 	if (condv == NULL) {
 		return NULL;
@@ -973,10 +973,10 @@ void eval_ForStmt(LoopStmt* ast) {
 	LLVMValueRef enter = eval_ast(ast->enter);
 
 	LLVMBasicBlockRef preheader_bb = LLVMGetInsertBlock(sem_ctx.builder);
-	LLVMBasicBlockRef cond_bb = alloc_bb();
-	LLVMBasicBlockRef body_bb = alloc_bb();
-	LLVMBasicBlockRef step_bb = alloc_bb();
-	LLVMBasicBlockRef after_bb = alloc_bb();
+	LLVMBasicBlockRef cond_bb = alloc_bb("for.cond");
+	LLVMBasicBlockRef body_bb = alloc_bb("for.body");
+	LLVMBasicBlockRef step_bb = alloc_bb("for.step");
+	LLVMBasicBlockRef after_bb = alloc_bb("for.after");
 
 	// 1. preheader
 	LLVMBuildBr(sem_ctx.builder, cond_bb);
@@ -1047,9 +1047,9 @@ LLVMValueRef eval_IfStmt(IfStmt* ast) {
 	if (condv == NULL) {
 		return NULL;
 	}
-	LLVMBasicBlockRef then_bb = alloc_bb();
-	LLVMBasicBlockRef else_bb = alloc_bb();
-	LLVMBasicBlockRef after_bb = alloc_bb();
+	LLVMBasicBlockRef then_bb = alloc_bb("if.then");
+	LLVMBasicBlockRef else_bb = alloc_bb("if.else");
+	LLVMBasicBlockRef after_bb = alloc_bb("if.after");
 
 	// 似乎clang的标准并不允许double作为条件的值，会有下述warning：
 	// implicit conversion from 'double' to '_Bool' changes value from 1.111 to true
@@ -1139,41 +1139,26 @@ LLVMValueRef eval_FunctionDefinitionStmt(FunctionDefinitionStmt* ast) {
 		// 如果符号表中已经有了函数，那么用那个符号
 		func = func_sym->value;
 		func_sym->func.body = ast->body;
+		// TODO 检查形参和实参是否一致
 	}
 	sem_ctx.cur_func_sym = func_sym;
 
 	ctx_enter_function_scope(ctx);
 	enter_sematic_temp_context();
 
+	LLVMBasicBlockRef entry_bb = LLVMAppendBasicBlock(func, "entry");
+	LLVMPositionBuilderAtEnd(sem_ctx.builder, entry_bb);
+
 	// 构建实参
-	tmp = decl_ast->type_spec->params;
-	while (tmp) {
-		// 这里和Declare是一致的
-		DeclareStmt pseudo_stmt;
-		DeclaratorExpr pseudo_expr;
-		ast_init(&pseudo_stmt, AST_DeclareStmt);
-		ast_init(&pseudo_expr, AST_DeclaratorExpr);
-		pseudo_stmt.type = tmp;
-		pseudo_stmt.identifiers = &pseudo_expr;
-		pseudo_stmt.attributes = ATTR_NONE;			// TODO C支不支持const参数来着
-		pseudo_expr.attributes = ATTR_NONE;
-		pseudo_expr.bitfield = NULL;
-		pseudo_expr.init_value = NULL;
-		pseudo_expr.name = tmp->field_name;
-		pseudo_expr.type_spec = pseudo_expr.type_spec_last = NULL;
-		eval_DeclareStmt(&pseudo_stmt);
-		tmp = tmp->super.next;
-	}
 	unsigned int n_params = LLVMCountParams(func);
 	LLVMValueRef* params = malloc(sizeof(LLVMValueRef) * n_params);
 	LLVMGetParams(func, params);
 	for (int i = 0; i < n_params; ++i) {
-		LLVMSetValueName(params[i], next_temp_id_str());
-		// TODO build alloca和store
+		LLVMSetValueName(params[i], next_temp_id_str());	// 给参数一个名字
+		// 为参数分配栈空间并store
+		LLVMValueRef* ptr = LLVMBuildAlloca(sem_ctx.builder, func_sym->func.params[i], next_temp_id_str());
+		LLVMBuildStore(sem_ctx.builder, params[i], ptr);
 	}
-
-	LLVMBasicBlockRef entry_bb = LLVMAppendBasicBlock(func, "entry");
-	LLVMPositionBuilderAtEnd(sem_ctx.builder, entry_bb);
 
 	// NOTE: 这里不能直接用Block，要hack一下。FunctionDef的时候是会创建一个scope的
 	//		如果function的body自己又创建一个scope，
@@ -1181,8 +1166,7 @@ LLVMValueRef eval_FunctionDefinitionStmt(FunctionDefinitionStmt* ast) {
 	LLVMValueRef bodyv = eval_BlockExprNoScope(ast->body);
 
 	// RET
-	// FIX：这里要作一个约定，判断前面有没有return过，哪怕是不带return value的return。
-	// 或者说强制要求return？LLVM IR不return应该不行吧
+	// 这里要作一个约定，判断前面有没有return过，哪怕是不带return value的return。
 	if (func_sym->func.ret_type == LLVMVoidType()|| bodyv == NULL) {
 		LLVMBuildRetVoid(sem_ctx.builder);
 	}
