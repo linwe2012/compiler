@@ -8,7 +8,7 @@ int foo(int x) {
         if (1) {
             return bar(1, 2, 3);
         } else {
-            return 3;
+            return 1;
         }
     }
     return 0;

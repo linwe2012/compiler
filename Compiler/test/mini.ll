@@ -18,7 +18,7 @@ if.then:                                          ; preds = %while.body
   ret i32 %"4"
 
 if.else:                                          ; preds = %while.body
-  ret i32 3
+  ret i32 2
 
 if.after:                                         ; No predecessors!
   br label %while.cond
