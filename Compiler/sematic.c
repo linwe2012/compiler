@@ -713,15 +713,22 @@ LLVMValueRef eval_IdentifierExpr(IdentifierExpr* ast)
 LLVMValueRef eval_NumberExpr(NumberExpr* ast) {
 	enum Types type = (ast->number_type & 0xFu);
 	switch (type) {
+	case TP_INT8:
+		return LLVMConstInt(LLVMInt8Type(), ast->i8, 1);
 	case TP_INT64:
 		return LLVMConstInt(LLVMInt64Type(), ast->i64, 1);
 	case TP_INT32:
 		return LLVMConstInt(LLVMInt32Type(), ast->i32, 1);
-	case TP_STR:
+	case TP_STR:	// 未测试
 		return LLVMBuildGlobalStringPtr(sem_ctx.builder, ast->str, next_temp_id_str());
-	default:
+	case TP_FLOAT32:
+		return LLVMConstReal(LLVMFloatType(), ast->f32);
+	case TP_FLOAT64:
 		return LLVMConstReal(LLVMDoubleType(), ast->f64);
+	default:
+		log_error(ast, "type %d currently not supported", type);
 	}
+	return NULL;
 }
 
 LLVMValueRef get_identifierxpr_llvm_value(IdentifierExpr* expr) {
