@@ -18,6 +18,8 @@ while.body:                                       ; preds = %while.cond
   br i1 true, label %if.then, label %if.else
 
 if.then:                                          ; preds = %while.body
+  %test_val = alloca i32
+  store i32 1, i32* %test_val
   %"4" = call i32 @bar(i32 1, i32 2, i32 3)
   ret i32 %"4"
 
