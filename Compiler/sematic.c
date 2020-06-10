@@ -263,19 +263,6 @@ struct SematicData* sematic_data_new() {
 	return sem;
 }
 
-// 测试用，只作了简单的几个
-LLVMTypeRef extract_llvm_type(TypeSpecifier* spec) {
-	switch (spec->type) {
-	case TP_INT32:
-		return LLVMInt32Type();
-	case TP_VOID:
-		return LLVMVoidType();
-	default:
-		break;
-	}
-	return NULL;
-}
-
 
 TypeInfo* extract_type(TypeSpecifier* spec)
 {
@@ -440,6 +427,26 @@ TypeInfo* extract_type(TypeSpecifier* spec)
 	return result;
 }
 
+// 测试用，只作了简单的几个
+LLVMTypeRef extract_llvm_type(TypeInfo* info) {
+	switch (info->type) {
+	case TP_INT8:
+		return LLVMInt8Type();
+	case TP_INT32:
+		return LLVMInt32Type();
+	case TP_VOID:
+		return LLVMVoidType();
+	case TP_FLOAT32:
+		return LLVMFloatType();
+	case TP_PTR:
+		return LLVMPointerType(extract_llvm_type(info->ptr.pointing), 0);
+		break;
+	default:
+		break;
+	}
+	return NULL;
+}
+
 // 返回函数符号
 static Symbol* eval_FuncDeclareStmt(AST* ast, TypeSpecifier* ret_typesp, const char* name, TypeSpecifier* paramsp) {
 	Symbol* func_sym = symtbl_find(ctx->functions, name);
@@ -447,7 +454,7 @@ static Symbol* eval_FuncDeclareStmt(AST* ast, TypeSpecifier* ret_typesp, const c
 		log_error(ast, "Function redeclaration");
 		return NULL;
 	}
-	LLVMTypeRef ret_type = extract_llvm_type(ret_typesp);
+	LLVMTypeRef ret_type = extract_llvm_type(extract_type(ret_typesp));
 	LLVMTypeRef* argv = NULL;
 	int argc = 0;
 	// 构建形参
@@ -458,7 +465,7 @@ static Symbol* eval_FuncDeclareStmt(AST* ast, TypeSpecifier* ret_typesp, const c
 		argv = (LLVMTypeRef*)malloc(argc * sizeof(LLVMTypeRef));
 		tmp = paramsp;
 		for (int i = 0; i < argc; ++i) {
-			argv[i] = extract_llvm_type(tmp);
+			argv[i] = extract_llvm_type(extract_type(tmp));
 			tmp = tmp->super.next;
 		}
 	}
@@ -516,7 +523,7 @@ LLVMValueRef eval_DeclareStmt(DeclareStmt* ast)
 			}
 
 			// TODO 更加复杂的构建
-			LLVMValueRef ptr = LLVMBuildAlloca(sem_ctx.builder, extract_llvm_type(id_spec), id->name);
+			LLVMValueRef ptr = LLVMBuildAlloca(sem_ctx.builder, extract_llvm_type(extract_type(id_spec)), id->name);
 
 			// TODO: 检查合并 attributes 的时候问题
 			id->attributes |= ast->attributes;
@@ -712,15 +719,18 @@ LLVMValueRef eval_IdentifierExpr(IdentifierExpr* ast)
 LLVMValueRef eval_NumberExpr(NumberExpr* ast) {
 	enum Types type = (ast->number_type & 0xFu);
 	switch (type) {
-	case TP_INT64:
-		return LLVMConstInt(LLVMInt32Type(), ast->i64, 1);
+	case TP_INT8:
+		return LLVMConstInt(LLVMInt8Type(), ast->i8, 1);
 	case TP_INT32:
 		return LLVMConstInt(LLVMInt32Type(), ast->i32, 1);
 	case TP_STR:
 		return LLVMBuildGlobalStringPtr(sem_ctx.builder, ast->str, next_temp_id_str());
-	default:
+	case TP_FLOAT64:
 		return LLVMConstReal(LLVMFloatType(), ast->f64);
+	default:
+		log_error(ast, "type %d currently not supported", type);
 	}
+	return NULL;
 }
 
 LLVMValueRef get_identifierxpr_llvm_value(IdentifierExpr* expr) {
