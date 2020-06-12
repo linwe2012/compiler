@@ -1072,7 +1072,7 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 		case OP_LESS:
 			if (!type_is_float(dest_type))
 			{
-				tmp = LLVMBuildICmp(sem_ctx.builder, LLVMRealOLT, lhs, rhs, "less_res");
+				tmp = LLVMBuildICmp(sem_ctx.builder, LLVMIntSLT, lhs, rhs, "less_res");
 			}
 			else
 				tmp = LLVMBuildFCmp(sem_ctx.builder, LLVMRealOLT, lhs, rhs, "less_res");
@@ -1080,7 +1080,7 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 		case OP_LESS_OR_EQUAL:
 			if (!type_is_float(dest_type))
 			{
-				tmp = LLVMBuildICmp(sem_ctx.builder, LLVMRealOLE, lhs, rhs, "less_equal_res");
+				tmp = LLVMBuildICmp(sem_ctx.builder, LLVMIntSLE, lhs, rhs, "less_equal_res");
 			}
 			else
 				tmp = LLVMBuildFCmp(sem_ctx.builder, LLVMRealOLE, lhs, rhs, "less_equal_res");
@@ -1088,7 +1088,7 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 		case OP_GREATER:
 			if (!type_is_float(dest_type))
 			{
-				tmp = LLVMBuildICmp(sem_ctx.builder, LLVMRealOGT, lhs, rhs, "greater_res");
+				tmp = LLVMBuildICmp(sem_ctx.builder, LLVMIntSGT, lhs, rhs, "greater_res");
 			}
 			else
 				tmp = LLVMBuildFCmp(sem_ctx.builder, LLVMRealOGT, lhs, rhs, "greater_res");
@@ -1096,7 +1096,7 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 		case OP_GREATER_OR_EQUAL:
 			if (!type_is_float(dest_type))
 			{
-				tmp = LLVMBuildICmp(sem_ctx.builder, LLVMRealOGE, lhs, rhs, "greater_equal_res");
+				tmp = LLVMBuildICmp(sem_ctx.builder, LLVMIntSGE, lhs, rhs, "greater_equal_res");
 			}
 			else
 				tmp = LLVMBuildFCmp(sem_ctx.builder, LLVMRealOGE, lhs, rhs, "greater_equal_res");
@@ -1104,7 +1104,7 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 		case OP_EQUAL:
 			if (!type_is_float(dest_type))
 			{
-				tmp = LLVMBuildICmp(sem_ctx.builder, LLVMRealOEQ, lhs, rhs, "equal_res");
+				tmp = LLVMBuildICmp(sem_ctx.builder, LLVMIntEQ, lhs, rhs, "equal_res");
 			}
 			else
 				tmp = LLVMBuildFCmp(sem_ctx.builder, LLVMRealOEQ, lhs, rhs, "equal_res");
