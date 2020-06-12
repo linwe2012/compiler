@@ -786,6 +786,7 @@ void save_identifierexpr_llvm_value(IdentifierExpr* expr, LLVMValueRef val)
 LLVMValueRef llvm_convert_type(LLVMTypeRef dest_type, LLVMValueRef val)
 {
 	LLVMTypeRef type = LLVMTypeOf(val);
+	LLVMTypeKind kind = LLVMGetTypeKind(type);
 	if (type == dest_type)
 	{
 		return val;
@@ -813,13 +814,13 @@ LLVMValueRef llvm_convert_type(LLVMTypeRef dest_type, LLVMValueRef val)
 		{
 			//bool类型需要特殊处理
 			if (!llvm_is_bit(val))
-				return LLVMBuildSIToFP(sem_ctx.builder, val, LLVMDoubleType(), "float_cast");
+				return LLVMBuildSIToFP(sem_ctx.builder, val, LLVMFloatType(), "float_cast");
 			else
-				return LLVMBuildUIToFP(sem_ctx.builder, val, LLVMDoubleType(), "float_cast");
+				return LLVMBuildUIToFP(sem_ctx.builder, val, LLVMFloatType(), "float_cast");
 		}
 		else
 		{
-			LLVMBuildFPTrunc(sem_ctx.builder, val, LLVMDoubleType(), "float_cast");
+			LLVMBuildFPTrunc(sem_ctx.builder, val, LLVMFloatType(), "float_cast");
 		}
 	}
 	//目标是int64
@@ -946,6 +947,7 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 		if (lhs && rhs)
 		{
 			dest_type = llvm_get_res_type(lhs, rhs);
+			LLVMTypeKind kind = LLVMGetTypeKind(dest_type);
 			lhs = llvm_convert_type(dest_type, lhs);
 			rhs = llvm_convert_type(dest_type, rhs);
 		}

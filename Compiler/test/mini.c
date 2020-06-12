@@ -5,15 +5,13 @@ int bar(int a, int b, int c);
 float test(float a);
 
 int foo(int x) {
-	float y;
-	y = 1.0;
 	int a = 10;
 	while (1) {
 		if (1) {
 			return bar(1, 2, 3);
 		}
 		else {
-			a = y < 2.0;
+			a = 1.0 < 2;
 			return 0;
 		}
 	}
