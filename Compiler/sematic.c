@@ -786,6 +786,7 @@ void save_identifierexpr_llvm_value(IdentifierExpr* expr, LLVMValueRef val)
 	if (sym == NULL) {
 		log_error(SUPER(expr), "No such identiifer: %s");
 	}
+	LLVMTypeKind kind = LLVMGetTypeKind(LLVMTypeOf(val));
 	LLVMBuildStore(sem_ctx.builder, val, sym->value);
 }
 
@@ -793,6 +794,7 @@ LLVMValueRef llvm_convert_type(LLVMTypeRef dest_type, LLVMValueRef val)
 {
 	LLVMTypeRef type = LLVMTypeOf(val);
 	LLVMTypeKind kind = LLVMGetTypeKind(type);
+	LLVMTypeKind kind1 = LLVMGetTypeKind(dest_type);
 	if (type == dest_type)
 	{
 		return val;
@@ -950,7 +952,7 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 		}
 		lhs = eval_OperatorExpr(operator->lhs);
 		rhs = eval_OperatorExpr(operator->rhs);
-		if (lhs && rhs)
+		if (lhs && rhs && operator->op != OP_ASSIGN)
 		{
 			dest_type = llvm_get_res_type(lhs, rhs);
 			LLVMTypeKind kind = LLVMGetTypeKind(dest_type);
@@ -964,7 +966,7 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 		LLVMValueRef tmp = NULL;
 		switch (operator->op)
 		{
-		// 一元运算符
+			// 一元运算符
 		case OP_INC:
 			if (!llvm_is_float(lhs))
 			{
@@ -1005,7 +1007,7 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 				tmp = LLVMBuildFAdd(sem_ctx.builder, lhs, LLVMConstReal(dest_type, -1), "dec_res");
 			}
 			break;
-		// 二元运算符
+			// 二元运算符
 		case OP_ADD:
 			if (!type_is_float(dest_type))
 			{
@@ -1076,7 +1078,7 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 				log_error(ast, "SHIFT OP Expected INT TYPE");
 			}
 			break;
-		//比较运算符返回的是INT_1类型
+			//比较运算符返回的是INT_1类型
 		case OP_LESS:
 			if (!type_is_float(dest_type))
 			{
@@ -1117,7 +1119,7 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 			else
 				tmp = LLVMBuildFCmp(sem_ctx.builder, LLVMRealOEQ, lhs, rhs, "equal_res");
 			break;
-		//赋值运算符
+			//赋值运算符
 		case OP_ASSIGN:
 			dest_type = LLVMTypeOf(lhs);
 			rhs = llvm_convert_type(dest_type, rhs);
@@ -1127,7 +1129,7 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 				log_error(operator->lhs, "Expected IdentifierExpr");
 				return NULL;
 			}
-			save_identifierexpr_llvm_value(operator->lhs, rhs);
+			save_identifierexpr_llvm_value(assigneer, rhs);
 			tmp = rhs;
 			break;
 		default:
