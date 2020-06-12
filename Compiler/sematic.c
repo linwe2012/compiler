@@ -757,9 +757,9 @@ LLVMValueRef eval_NumberExpr(NumberExpr* ast) {
 	case TP_STR:
 		return LLVMBuildGlobalStringPtr(sem_ctx.builder, ast->str, next_temp_id_str());
 	case TP_FLOAT32:
-		return LLVMConstReal(LLVMFloatType(), ast->f64);
+		return LLVMConstReal(LLVMFloatType(), ast->f32);
 	case TP_FLOAT64:
-		return LLVMConstReal(LLVMFloatType(), ast->f64);
+		return LLVMConstReal(LLVMDoubleType(), ast->f64);
 	default:
 		log_error(ast, "type %d currently not supported", type);
 	}
