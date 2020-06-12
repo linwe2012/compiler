@@ -138,6 +138,8 @@ static void build_putchar() {
 	symtbl_push(ctx->functions, func_sym);
 }
 
+static LLVMValueRef llvm_convert_type(LLVMTypeRef dest_type, LLVMValueRef val);
+
 STRUCT_TYPE(SematicData);
 
 
@@ -531,7 +533,8 @@ LLVMValueRef eval_DeclareStmt(DeclareStmt* ast)
 			}
 
 			// TODO 更加复杂的构建
-			LLVMValueRef ptr = LLVMBuildAlloca(sem_ctx.builder, extract_llvm_type(extract_type(id_spec)), id->name);
+			LLVMTypeRef decl_type = extract_llvm_type(extract_type(id_spec));
+			LLVMValueRef ptr = LLVMBuildAlloca(sem_ctx.builder, decl_type, id->name);
 
 			// TODO: 检查合并 attributes 的时候问题
 			id->attributes |= ast->attributes;
@@ -539,6 +542,9 @@ LLVMValueRef eval_DeclareStmt(DeclareStmt* ast)
 			if (id->init_value)
 			{
 				value = eval_ast(id->init_value);
+				if (LLVMTypeOf(value) != decl_type) {
+					value = llvm_convert_type(decl_type, value);
+				}
 				last_value = value;
 				LLVMBuildStore(sem_ctx.builder, value, ptr);
 			}
@@ -813,9 +819,9 @@ LLVMValueRef llvm_convert_type(LLVMTypeRef dest_type, LLVMValueRef val)
 		{
 			//bool类型需要特殊处理
 			if (!llvm_is_bit(val))
-				return LLVMBuildSIToFP(sem_ctx.builder, val, LLVMDoubleType(), "float_cast");
+				return LLVMBuildSIToFP(sem_ctx.builder, val, LLVMFloatType(), "float_cast");
 			else
-				return LLVMBuildUIToFP(sem_ctx.builder, val, LLVMDoubleType(), "float_cast");
+				return LLVMBuildUIToFP(sem_ctx.builder, val, LLVMFloatType(), "float_cast");
 		}
 		else
 		{
