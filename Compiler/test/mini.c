@@ -13,7 +13,7 @@ int foo(int x) {
 			return bar(1, 2, 3);
 		}
 		else {
-			a = 1 < 2;
+			a = y < 2.0;
 			return 0;
 		}
 	}

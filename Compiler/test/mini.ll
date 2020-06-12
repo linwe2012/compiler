@@ -9,7 +9,7 @@ entry:
   store i32 %"0", i32* %"1"
   %y = alloca float
   %load_val = load float, float* %y
-  store float 0.000000e+00, float* %y
+  store float 1.000000e+00, float* %y
   %a = alloca i32
   store i32 10, i32* %a
   br label %while.cond
@@ -26,7 +26,10 @@ if.then:                                          ; preds = %while.body
 
 if.else:                                          ; preds = %while.body
   %load_val1 = load i32, i32* %a
-  store i32 1, i32* %a
+  %load_val2 = load float, float* %y
+  %less_res = fcmp olt float %load_val2, 2.000000e+00
+  %int32_cast = zext i1 %less_res to i32
+  store i32 %int32_cast, i32* %a
   ret i32 0
 
 if.after:                                         ; No predecessors!
