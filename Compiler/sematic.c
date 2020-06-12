@@ -83,6 +83,12 @@ void sem_init(AST* ast)
 	}
 }
 
+void sematic_init_context(Context* ctx)
+{
+	// TODO
+	//LLVM
+}
+
 LLVMValueRef eval_ast(AST* ast)
 {
 #define EVAL_CASE(type__) \
@@ -504,6 +510,7 @@ LLVMOpcode eval_binary_opcode_llvm(enum Operators op)
 
 static LLVMTypeKind llvm_is_float(LLVMValueRef v)
 {
+	
 	LLVMTypeKind kind = LLVMGetTypeKind(LLVMTypeOf(v));
 	return ((kind == LLVMHalfTypeKind) || (kind == LLVMFloatTypeKind) || (kind == LLVMDoubleTypeKind));
 }
@@ -514,8 +521,9 @@ LLVMValueRef eval_IdentifierExpr(IdentifierExpr* ast)
 	return sym->var.value;
 }
 
+// TODO: support more types
 LLVMValueRef eval_NumberExpr(NumberExpr* ast) {
-	if (ast->number_type && TP_INT64)
+	if ((ast->number_type & TP_CLEAR_SIGNFLAGS) == TP_INT64)
 	{
 		return LLVMConstInt(LLVMInt64Type(), ast->i64, 1);
 	}
