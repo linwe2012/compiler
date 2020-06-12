@@ -2,18 +2,24 @@ int foo(int x);
 
 int bar(int a, int b, int c);
 
+float test(float a);
+
 int foo(int x) {
-	int a = 10;
+	float a;
+	float b;
 	while (1) {
 		if (1) {
 			return bar(1, 2, 3);
 		}
 		else {
-			return a * 3 + 3;
+			a = 1;
+			return 0;
 		}
 	}
 	return 0;
 }
+
+
 
 /*int foo(int a);
 

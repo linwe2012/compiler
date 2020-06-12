@@ -715,17 +715,28 @@ LLVMOpcode eval_binary_opcode_llvm(enum Operators op)
 
 static int llvm_is_float(LLVMValueRef v)
 {
-	return LLVMTypeOf(v) == LLVMFloatType();
+	return LLVMTypeOf(v) == LLVMFloatType()
+		|| LLVMTypeOf(v) == LLVMDoubleType();
 }
 
 static int llvm_is_int(LLVMValueRef v)
 {
-	return LLVMTypeOf(v) == LLVMInt32Type();
+	return LLVMTypeOf(v) == LLVMInt64Type()
+		|| LLVMTypeOf(v) == LLVMInt32Type()
+		|| LLVMTypeOf(v) == LLVMInt16Type()
+		|| LLVMTypeOf(v) == LLVMInt8Type()
+		|| LLVMTypeOf(v) == LLVMInt1Type();
 }
 
 static int llvm_is_bit(LLVMValueRef v)
 {
 	return LLVMTypeOf(v) == LLVMInt1Type();
+}
+
+static int type_is_float(LLVMTypeRef type)
+{
+	return type == LLVMFloatType()
+		|| type == LLVMDoubleType();
 }
 
 LLVMValueRef eval_IdentifierExpr(IdentifierExpr* ast)
@@ -741,8 +752,12 @@ LLVMValueRef eval_NumberExpr(NumberExpr* ast) {
 		return LLVMConstInt(LLVMInt8Type(), ast->i8, 1);
 	case TP_INT32:
 		return LLVMConstInt(LLVMInt32Type(), ast->i32, 1);
+	case TP_INT64:
+		return LLVMConstInt(LLVMInt32Type(), ast->i64, 1);
 	case TP_STR:
 		return LLVMBuildGlobalStringPtr(sem_ctx.builder, ast->str, next_temp_id_str());
+	case TP_FLOAT32:
+		return LLVMConstReal(LLVMFloatType(), ast->f64);
 	case TP_FLOAT64:
 		return LLVMConstReal(LLVMFloatType(), ast->f64);
 	default:
@@ -759,38 +774,145 @@ LLVMValueRef get_identifierxpr_llvm_value(IdentifierExpr* expr) {
 	return  LLVMBuildLoad(sem_ctx.builder, sym->value, "load_val");
 }
 
-LLVMValueRef cast_int(LLVMValueRef val)
+void save_identifierexpr_llvm_value(IdentifierExpr* expr, LLVMValueRef val)
 {
-	//如果是Int32类型直接返回
-	if (llvm_is_int(val))
-		return val;
-	//如果是Int1类型必须无符号扩展
-	else if (LLVMTypeOf(val) == LLVMInt1Type())
-		return LLVMBuildZExtOrBitCast(sem_ctx.builder, val, LLVMInt32Type(), "int32_cast");
-	//如果是Float32类型就直接转换
-	else if (llvm_is_float(val))
-		return LLVMBuildFPToSI(sem_ctx.builder, val, LLVMInt32Type(), "int32_cast");
-
-}
-// 比较暴力，直接将int转换成float类型
-LLVMValueRef cast_float(LLVMValueRef val)
-{
-	if (llvm_is_float(val))
-		return val;
-	//Int1类型需要无符号扩展
-	else if (LLVMTypeOf(val) == LLVMInt1Type())
-		return LLVMBuildUIToFP(sem_ctx.builder, val, LLVMInt32Type(), "float_cast");
-	//其他类型直接转换
-	return LLVMBuildSIToFP(sem_ctx.builder, val, LLVMFloatType(), "cast_float");
+	Symbol* sym = symtbl_find(ctx->variables, expr->name);
+	if (sym == NULL) {
+		log_error(SUPER(expr), "No such identiifer: %s");
+	}
+	LLVMBuildStore(sem_ctx.builder, val, sym->value);
 }
 
+LLVMValueRef llvm_convert_type(LLVMTypeRef dest_type, LLVMValueRef val)
+{
+	LLVMTypeRef type = LLVMTypeOf(val);
+	if (type == dest_type)
+	{
+		return val;
+	}
+	//目标类型是double
+	if (dest_type == LLVMDoubleType())
+	{
+		if (llvm_is_int(val))
+		{
+			//bool类型需要特殊处理
+			if (!llvm_is_bit(val))
+				return LLVMBuildSIToFP(sem_ctx.builder, val, LLVMDoubleType(), "double_cast");
+			else
+				return LLVMBuildUIToFP(sem_ctx.builder, val, LLVMDoubleType(), "double_cast");
+		}
+		else
+		{
+			LLVMBuildFPCast(sem_ctx.builder, val, LLVMDoubleType(), "double_cast");
+		}
+	}
+	//目标类型是float
+	if (dest_type == LLVMFloatType())
+	{
+		if (llvm_is_int(val))
+		{
+			//bool类型需要特殊处理
+			if (!llvm_is_bit(val))
+				return LLVMBuildSIToFP(sem_ctx.builder, val, LLVMDoubleType(), "float_cast");
+			else
+				return LLVMBuildUIToFP(sem_ctx.builder, val, LLVMDoubleType(), "float_cast");
+		}
+		else
+		{
+			LLVMBuildFPTrunc(sem_ctx.builder, val, LLVMDoubleType(), "float_cast");
+		}
+	}
+	//目标是int64
+	if (dest_type == LLVMInt64Type())
+	{
+		if (llvm_is_int(val))
+		{
+			if (!llvm_is_bit(val))
+				return LLVMBuildSExtOrBitCast(sem_ctx.builder, val, LLVMInt64Type(), "int64_cast");
+			else
+				return LLVMBuildZExtOrBitCast(sem_ctx.builder, val, LLVMInt64Type(), "int64_cast");
+		}
+		else
+		{
+			return LLVMBuildFPToSI(sem_ctx.builder, val, LLVMInt64Type(), "int64_cast");
+		}
+	}
+	//目标是int32
+	else if (dest_type == LLVMInt32Type())
+	{
+		if (llvm_is_int(val))
+		{
+			if (!llvm_is_bit(val))
+			{
+				if (LLVMTypeOf(val) == LLVMInt64Type())
+				{
+					return LLVMBuildTrunc(sem_ctx.builder, val, LLVMInt32Type(), "int32_cast");
+				}
+				else
+					return LLVMBuildSExtOrBitCast(sem_ctx.builder, val, LLVMInt32Type(), "int32_cast");
+			}
+			else
+				return LLVMBuildZExtOrBitCast(sem_ctx.builder, val, LLVMInt32Type(), "int32_cast");
+		}
+		else
+		{
+			return LLVMBuildFPToSI(sem_ctx.builder, val, LLVMInt32Type(), "int32_cast");
+		}
+	}
+	//目标是int8
+	else if (dest_type == LLVMInt8Type())
+	{
+		if (llvm_is_int(val))
+		{
+			if (!llvm_is_bit(val))
+			{
+				return LLVMBuildTrunc(sem_ctx.builder, val, LLVMInt8Type(), "int8_cast");
+			}
+			else
+				return LLVMBuildZExtOrBitCast(sem_ctx.builder, val, LLVMInt8Type(), "int8_cast");
+		}
+		else
+			return LLVMBuildFPToSI(sem_ctx.builder, val, LLVMInt8Type(), "int8_cast");
+	}
+	//不支持的类型
+	else
+		return val;
+}
+// 这个函数主要确定二元运算符的结果类型
+LLVMTypeRef llvm_get_res_type(LLVMValueRef lhs, LLVMValueRef rhs)
+{
+	LLVMTypeRef left_type = LLVMTypeOf(lhs);
+	LLVMTypeRef right_type = LLVMTypeOf(rhs);
+	//这儿由于函数没法用switch
+	if (left_type == right_type)
+		return left_type;
+	else if (left_type == LLVMDoubleType() || right_type == LLVMDoubleType())
+		return LLVMDoubleType();
+	else if (left_type == LLVMFloatType() || right_type == LLVMFloatType())
+		return LLVMFloatType();
+	else if (left_type == LLVMInt64Type() || right_type == LLVMInt64Type())
+		return LLVMInt64Type();
+	else if (left_type == LLVMInt32Type() || right_type == LLVMInt32Type())
+		return LLVMInt32Type();
+	//暂时不支持int16
+	//else if (left_type == LLVMInt16Type() || right_type == LLVMInt16Type())
+	//	return LLVMInt16Type();
+	else if (left_type == LLVMInt8Type() || right_type == LLVMInt8Type())
+		return LLVMInt8Type();
+	else if (left_type == LLVMInt1Type() || right_type == LLVMInt1Type())
+		return LLVMInt1Type();
+	else
+		return LLVMInt32Type();
+}
 
-// 因为llvm的运算符要求lhs和rhs类型完全一致，因此目前OperatorExpr 仅支持int和float两种类型 + signed
+
+// 目前仅考虑signed类型
 LLVMValueRef eval_OperatorExpr(AST* ast)
 {
 	LLVMBasicBlockRef block;
 	if (!ast) return NULL;
 	LLVMValueRef lhs, rhs;
+	LLVMTypeRef dest_type;
 	if (ast->type == AST_NumberExpr)
 	{
 		TRY_CAST(NumberExpr, number, ast);
@@ -819,89 +941,75 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 			log_error(ast, "Expected OperatorExpr");
 			return NULL;
 		}
-		lhs = eval_OperatorExpr(operator->lhs);		
+		lhs = eval_OperatorExpr(operator->lhs);
 		rhs = eval_OperatorExpr(operator->rhs);
-		if (lhs && !rhs)
+		if (lhs && rhs)
 		{
-			if (!llvm_is_float(lhs) && llvm_is_bit(lhs))
-			{
-				lhs = LLVMBuildZExtOrBitCast(sem_ctx.builder, lhs, LLVMInt32Type(), "int32_cast");
-			}
+			dest_type = llvm_get_res_type(lhs, rhs);
+			lhs = llvm_convert_type(dest_type, lhs);
+			rhs = llvm_convert_type(dest_type, rhs);
 		}
 		else
 		{
-			if (!(llvm_is_float(rhs) || llvm_is_float(rhs)))
-			{
-				if (llvm_is_bit(lhs))
-					lhs = LLVMBuildZExtOrBitCast(sem_ctx.builder, lhs, LLVMInt32Type(), "int32_cast");
-				if (llvm_is_bit(rhs))
-					rhs = LLVMBuildZExtOrBitCast(sem_ctx.builder, lhs, LLVMInt32Type(), "int32_cast");
-			}
-			else
-			{
-				lhs = cast_float(lhs);
-				rhs = cast_float(rhs);
-			}
+			dest_type = LLVMTypeOf(lhs);
 		}
 		LLVMValueRef tmp = NULL;
 		switch (operator->op)
 		{
-			// 一元运算符
+		// 一元运算符
 		case OP_INC:
 			if (!llvm_is_float(lhs))
 			{
-				tmp = LLVMBuildAdd(sem_ctx.builder, lhs, LLVMConstInt(LLVMInt32Type(), 1, 1), "inc_res");
+				tmp = LLVMBuildAdd(sem_ctx.builder, lhs, LLVMConstInt(dest_type, 1, 1), "inc_res");
 			}
 			else
 			{
-				tmp = LLVMBuildFAdd(sem_ctx.builder, lhs, LLVMConstReal(LLVMFloatType(), 1), "inc_res");
+				tmp = LLVMBuildFAdd(sem_ctx.builder, lhs, LLVMConstReal(dest_type, 1), "inc_res");
 			}
 			break;
 		case OP_DEC:
 			if (!llvm_is_float(lhs))
 			{
-				tmp = LLVMBuildAdd(sem_ctx.builder, lhs, LLVMConstInt(LLVMInt32Type(), -1, 1), "dec_res");
+				tmp = LLVMBuildAdd(sem_ctx.builder, lhs, LLVMConstInt(dest_type, -1, 1), "dec_res");
 			}
 			else
 			{
-				tmp = LLVMBuildFAdd(sem_ctx.builder, lhs, LLVMConstReal(LLVMFloatType(), -1), "dec_res");
+				tmp = LLVMBuildFAdd(sem_ctx.builder, lhs, LLVMConstReal(dest_type, -1), "dec_res");
 			}
 			break;
 		case OP_POSTFIX_INC:
 			if (!llvm_is_float(lhs))
 			{
-				tmp = LLVMBuildAdd(sem_ctx.builder, lhs, LLVMConstInt(LLVMInt32Type(), 1, 1), "inc_res");
+				tmp = LLVMBuildAdd(sem_ctx.builder, lhs, LLVMConstInt(dest_type, 1, 1), "inc_res");
 			}
 			else
 			{
-				tmp = LLVMBuildFAdd(sem_ctx.builder, lhs, LLVMConstReal(LLVMFloatType(), 1), "inc_res");
+				tmp = LLVMBuildFAdd(sem_ctx.builder, lhs, LLVMConstReal(dest_type, 1), "inc_res");
 			}
 			break;
 		case OP_POSTFIX_DEC:
 			if (!llvm_is_float(lhs))
 			{
-				tmp = LLVMBuildAdd(sem_ctx.builder, lhs, LLVMConstInt(LLVMInt32Type(), 1, 1), "dec_res");
+				tmp = LLVMBuildAdd(sem_ctx.builder, lhs, LLVMConstInt(dest_type, 1, 1), "dec_res");
 			}
 			else
 			{
-				tmp = LLVMBuildFAdd(sem_ctx.builder, lhs, LLVMConstReal(LLVMFloatType(), -1), "dec_res");
+				tmp = LLVMBuildFAdd(sem_ctx.builder, lhs, LLVMConstReal(dest_type, -1), "dec_res");
 			}
 			break;
-			// 二元运算符
+		// 二元运算符
 		case OP_ADD:
-			if (!(llvm_is_float(lhs) || llvm_is_float(rhs)))
+			if (!type_is_float(dest_type))
 			{
 				tmp = LLVMBuildAdd(sem_ctx.builder, lhs, rhs, "add_res");
 			}
 			else
 			{
-				lhs = cast_float(lhs);
-				rhs = cast_float(rhs);
 				tmp = LLVMBuildFAdd(sem_ctx.builder, lhs, rhs, "add_res");
 			}
 			break;
 		case OP_SUB:
-			if (!(llvm_is_float(lhs) || llvm_is_float(rhs)))
+			if (!type_is_float(dest_type))
 			{
 				tmp = LLVMBuildSub(sem_ctx.builder, lhs, rhs, "dec_res");
 			}
@@ -911,7 +1019,7 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 			}
 			break;
 		case OP_MUL:
-			if (!(llvm_is_float(lhs) || llvm_is_float(rhs)))
+			if (!type_is_float(dest_type))
 			{
 				tmp = LLVMBuildMul(sem_ctx.builder, lhs, rhs, "mul_res");
 			}
@@ -921,7 +1029,7 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 			}
 			break;
 		case OP_DIV:
-			if (!(llvm_is_float(lhs) || llvm_is_float(rhs)))
+			if (!type_is_float(dest_type))
 			{
 				tmp = LLVMBuildExactSDiv(sem_ctx.builder, lhs, rhs, "div_res"); //默认为signed了 有需求再改吧
 			}
@@ -931,17 +1039,17 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 			}
 			break;
 		case OP_MOD:
-			if (!(llvm_is_float(lhs) || llvm_is_float(rhs)))
+			if (!type_is_float(dest_type))
 			{
-				tmp = LLVMBuildSRem(sem_ctx.builder, lhs, rhs, NULL);
+				tmp = LLVMBuildSRem(sem_ctx.builder, lhs, rhs, "mod_res");
 			}
 			else
 			{
-				tmp = LLVMBuildFRem(sem_ctx.builder, lhs, rhs, NULL);
+				tmp = LLVMBuildFRem(sem_ctx.builder, lhs, rhs, "mod_res");
 			}
 			break;
 		case OP_SHIFT_LEFT:
-			if (!(llvm_is_float(lhs) || llvm_is_float(rhs)))
+			if (!type_is_float(dest_type))
 			{
 				tmp = LLVMBuildShl(sem_ctx.builder, lhs, rhs, "sll_res");
 			}
@@ -951,7 +1059,7 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 			}
 			break;
 		case OP_SHIFT_RIGHT:
-			if (!(llvm_is_float(lhs) || llvm_is_float(rhs)))
+			if (!type_is_float(dest_type))
 			{
 				tmp = LLVMBuildAShr(sem_ctx.builder, lhs, rhs, "sra_res"); //算数移位
 			}
@@ -960,31 +1068,59 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 				log_error(ast, "SHIFT OP Expected INT TYPE");
 			}
 			break;
-			//这五个返回的是INT_1类型
+		//比较运算符返回的是INT_1类型
 		case OP_LESS:
-			lhs = cast_float(lhs);
-			rhs = cast_float(rhs);
-			tmp = LLVMBuildFCmp(sem_ctx.builder, LLVMRealOLT, lhs, rhs, "less_res");
+			if (!type_is_float(dest_type))
+			{
+				tmp = LLVMBuildICmp(sem_ctx.builder, LLVMRealOLT, lhs, rhs, "less_res");
+			}
+			else
+				tmp = LLVMBuildFCmp(sem_ctx.builder, LLVMRealOLT, lhs, rhs, "less_res");
 			break;
 		case OP_LESS_OR_EQUAL:
-			lhs = cast_float(lhs);
-			rhs = cast_float(rhs);
-			tmp = LLVMBuildFCmp(sem_ctx.builder, LLVMRealOLE, lhs, rhs, "less_equal_res");
+			if (!type_is_float(dest_type))
+			{
+				tmp = LLVMBuildICmp(sem_ctx.builder, LLVMRealOLE, lhs, rhs, "less_equal_res");
+			}
+			else
+				tmp = LLVMBuildFCmp(sem_ctx.builder, LLVMRealOLE, lhs, rhs, "less_equal_res");
 			break;
 		case OP_GREATER:
-			lhs = cast_float(lhs);
-			rhs = cast_float(rhs);
-			tmp = LLVMBuildFCmp(sem_ctx.builder, LLVMRealOGT, lhs, rhs, "greater_res");
+			if (!type_is_float(dest_type))
+			{
+				tmp = LLVMBuildICmp(sem_ctx.builder, LLVMRealOGT, lhs, rhs, "greater_res");
+			}
+			else
+				tmp = LLVMBuildFCmp(sem_ctx.builder, LLVMRealOGT, lhs, rhs, "greater_res");
 			break;
 		case OP_GREATER_OR_EQUAL:
-			lhs = cast_float(lhs);
-			rhs = cast_float(rhs);
-			tmp = LLVMBuildFCmp(sem_ctx.builder, LLVMRealOGE, lhs, rhs, "greater_equal_res");
+			if (!type_is_float(dest_type))
+			{
+				tmp = LLVMBuildICmp(sem_ctx.builder, LLVMRealOGE, lhs, rhs, "greater_equal_res");
+			}
+			else
+				tmp = LLVMBuildFCmp(sem_ctx.builder, LLVMRealOGE, lhs, rhs, "greater_equal_res");
 			break;
 		case OP_EQUAL:
-			lhs = cast_float(lhs);
-			rhs = cast_float(rhs);
-			tmp = LLVMBuildFCmp(sem_ctx.builder, LLVMRealOEQ, lhs, rhs, "equal_res");
+			if (!type_is_float(dest_type))
+			{
+				tmp = LLVMBuildICmp(sem_ctx.builder, LLVMRealOEQ, lhs, rhs, "equal_res");
+			}
+			else
+				tmp = LLVMBuildFCmp(sem_ctx.builder, LLVMRealOEQ, lhs, rhs, "equal_res");
+			break;
+		//赋值运算符
+		case OP_ASSIGN:
+			dest_type = LLVMTypeOf(lhs);
+			rhs = llvm_convert_type(dest_type, rhs);
+			TRY_CAST(IdentifierExpr, assigneer, operator->lhs);
+			if (!assigneer)
+			{
+				log_error(operator->lhs, "Expected IdentifierExpr");
+				return NULL;
+			}
+			save_identifierexpr_llvm_value(operator->lhs, rhs);
+			tmp = rhs;
 			break;
 		default:
 			return NULL;
@@ -1001,8 +1137,6 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 
 LLVMValueRef eval_InitilizerListExpr(InitilizerListExpr* ast)
 {
-
-
 	NOT_IMPLEMENTED;
 }
 
@@ -1144,12 +1278,12 @@ LLVMValueRef eval_LoopStmt(LoopStmt* ast) {
 //增加临时测试代码的地方，贫穷.jpg
 void sentence_test()
 {
-	LLVMValueRef v1 = LLVMConstInt(LLVMInt32Type(), 1, 1);
-	LLVMValueRef v2 = LLVMConstInt(LLVMInt32Type(), 2, 1);
-	LLVMValueRef v4 = LLVMBuildAlloca(sem_ctx.builder, LLVMInt32Type(), "test_val");	
-	LLVMValueRef v5 = LLVMBuildStore(sem_ctx.builder, v2, v4);
-	LLVMValueRef v6 = LLVMBuildLoad(sem_ctx.builder, v4, "fuck");
-	printf("fuck!fuck!:%d\n", LLVMTypeOf(v6) == LLVMInt32Type());
+	LLVMValueRef v1 = LLVMConstInt(LLVMInt32Type(), 10, 1);
+	//LLVMValueRef v2 = LLVMBuildTrunc(sem_ctx.builder, v1, LLVMInt64Type(), "trunc");
+	//LLVMValueRef v3 = LLVMBuildAlloca(sem_ctx.builder, LLVMInt1Type(), "test_float");		
+	//LLVMValueRef v6 = LLVMBuildLoad(sem_ctx.builder, v3, "fuck");
+	//LLVMValueRef v7 = LLVMBuildSIToFP(sem_ctx.builder, v1, LLVMFloatType(), "float_cast");
+	//LLVMValueRef v5 = LLVMBuildStore(sem_ctx.builder, v2, v3);
 }
 
 // TODO: @wushuhui

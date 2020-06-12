@@ -7,8 +7,8 @@ define i32 @foo(i32 %"0") {
 entry:
   %"1" = alloca i32
   store i32 %"0", i32* %"1"
-  %a = alloca i32
-  store i32 10, i32* %a
+  %a = alloca float
+  %b = alloca float
   br label %while.cond
 
 while.cond:                                       ; preds = %if.after, %entry
@@ -22,10 +22,7 @@ if.then:                                          ; preds = %while.body
   ret i32 %"4"
 
 if.else:                                          ; preds = %while.body
-  %load_val = load i32, i32* %a
-  %mul_res = mul i32 %load_val, 3
-  %add_res = add i32 %mul_res, 3
-  ret i32 %add_res
+  ret i32 0
 
 if.after:                                         ; No predecessors!
   br label %while.cond
@@ -35,3 +32,5 @@ while.after:                                      ; preds = %while.cond
 }
 
 declare i32 @bar(i32, i32, i32)
+
+declare float @test(float)
