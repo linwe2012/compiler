@@ -7,11 +7,6 @@ define i32 @foo(i32 %"0") {
 entry:
   %"1" = alloca i32
   store i32 %"0", i32* %"1"
-  %y = alloca float
-  %load_val = load float, float* %y
-  store float 1.000000e+00, float* %y
-  %a = alloca i32
-  store i32 10, i32* %a
   br label %while.cond
 
 while.cond:                                       ; preds = %if.after, %entry
@@ -25,10 +20,15 @@ if.then:                                          ; preds = %while.body
   ret i32 %"4"
 
 if.else:                                          ; preds = %while.body
-  %load_val1 = load i32, i32* %a
-  %load_val2 = load float, float* %y
-  %less_res = fcmp olt float %load_val2, 2.000000e+00
-  %int32_cast = zext i1 %less_res to i32
+  %a = alloca i32
+  store i32 10, i32* %a
+  %b = alloca float
+  store float 1.000000e+00, float* %b
+  %load_val = load i32, i32* %a
+  %load_val1 = load float, float* %b
+  %mul_res = fmul float %load_val1, 3.000000e+00
+  %add_res = fadd float 1.000000e+00, %mul_res
+  %int32_cast = fptosi float %add_res to i32
   store i32 %int32_cast, i32* %a
   ret i32 0
 
