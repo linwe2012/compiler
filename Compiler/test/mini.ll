@@ -1,7 +1,13 @@
 ; ModuleID = 'mini.c'
 source_filename = "mini.c"
 
+@"2" = private unnamed_addr constant [16 x i8] c"\22\5CnHello world\22\00"
+@"4" = private unnamed_addr constant [48 x i8] c"\22My age is %d\5Cn, Im %f m, and my hobby is %d\5Cn\22\00"
+@"5" = private unnamed_addr constant [10 x i8] c"\22Running\22\00"
+
 declare i32 @putchar(i32)
+
+declare i32 @printf(i8*, ...)
 
 define i32 @gcd(i32 %a, i32 %b) {
 entry:
@@ -80,5 +86,7 @@ entry:
   %"0" = call i32 @gcd(i32 36, i32 60)
   call void @disp_num(i32 %"0")
   %"1" = call i32 @putchar(i32 10)
+  %"3" = call i32 (i8*, ...) @printf(i8* getelementptr inbounds ([16 x i8], [16 x i8]* @"2", i32 0, i32 0))
+  %"6" = call i32 (i8*, ...) @printf(i8* getelementptr inbounds ([48 x i8], [48 x i8]* @"4", i32 0, i32 0), i32 22, float 0x3FFCCCCCC0000000, i8* getelementptr inbounds ([10 x i8], [10 x i8]* @"5", i32 0, i32 0))
   ret i32 0
 }

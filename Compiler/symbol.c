@@ -612,13 +612,15 @@ Symbol* symbol_create_struct_or_union_incomplete(char* name, enum Types struct_o
 	return sym;
 }
 
-Symbol* symbol_create_func(char* name, LLVMValueRef f, LLVMTypeRef ret_type, LLVMTypeRef* params, AST* body) {
+Symbol* symbol_create_func(char* name, LLVMValueRef f, LLVMTypeRef ret_type, LLVMTypeRef* params, AST* body, int is_variadic, int argc) {
 	Symbol* sym = new_symbol(name, Symbol_FunctionInfo);
 	sym->func.name = name;
 	sym->func.body = body;
 	sym->func.params = params;
 	sym->func.value = f;
 	sym->func.ret_type = ret_type;
+	sym->func.is_variadic = is_variadic;
+	sym->func.argc = argc;
 	return sym;
 }
 

@@ -132,6 +132,8 @@ struct FunctionInfo
 	LLVMTypeRef ret_type;
 	LLVMTypeRef* params;
 	struct AST* body;
+	int is_variadic;
+	int argc;
 };
 STRUCT_TYPE(FunctionInfo)
 
@@ -226,7 +228,7 @@ Symbol* symbol_create_enum_item(Symbol* type, Symbol* prev, char* name, void* va
 Symbol* symbol_from_type_info(TypeInfo* info);
 Symbol* symbol_create_struct_or_union(TypeInfo* info, TypeInfo* child);
 Symbol* symbol_create_struct_or_union_incomplete(char* name, enum Types struct_or_union);
-Symbol* symbol_create_func(char* name, LLVMValueRef f, LLVMTypeRef ret_type, LLVMTypeRef* params, struct AST* body);
+Symbol* symbol_create_func(char* name, LLVMValueRef f, LLVMTypeRef ret_type, LLVMTypeRef* params, struct AST* body, int is_variadic, int argc);
 Symbol* symbol_create_variable(char* name, enum SymbolAttributes attributes, Symbol* type, void* value, int is_constant);
 
 // 类型管理 & 创建

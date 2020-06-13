@@ -925,7 +925,7 @@ AST* make_paramter_ellipse()
 	NEW_AST(TypeSpecifier, spec);
 	init_type_specifier(spec, TypeSpecifier_Exclusive);
 	spec->type = TP_ELLIPSIS;
-
+	decl->type_spec = decl->type_spec_last = spec;
 	return SUPER(decl);
 }
 

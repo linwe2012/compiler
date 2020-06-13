@@ -140,7 +140,7 @@ static void build_putchar() {
 	LLVMTypeRef func_tp = LLVMFunctionType(LLVMInt32Type(), argv, 1, 0);
 
 	LLVMValueRef func = LLVMAddFunction(sem_ctx.module, "putchar", func_tp);
-	Symbol* func_sym = symbol_create_func("putchar", func, LLVMInt32Type(), argv, NULL);
+	Symbol* func_sym = symbol_create_func("putchar", func, LLVMInt32Type(), argv, NULL, 0, 1);
 	symtbl_push(ctx->functions, func_sym);
 }
 
@@ -497,11 +497,24 @@ static Symbol* eval_FuncDeclareStmt(AST* ast, TypeSpecifier* ret_typesp, const c
 	LLVMTypeRef ret_type = extract_llvm_type(extract_type(ret_typesp));
 	LLVMTypeRef* argv = NULL;
 	int argc = 0;
+
+	int is_var_arg = 0;
 	// 构建形参
 	// 如果第一个参数是void，代表无参数, TODO：检查void后面还跟了参数的情况(低优先级)
 	if (paramsp != NULL && paramsp->type != TP_VOID) {
 		TypeSpecifier* tmp = paramsp;
-		for (argc = 0; tmp != NULL; ++argc, tmp = tmp->super.next);
+		TypeSpecifier* prev = NULL;
+
+		for (argc = 0; tmp != NULL && tmp->type != TP_ELLIPSIS; ++argc, tmp = tmp->super.next)
+			prev = tmp;
+
+		// 如果是变参函数
+		if (tmp)
+		{
+			// 在  '...' 之后声明参数是无效的, 但是这个 Yacc 已经帮我们检查了
+
+			is_var_arg = 1;
+		}
 		argv = (LLVMTypeRef*)malloc(argc * sizeof(LLVMTypeRef));
 		tmp = paramsp;
 		for (int i = 0; i < argc; ++i) {
@@ -509,15 +522,17 @@ static Symbol* eval_FuncDeclareStmt(AST* ast, TypeSpecifier* ret_typesp, const c
 			tmp = tmp->super.next;
 		}
 	}
+	
+	
 	LLVMTypeRef func_type = LLVMFunctionType(
 		ret_type,	// 返回类型
 		argv,		// 形参数组
 		argc,		// 形参数量
-		0			// TODO 支持...
+		is_var_arg			// TODO 支持...
 	);
 	LLVMValueRef func = LLVMAddFunction(sem_ctx.module, name, func_type);
 
-	func_sym = symbol_create_func(name, func, ret_type, argv, NULL);
+	func_sym = symbol_create_func(name, func, ret_type, argv, NULL, is_var_arg, argc);
 	symtbl_push(ctx->functions, func_sym);
 	return func_sym;
 }
@@ -748,8 +763,11 @@ LLVMValueRef eval_FunctionCallExpr(FunctionCallExpr* ast) {
 	AST* arg = ast->params;
 	for (; arg != NULL; arg = arg->next, ++argc);
 	LLVMValueRef* argv = calloc(argc, sizeof(LLVMValueRef));
+	
 	arg = ast->params;
-	for (int i = 0; arg != NULL; ++i) {
+	int i = 0;
+	for (; i < func_sym->func.argc; ++i)
+	{
 		argv[i] = llvm_convert_type(func_sym->func.params[i], eval_ast(arg));
 		if (argv[i] == NULL) {
 			log_error(ast, "Pass null value to function call");
@@ -757,6 +775,15 @@ LLVMValueRef eval_FunctionCallExpr(FunctionCallExpr* ast) {
 		}
 		arg = arg->next;
 	}
+
+	if (func_sym->func.is_variadic)
+	{
+		for (; arg != NULL; ++i) {
+			argv[i] = eval_ast(arg);
+			arg = arg->next;
+		}
+	}
+	
 	return LLVMBuildCall(sem_ctx.builder, 
 		func_sym->func.value, argv, argc, 
 		func_sym->func.ret_type == LLVMVoidType() ? "" : next_temp_id_str());

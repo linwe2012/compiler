@@ -1,5 +1,6 @@
 // char *xa[5];
 // char *( *(*xvar)() )[10]; <- 可以解析但是没法LLVM 编译
+int printf(char const* format, ...);
 
 int gcd(int a, int b) {
     if (a % b == 0)
@@ -22,5 +23,8 @@ void disp_num(int n) {
 int main(void) {
     disp_num(gcd(3 * 12, 60));
 	putchar(10);
+
+	printf("\nHello world");
+	printf("My age is %d\n, Im %f m, and my hobby is %d\n", 22, 1.8, "Running");
     return 0;
 }

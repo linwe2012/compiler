@@ -94,6 +94,8 @@ declaration
 declaration_specifiers
     : type_specifier                                   { $$ = $1; }
     | type_specifier declaration_specifiers            { $$ = make_type_specifier_extend($1, $2, ATTR_NONE); }
+	| type_qualifier                                   { $$ = make_type_specifier_extend(NULL, NULL, $1); }
+	| type_qualifier declaration_specifiers            { $$ = make_type_specifier_extend($2, NULL, $1); }
     | storage_class_specifier declaration_specifiers   { $$ = make_type_specifier_extend($2, NULL, $1); }
 	| storage_class_specifier                          { $$ = make_type_specifier_extend(NULL, NULL, $1); }
     ;
