@@ -454,7 +454,7 @@ TypeInfo* extract_type(TypeSpecifier* spec)
 	return result;
 }
 
-// 测试用，只作了简单的几个
+
 LLVMTypeRef extract_llvm_type(TypeInfo* info) {
 	switch (info->type & TP_CLEAR_SIGNFLAGS) {
 	case TP_INT8:
@@ -981,6 +981,8 @@ static LLVMValueRef eval_OP_ARRAY_ACCESS(OperatorExpr* op, int lv) {
 	Symbol* sym = symtbl_find(ctx->variables, identifier->name);
 	LLVMValueRef* indices = calloc(2, sizeof(LLVMValueRef));
 	indices[0] = eval_OperatorExpr(op->rhs);
+	// TODO 这个值的类型是要根据数组类型变的
+	// 并且将来支持struct数组还需要知道offset，所以语义上是否应该在symbol中记录数组类型
 	indices[1] = LLVMConstInt(LLVMInt32Type(), 0, 1);
 	LLVMValueRef gep = LLVMBuildGEP(sem_ctx.builder, sym->value, indices, 2, "gep_res");
 	if (lv) {
@@ -1051,6 +1053,9 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 			// 一元运算符
 		case OP_NEGATIVE:
 			tmp = LLVMBuildNeg(sem_ctx.builder, lhs, "neg_res");
+			break;
+		case OP_PTR_ACCESS:
+			tmp = LLVMBuildLoad(sem_ctx.builder, lhs, "ptr_res");
 			break;
 		case OP_INC:
 			if (!llvm_is_float(lhs))
