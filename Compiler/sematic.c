@@ -1193,7 +1193,7 @@ void eval_WhileStmt(LoopStmt* ast) {
 	}
 	else {
 		if (llvm_is_float(condv)) {
-			fprintf(stderr, "Double value as if.cond is not allowed, implicit converted to true\n");
+			fprintf(stderr, "Cond is float, which is not allowed. Implicit converted to true\n");
 			LLVMBuildBr(sem_ctx.builder, body_bb);
 		}
 		else {
@@ -1244,7 +1244,7 @@ void eval_ForStmt(LoopStmt* ast) {
 	}
 	else {
 		if (llvm_is_float(condv)) {
-			fprintf(stderr, "Double value as if condition is not allowed, implicit converted to true\n");
+			fprintf(stderr, "Cond is float, which is not allowed. Implicit converted to true\n");
 			LLVMBuildBr(sem_ctx.builder, body_bb);
 		}
 		else {
@@ -1322,9 +1322,7 @@ LLVMValueRef eval_IfStmt(IfStmt* ast) {
 	// 似乎clang的标准并不允许double作为条件的值，会有下述warning：
 	// implicit conversion from 'double' to '_Bool' changes value from 1.111 to true
 	if (llvm_is_float(condv)) {
-		// log_warning(ast, "Double value as if condition is not allowed, implicit converted to true");
-		// TODO: 用上面那个warning会终止，手动输出了
-		fprintf(stderr, "Double value as if condition is not allowed, implicit converted to true\n");
+		fprintf(stderr, "Cond is float, which is not allowed. Implicit converted to true\n");
 		LLVMBuildBr(sem_ctx.builder, then_bb);
 	}
 	else {
