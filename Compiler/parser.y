@@ -19,7 +19,7 @@ AST* parser_result = NULL;
     char* str;
 }
 
-%token <str> IDENTIFIER CONSTANT STRING_LITERAL
+%token <str> IDENTIFIER CONSTANT STRING_LITERAL CHAR_LITERAL
 %token <str> SIZEOF
 %token <str> PTR_OP INC_OP DEC_OP LEFT_OP RIGHT_OP LE_OP GE_OP EQ_OP NE_OP
 %token <str> AND_OP OR_OP MUL_ASSIGN DIV_ASSIGN MOD_ASSIGN ADD_ASSIGN
@@ -64,7 +64,7 @@ AST* parser_result = NULL;
 %%
 // defination part
 translation_unit 
-    : external_declaration                      { parser_result = $1; $$ = $1; }
+    : external_declaration                             { parser_result = $1; $$ = $1; }
     | external_declaration translation_unit     { parser_result = $1; $$ = ast_append($1, $2); }
     ;
 
@@ -88,6 +88,7 @@ function_definition
 declaration
     : declaration_specifiers attribute_specifier init_declarator_list ';'  { $$ = make_declaration($1, $2, $3); }
     | declaration_specifiers init_declarator_list ';'                      { $$ = make_declaration($1, ATTR_NONE, $2); }
+	// | declaration_specifiers ';'										   { $$ = make_declaration($1, ATTR_NONE, NULL); }
     ;
 
 declaration_specifiers
@@ -472,7 +473,7 @@ postfix_expression
 	| postfix_expression '.' IDENTIFIER { $$ = make_binary_expr(OP_STACK_ACCESS, $1, make_identifier($3)); }
 	| postfix_expression PTR_OP IDENTIFIER { $$ = make_binary_expr(OP_PTR_ACCESS, $1, make_identifier($3)); }
 	| postfix_expression INC_OP { $$ = make_unary_expr(OP_POSTFIX_INC, $1); }
-	| postfix_expression DEC_OP { $$ = make_unary_expr(OP_POSTFIX_INC, $1); }
+	| postfix_expression DEC_OP { $$ = make_unary_expr(OP_POSTFIX_DEC, $1); }
 	;
 
 primary_expression
@@ -481,6 +482,7 @@ primary_expression
 	| NUM_FLOAT32           { $$ = make_number_float($1, 32); }
 	| NUM_FLOAT64           { $$ = make_number_float($1, 64); }
 	| STRING_LITERAL      { $$ = make_string($1); }  
+	| CHAR_LITERAL			{ $$ = make_char($1); }
 	| '(' expression ')'  { $$ = make_list_expr($2); }
 	;
 

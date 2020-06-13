@@ -19,7 +19,7 @@ int main()
 #ifdef CC_DEBUG
 	// parser_set_debug(0);
 	// yydebug = 1;
-	yydebug = 1;
+	// yydebug = 1;
 #endif
 	yyin = fopen("test/mini.c", "rt");
 	int res = yyparse();

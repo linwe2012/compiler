@@ -1,47 +1,26 @@
-char *xa[5];
-char *( *(*xvar)() )[10];
+// char *xa[5];
+// char *( *(*xvar)() )[10]; <- 可以解析但是没法LLVM 编译
 
-/*
-int foo(int x);
-
-int bar(int a, int b, int c);
-
-float test(float a);
-
-struct A {
-	int a;
-	double b;
-};
-
-int foo(int x) {
-	while (1) {
-		if (1) {
-			return bar(1, 2, 3);
-		}
-		else {	
-			int a = 10;
-			float b = 1.0;
-			a = 1 + b * 3;
-			return 0;
-		}
-		if(0)
-		{
-			int c = sizeof(struct A);
-		}
-	}
-	return 0;
+int gcd(int a, int b) {
+    if (a % b == 0)
+        return b;
+    return gcd(b, a % b);
 }
 
-
-
-/*int foo(int a);
+void disp_num(int n) {
+	if (n < 0) {
+		n = -n;
+		putchar('-');
+	} else if (n == 0) {
+		return;
+	}
+	
+	disp_num(n / 10);
+	putchar(n % 10 + '0');
+}
 
 int main(void) {
-	int h = 104, o = 111, l = 108, a = 97;
-	putchar(h); // 'h'
-	putchar(o); // 'o'
-	putchar(l); // 'l'
-	putchar(a);  // 'a'
-	putchar(10);  // '\n'
-	return 0;
-}*/
+    disp_num(gcd(3 * 12, 60));
+	putchar(10);
+    return 0;
+}
