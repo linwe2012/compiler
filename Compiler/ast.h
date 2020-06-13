@@ -299,6 +299,7 @@ struct TypeSpecifier
 	char* name;
 	char* field_name;
 	enum Types type;
+	int paren;
 	
 	struct TypeSpecifier* child;
 	struct TypeSpecifier* params;
@@ -445,7 +446,7 @@ AST* make_enum_define(char* identifier, AST* enum_list);
 //     struct/union identifier { field_list }
 AST* make_struct_field_declaration(AST* specifier_qualifier, AST* struct_declarator);
 AST* make_struct_or_union_define(enum Types type, char* identifier, AST* field_list);
-
+AST* make_mark_declarator_paren(AST* target);
 
 
 
@@ -457,7 +458,7 @@ AST* make_type_declarator(AST* specifier_qualifier, AST* declarator);
 AST* make_paramter_ellipse();
 
 
-void do_eval(AST* ast, struct Context* _ctx, char* module_name);
+void do_eval(AST* ast, struct Context* _ctx, char* module_name, const char* output_file);
 
 /*
 

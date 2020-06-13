@@ -58,6 +58,12 @@ struct SematicContext
 	LLVMModuleRef module;
 } sem_ctx;
 
+// TypeInfo.value = TypeLLVMValue
+struct TypeSematic
+{
+	LLVMTypeRef llvm_type;
+};
+
 static void append_bb(BBListNode** top, LLVMBasicBlockRef bb) {
 	BBListNode* breakable = (BBListNode*)calloc(1, sizeof(BBListNode));
 	breakable->block = bb;
@@ -158,6 +164,12 @@ void sem_init(AST* ast)
 	}
 }
 
+void sematic_init_context(Context* ctx)
+{
+	// TODO
+	//LLVM
+}
+
 LLVMValueRef eval_ast(AST* ast)
 {
 #define EVAL_CASE(type__) \
@@ -200,7 +212,7 @@ LLVMValueRef eval_list(AST* ast)
 }
 
 // bootstrapping
-void do_eval(AST* ast, struct Context* _ctx, char* module_name)
+void do_eval(AST* ast, struct Context* _ctx, char* module_name, const char* output_file)
 {
 	sem_ctx.module = LLVMModuleCreateWithName(module_name);
 	sem_ctx.builder = LLVMCreateBuilder();
@@ -212,7 +224,7 @@ void do_eval(AST* ast, struct Context* _ctx, char* module_name)
 	eval_list(ast);
 
 	char** msg = NULL;
-	LLVMBool res = LLVMPrintModuleToFile(sem_ctx.module, "test/mini.ll", msg);
+	LLVMBool res = LLVMPrintModuleToFile(sem_ctx.module, output_file, msg);
 	if (res != 0 && msg != NULL) {
 		printf("LLVM error: %s\n", msg);
 		LLVMDisposeMessage(*msg);
@@ -444,18 +456,31 @@ TypeInfo* extract_type(TypeSpecifier* spec)
 
 // 测试用，只作了简单的几个
 LLVMTypeRef extract_llvm_type(TypeInfo* info) {
-	switch (info->type) {
+	switch (info->type & TP_CLEAR_SIGNFLAGS) {
 	case TP_INT8:
 		return LLVMInt8Type();
+	case TP_INT16:
+		return LLVMInt16Type();
 	case TP_INT32:
 		return LLVMInt32Type();
+	case TP_INT64:
+		return LLVMInt64Type();
+	case TP_INT128:
+		return LLVMInt128Type();
 	case TP_VOID:
 		return LLVMVoidType();
 	case TP_FLOAT32:
 		return LLVMFloatType();
+	case TP_FLOAT64:
+		return LLVMFloatType();
 	case TP_PTR:
 		return LLVMPointerType(extract_llvm_type(info->ptr.pointing), 0);
-		break;
+	case TP_ENUM:
+		return LLVMInt64Type();
+	case TP_UNION:
+	case TP_STRUCT:
+		return LLVMArrayType(LLVMInt8Type(), info->aligned_size);
+
 	default:
 		break;
 	}
@@ -614,8 +639,6 @@ LLVMValueRef eval_EnumDeclareStmt(EnumDeclareStmt* ast)
 			continue;
 		}
 
-
-
 		//TODO: Check for duplicate enums
 		Symbol* enum_item = symbol_create_enum_item(
 			enum_type, last_enum_item, id->name,
@@ -639,16 +662,30 @@ LLVMValueRef eval_EnumDeclareStmt(EnumDeclareStmt* ast)
 // TODO: Add type from symbol table
 LLVMValueRef eval_AggregateDeclareStmt(AggregateDeclareStmt* ast)
 {
-
-
-
-	/*
 	TypeInfo* first = NULL;
 	TypeInfo* last = NULL;
+	AST* field_list = ast->fields;
+	Symbol* aggregate = NULL;
+	if (ast->name != NULL)
+	{
+		aggregate = symtbl_find(ctx->types, ast->name);
+	}
+	
+	if (aggregate == NULL)
+	{
+		aggregate = symbol_create_struct_or_union_incomplete(NULL, ast->type);
+	}
+
+	if (field_list == NULL)
+	{
+		log_error(ast, "Expected at least on field for struct");
+	}
+
 	FOR_EACH(field_list, st)
 	{
-		CAST(DeclaratorExpr, decl, st);
-		TypeInfo* ty = decl->first;
+		TRY_CAST(DeclaratorExpr, decl, st);
+		TypeInfo * ty = extract_type(decl->type_spec);
+		
 		if (first == NULL)
 		{
 			first = last = ty;
@@ -658,8 +695,17 @@ LLVMValueRef eval_AggregateDeclareStmt(AggregateDeclareStmt* ast)
 			last = ty;
 		}
 	}
-	*/
-	NOT_IMPLEMENTED;
+
+	if (first != NULL)
+	{
+		symbol_create_struct_or_union(&aggregate->type, first);
+		NEW_STRUCT(TypeSematic, sem);
+		sem->llvm_type = LLVMArrayType(LLVMInt8Type(), aggregate->type.aligned_size);
+		aggregate->type.value = sem;
+	}
+	
+	
+	return NULL;
 }
 
 LLVMValueRef eval_BlockExpr(BlockExpr* ast)
@@ -760,6 +806,7 @@ LLVMValueRef eval_IdentifierExpr(IdentifierExpr* ast)
 	return LLVMBuildLoad(sem_ctx.builder, sym->var.value, next_temp_id_str());
 }
 
+// TODO: support more types
 LLVMValueRef eval_NumberExpr(NumberExpr* ast) {
 	enum Types type = (ast->number_type & 0xFu);
 	switch (type) {
@@ -982,8 +1029,83 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 		case OP_INC:
 			if (!llvm_is_float(lhs))
 			{
+				tmp = LLVMBuildAdd(sem_ctx.builder, lhs, LLVMConstInt(dest_type, 1, 1), "inc_res");
+				TRY_CAST(IdentifierExpr, assigneer, operator->lhs);
+				if (!assigneer)
+				{
+					log_error(operator->lhs, "Expected IdentifierExpr");
+					return NULL;
+				}
+				save_identifierexpr_llvm_value(assigneer, tmp);
+			}
+			else
+			{
+				tmp = LLVMBuildFAdd(sem_ctx.builder, lhs, LLVMConstReal(dest_type, 1), "inc_res");
+				TRY_CAST(IdentifierExpr, assigneer, operator->lhs);
+				if (!assigneer)
+				{
+					log_error(operator->lhs, "Expected IdentifierExpr");
+					return NULL;
+				}
+				save_identifierexpr_llvm_value(assigneer, tmp);
+			}
+			break;
+		case OP_DEC:
+			if (!llvm_is_float(lhs))
+			{
+				tmp = LLVMBuildAdd(sem_ctx.builder, lhs, LLVMConstInt(dest_type, -1, 1), "dec_res");
+				TRY_CAST(IdentifierExpr, assigneer, operator->lhs);
+				if (!assigneer)
+				{
+					log_error(operator->lhs, "Expected IdentifierExpr");
+					return NULL;
+				}
+				save_identifierexpr_llvm_value(assigneer, tmp);
+			}
+			else
+			{
+				tmp = LLVMBuildFAdd(sem_ctx.builder, lhs, LLVMConstReal(dest_type, -1), "dec_res");
+				TRY_CAST(IdentifierExpr, assigneer, operator->lhs);
+				if (!assigneer)
+				{
+					log_error(operator->lhs, "Expected IdentifierExpr");
+					return NULL;
+				}
+				save_identifierexpr_llvm_value(assigneer, tmp);
+			}
+			break;
+		case OP_POSTFIX_INC:
+			if (!llvm_is_float(lhs))
+			{
 				tmp = lhs;
 				tmp1 = LLVMBuildAdd(sem_ctx.builder, lhs, LLVMConstInt(dest_type, 1, 1), "inc_res");
+				TRY_CAST(IdentifierExpr, assigneer, operator->lhs);
+				if (!assigneer)
+				{
+					log_error(operator->lhs, "Expected IdentifierExpr");
+					return NULL;
+				}
+				save_identifierexpr_llvm_value(assigneer, tmp1);
+
+			}
+			else
+			{
+				tmp = lhs;
+				tmp1 = LLVMBuildFAdd(sem_ctx.builder, lhs, LLVMConstReal(dest_type, 1), "inc_res");
+				TRY_CAST(IdentifierExpr, assigneer, operator->lhs);
+				if (!assigneer)
+				{
+					log_error(operator->lhs, "Expected IdentifierExpr");
+					return NULL;
+				}
+				save_identifierexpr_llvm_value(assigneer, tmp1);
+			}
+			break;
+		case OP_POSTFIX_DEC:
+			if (!llvm_is_float(lhs))
+			{
+				tmp = lhs;
+				tmp1 = LLVMBuildAdd(sem_ctx.builder, lhs, LLVMConstInt(dest_type, -1, 1), "dec_res");
 				TRY_CAST(IdentifierExpr, assigneer, operator->lhs);
 				if (!assigneer)
 				{
@@ -994,37 +1116,15 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 			}
 			else
 			{
-				tmp = LLVMBuildFAdd(sem_ctx.builder, lhs, LLVMConstReal(dest_type, 1), "inc_res");
-			}
-			break;
-		case OP_DEC:
-			if (!llvm_is_float(lhs))
-			{
-				tmp = LLVMBuildAdd(sem_ctx.builder, lhs, LLVMConstInt(dest_type, -1, 1), "dec_res");
-			}
-			else
-			{
-				tmp = LLVMBuildFAdd(sem_ctx.builder, lhs, LLVMConstReal(dest_type, -1), "dec_res");
-			}
-			break;
-		case OP_POSTFIX_INC:
-			if (!llvm_is_float(lhs))
-			{
-				tmp = LLVMBuildAdd(sem_ctx.builder, lhs, LLVMConstInt(dest_type, 1, 1), "inc_res");
-			}
-			else
-			{
-				tmp = LLVMBuildFAdd(sem_ctx.builder, lhs, LLVMConstReal(dest_type, 1), "inc_res");
-			}
-			break;
-		case OP_POSTFIX_DEC:
-			if (!llvm_is_float(lhs))
-			{
-				tmp = LLVMBuildAdd(sem_ctx.builder, lhs, LLVMConstInt(dest_type, 1, 1), "dec_res");
-			}
-			else
-			{
-				tmp = LLVMBuildFAdd(sem_ctx.builder, lhs, LLVMConstReal(dest_type, -1), "dec_res");
+				tmp = lhs;
+				tmp1 = LLVMBuildFAdd(sem_ctx.builder, lhs, LLVMConstReal(dest_type, -1), "dec_res");
+				TRY_CAST(IdentifierExpr, assigneer, operator->lhs);
+				if (!assigneer)
+				{
+					log_error(operator->lhs, "Expected IdentifierExpr");
+					return NULL;
+				}
+				save_identifierexpr_llvm_value(assigneer, tmp1);
 			}
 			break;
 			// 二元运算符
@@ -1158,6 +1258,54 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 			save_identifierexpr_llvm_value(assigneer, rhs);
 			tmp = rhs;
 			break;
+
+		case OP_SIZEOF:
+		{
+			uint64_t result = 0;
+			TRY_CAST(IdentifierExpr, id, operator->lhs);
+			TRY_CAST(TypeSpecifier, spec, operator->lhs);
+			if (id != NULL)
+			{
+				Symbol* variable = symtbl_find(ctx->variables, id->name);
+				
+				if (variable == NULL)
+				{
+					log_error(operator->lhs, "Undeclared identifier");
+				}
+				else {
+					if (variable->var.type->type.incomplete)
+					{
+						log_error(operator->lhs, "Identifier's type is not declared or incomplete");
+					}
+					else {
+						result = variable->var.type->type.aligned_size;
+					}
+				}
+			}
+			// TODO: Specifier 是否也可以用 value ref?
+			else if (spec != NULL)
+			{
+				TypeInfo* ty = extract_type(spec);
+				if (ty == NULL || ty->incomplete)
+				{
+					log_error(operator->lhs, "Type specifier is incomplete");
+				}
+				result = ty->aligned_size;
+			}
+			else {
+				LLVMValueRef val = eval_ast(operator->lhs);
+				if (val != NULL)
+				{
+					LLVMValueRef ty = LLVMTypeOf(val);
+					tmp = LLVMSizeOf(ty);
+				}
+			}
+			tmp = LLVMConstInt(
+				LLVMInt64Type(),
+				result,
+				0);
+		}
+
 		default:
 			return NULL;
 			break;

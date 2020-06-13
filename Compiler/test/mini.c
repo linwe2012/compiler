@@ -1,3 +1,6 @@
+// char *xa[5];
+// char *( *(*xvar)() )[10]; <- 可以解析但是没法LLVM 编译
+
 int gcd(int a, int b) {
     if (a % b == 0)
         return b;

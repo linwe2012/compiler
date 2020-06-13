@@ -564,7 +564,27 @@ void extend_declarator_with_specifier(DeclaratorExpr* decl, TypeSpecifier* spec)
 	else {
 		decl->type_spec_last->child = spec;
 	}
+	while (spec->child)
+	{
+		spec = spec->child;
+	}
 	decl->type_spec_last = spec;
+}
+
+void extend_declarator_with_specifier_prepend(DeclaratorExpr* decl, TypeSpecifier* spec)
+{
+	spec->child = decl->type_spec;
+	decl->type_spec = spec;
+}
+
+AST* make_mark_declarator_paren(AST* target)
+{
+	CAST(DeclaratorExpr, decl, target);
+	if (decl->type_spec)
+	{
+		decl->type_spec->paren = 1;
+	}
+	return target;
 }
 
 AST* make_extent_direct_declarator(AST* direct, enum Types type, AST* wrapped)
@@ -645,13 +665,14 @@ AST* make_declarator(AST* pointer, AST* direct_declarator)
 {
 	CAST(DeclaratorExpr, ptr, pointer);
 	CAST(DeclaratorExpr, decl, direct_declarator);
-
+	extend_declarator_with_specifier(decl, ptr->type_spec);
+	/*
 	ptr->type_spec_last->child = decl->type_spec;
 	decl->type_spec = ptr->type_spec;
 	if (decl->type_spec_last == NULL)
 	{
 		decl->type_spec_last = ptr->type_spec_last;
-	}
+	}*/
 
 	free(ptr);
 
@@ -715,6 +736,7 @@ void init_type_specifier(TypeSpecifier* ts, enum TypeSpecifierFlags flags)
 	ts->type = TP_INCOMPLETE;
 	ts->flags |= flags;
 	ts->params = NULL;
+	ts->paren = 0;
 }
 
 AST* make_type_specifier(enum Types type)

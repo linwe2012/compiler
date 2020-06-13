@@ -19,6 +19,7 @@ int main()
 #ifdef CC_DEBUG
 	// parser_set_debug(0);
 	// yydebug = 1;
+	// yydebug = 1;
 #endif
 	yyin = fopen("test/mini.c", "rt");
 	int res = yyparse();
@@ -32,7 +33,7 @@ int main()
 	// AST* ast = make_block(parser_result);// yylval.val;
 	ast_to_json(parser_result, "test/out.json");
 
-	do_eval(parser_result, &ctx, "mini.c");
+	do_eval(parser_result, &ctx, "mini.c", "test/mini.ll");
 
 	printf("done");
 	return res;

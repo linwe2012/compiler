@@ -236,6 +236,7 @@ TypeInfo* type_create_array(uint64_t n, enum SymbolAttributes qualifers, TypeInf
 TypeInfo* type_create_ptr(enum SymbolAttributes qualifers, struct TypeInfo* pointing);
 TypeInfo* type_create_func(struct TypeInfo* ret, char* name, struct TypeInfo* params);
 TypeInfo* create_struct_field(TypeInfo* type_info, enum SymbolAttributes attributes, char* field_name);
+// TypeInfo* create_struct_bitfield(TypeInfo* type_info, enum SymbolAttributes attributes, char* field_name, int bits);
 
 TypeInfo* type_create_param_ellipse();
 

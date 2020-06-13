@@ -251,6 +251,10 @@ TypeInfo* type_create_array(uint64_t n, enum SymbolAttributes qualifers, TypeInf
 	info->qualifiers = qualifers;
 	info->arr.array_type = array_element_type;
 	info->arr.has_value = 1;
+
+	info->alignment = array_element_type->alignment;
+	info->aligned_size = array_element_type->alignment * n;
+	
 	return info;
 }
 
@@ -290,6 +294,8 @@ TypeInfo* type_create_func(struct TypeInfo* ret, char* name, struct TypeInfo* pa
 	info->type = TP_FUNC;
 	info->fn.params = params;
 	info->fn.return_type = ret;
+	info->aligned_size = 8;
+	info->alignment = 8;
 
 	return info;
 }
@@ -531,6 +537,7 @@ union ConstantValue constant_cast(enum Types from, enum Types to, union Constant
 }
 
 
+
 //TODO: Double check 我算的 对不对
 //TODO: 支持 bit field
 
@@ -539,31 +546,46 @@ Symbol* symbol_create_struct_or_union(TypeInfo* info, TypeInfo* child)
 	TypeInfo* move = child;
 	int max_aligned_size = 0;
 	int max_alignment = 0;
+
+	char* (*a)[10];
+
+	// 每个 field 的对齐要求和最大对其量
 	while (move)
 	{
 		max_aligned_size = max(move->aligned_size, max_aligned_size);
 		max_alignment = max(move->alignment, max_alignment);
+		move = move->next;
 	}
 
+	move = child;
 	if (info->type & TP_UNION)
 	{
-		move->offset = 0;
+		while (move)
+		{
+			move->offset = 0;
+		}
+		
 		info->aligned_size = max_aligned_size;
 		info->alignment = max_alignment;
 	}
+
 	else if (info->type & TP_STRUCT)
 	{
 		int size = 0;
-		move = child;
+		int last_alignment = 0;
+
 		while (move)
 		{
-			if (size != 0)
+			if ((size != 0) && (last_alignment < move->alignment))
 			{
-				size = (size / move->alignment + 1) * move->alignment;
+				int padding = move->alignment - last_alignment;
+				size += padding;
 			}
+			
 
 			move->offset = size;
 			size += move->alignment;
+			last_alignment = move->alignment;
 		}
 
 
