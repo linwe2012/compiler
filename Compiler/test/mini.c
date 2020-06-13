@@ -8,15 +8,16 @@ void disp_num(int n) {
 	if (n < 0) {
 		n = -n;
 		putchar('-');
+	} else if (n == 0) {
+		return;
 	}
-	while (n) {
-		putchar(n % 10 + '0');
-		n = n / 10;
-	}
+	
+	disp_num(n / 10);
+	putchar(n % 10 + '0');
 }
 
 int main(void) {
-    disp_num(gcd(3 * 12, 8));
+    disp_num(gcd(3 * 12, 60));
 	putchar(10);
     return 0;
 }

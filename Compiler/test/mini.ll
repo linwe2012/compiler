@@ -49,35 +49,35 @@ if.then:                                          ; preds = %entry
   %"2" = call i32 @putchar(i32 45)
   br label %if.after
 
-if.else:                                          ; preds = %entry
+if.then4:                                         ; preds = %if.else
+  ret void
+
+if.else5:                                         ; preds = %if.else
+  br label %if.after6
+
+if.after6:                                        ; preds = %if.else5
   br label %if.after
 
-if.after:                                         ; preds = %if.else, %if.then
-  br label %while.cond
-
-while.cond:                                       ; preds = %while.body, %if.after
-  %"3" = load i32, i32* %"0"
-  %"4" = icmp ne i32 %"3", 0
-  br i1 %"4", label %while.body, label %while.after
-
-while.body:                                       ; preds = %while.cond
+if.else:                                          ; preds = %entry
   %load_val3 = load i32, i32* %"0"
-  %mod_res = srem i32 %load_val3, 10
-  %add_res = add i32 %mod_res, 48
-  %"5" = call i32 @putchar(i32 %add_res)
-  %load_val4 = load i32, i32* %"0"
-  %load_val5 = load i32, i32* %"0"
-  %div_res = sdiv exact i32 %load_val5, 10
-  store i32 %div_res, i32* %"0"
-  br label %while.cond
+  %equal_res = icmp eq i32 %load_val3, 0
+  %"3" = icmp ne i1 %equal_res, false
+  br i1 %"3", label %if.then4, label %if.else5
 
-while.after:                                      ; preds = %while.cond
+if.after:                                         ; preds = %if.after6, %if.then
+  %load_val7 = load i32, i32* %"0"
+  %div_res = sdiv exact i32 %load_val7, 10
+  call void @disp_num(i32 %div_res)
+  %load_val8 = load i32, i32* %"0"
+  %mod_res = srem i32 %load_val8, 10
+  %add_res = add i32 %mod_res, 48
+  %"4" = call i32 @putchar(i32 %add_res)
   ret void
 }
 
 define i32 @main() {
 entry:
-  %"0" = call i32 @gcd(i32 36, i32 8)
+  %"0" = call i32 @gcd(i32 36, i32 60)
   call void @disp_num(i32 %"0")
   %"1" = call i32 @putchar(i32 10)
   ret i32 0
