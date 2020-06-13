@@ -475,6 +475,8 @@ LLVMTypeRef extract_llvm_type(TypeInfo* info) {
 		return LLVMFloatType();
 	case TP_PTR:
 		return LLVMPointerType(extract_llvm_type(info->ptr.pointing), 0);
+	case TP_ARRAY:
+		return LLVMArrayType(extract_llvm_type(info->arr.array_type), info->arr.array_count);
 	case TP_ENUM:
 		return LLVMInt64Type();
 	case TP_UNION:
@@ -970,6 +972,24 @@ LLVMTypeRef llvm_get_res_type(LLVMValueRef lhs, LLVMValueRef rhs)
 		return LLVMInt32Type();
 }
 
+static LLVMValueRef eval_OP_ARRAY_ACCESS(OperatorExpr* op, int lv) {
+	TRY_CAST(IdentifierExpr, identifier, op->lhs);
+	if (!identifier) {
+		log_error(op, "Expected IdentifierExpr");
+		return NULL;
+	}
+	Symbol* sym = symtbl_find(ctx->variables, identifier->name);
+	LLVMValueRef* indices = calloc(2, sizeof(LLVMValueRef));
+	indices[0] = eval_OperatorExpr(op->rhs);
+	indices[1] = LLVMConstInt(LLVMInt32Type(), 0, 1);
+	LLVMValueRef gep = LLVMBuildGEP(sem_ctx.builder, sym->value, indices, 2, "gep_res");
+	if (lv) {
+		return gep;
+	} else {
+		return LLVMBuildLoad(sem_ctx.builder, gep, "arr_res");
+	}
+}
+
 
 // 目前仅考虑signed类型
 LLVMValueRef eval_OperatorExpr(AST* ast)
@@ -1006,6 +1026,12 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 			log_error(ast, "Expected OperatorExpr");
 			return NULL;
 		}
+
+		if (operator->op == OP_ARRAY_ACCESS) {
+			// 一些比较特殊的op不适合和后面的一起做
+			return eval_OP_ARRAY_ACCESS(operator, 0);
+		}
+
 		lhs = eval_OperatorExpr(operator->lhs);
 		rhs = eval_OperatorExpr(operator->rhs);
 		if (lhs && rhs && operator->op != OP_ASSIGN)
@@ -1256,6 +1282,7 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 				return NULL;
 			}
 			save_identifierexpr_llvm_value(assigneer, rhs);
+			// LLVMBuildStore(sem_ctx.builder, rhs, eval_OP_ARRAY_ACCESS(operator->lhs, 1));
 			tmp = rhs;
 			break;
 
