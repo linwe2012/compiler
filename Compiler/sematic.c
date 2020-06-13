@@ -704,7 +704,10 @@ LLVMValueRef eval_FunctionCallExpr(FunctionCallExpr* ast) {
 		}
 		arg = arg->next;
 	}
-	return LLVMBuildCall(sem_ctx.builder, func_sym->func.value, argv, argc, next_temp_id_str());
+	char* res_name = func_sym->func.ret_type == LLVMVoidType() ? "" : next_temp_id_str();
+	return LLVMBuildCall(sem_ctx.builder, 
+		func_sym->func.value, argv, argc, 
+		res_name);
 }
 
 
@@ -777,7 +780,7 @@ LLVMValueRef get_identifierxpr_llvm_value(IdentifierExpr* expr) {
 	if (sym == NULL) {
 		return NULL;
 	}
-	return  LLVMBuildLoad(sem_ctx.builder, sym->value, "load_val");
+	return LLVMBuildLoad(sem_ctx.builder, sym->value, "load_val");
 }
 
 void save_identifierexpr_llvm_value(IdentifierExpr* expr, LLVMValueRef val)
