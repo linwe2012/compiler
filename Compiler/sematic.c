@@ -982,8 +982,83 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 		case OP_INC:
 			if (!llvm_is_float(lhs))
 			{
+				tmp = LLVMBuildAdd(sem_ctx.builder, lhs, LLVMConstInt(dest_type, 1, 1), "inc_res");
+				TRY_CAST(IdentifierExpr, assigneer, operator->lhs);
+				if (!assigneer)
+				{
+					log_error(operator->lhs, "Expected IdentifierExpr");
+					return NULL;
+				}
+				save_identifierexpr_llvm_value(assigneer, tmp);
+			}
+			else
+			{
+				tmp = LLVMBuildFAdd(sem_ctx.builder, lhs, LLVMConstReal(dest_type, 1), "inc_res");
+				TRY_CAST(IdentifierExpr, assigneer, operator->lhs);
+				if (!assigneer)
+				{
+					log_error(operator->lhs, "Expected IdentifierExpr");
+					return NULL;
+				}
+				save_identifierexpr_llvm_value(assigneer, tmp);
+			}
+			break;
+		case OP_DEC:
+			if (!llvm_is_float(lhs))
+			{
+				tmp = LLVMBuildAdd(sem_ctx.builder, lhs, LLVMConstInt(dest_type, -1, 1), "dec_res");
+				TRY_CAST(IdentifierExpr, assigneer, operator->lhs);
+				if (!assigneer)
+				{
+					log_error(operator->lhs, "Expected IdentifierExpr");
+					return NULL;
+				}
+				save_identifierexpr_llvm_value(assigneer, tmp);
+			}
+			else
+			{
+				tmp = LLVMBuildFAdd(sem_ctx.builder, lhs, LLVMConstReal(dest_type, -1), "dec_res");
+				TRY_CAST(IdentifierExpr, assigneer, operator->lhs);
+				if (!assigneer)
+				{
+					log_error(operator->lhs, "Expected IdentifierExpr");
+					return NULL;
+				}
+				save_identifierexpr_llvm_value(assigneer, tmp);
+			}
+			break;
+		case OP_POSTFIX_INC:
+			if (!llvm_is_float(lhs))
+			{
 				tmp = lhs;
 				tmp1 = LLVMBuildAdd(sem_ctx.builder, lhs, LLVMConstInt(dest_type, 1, 1), "inc_res");
+				TRY_CAST(IdentifierExpr, assigneer, operator->lhs);
+				if (!assigneer)
+				{
+					log_error(operator->lhs, "Expected IdentifierExpr");
+					return NULL;
+				}
+				save_identifierexpr_llvm_value(assigneer, tmp1);
+
+			}
+			else
+			{
+				tmp = lhs;
+				tmp1 = LLVMBuildFAdd(sem_ctx.builder, lhs, LLVMConstReal(dest_type, 1), "inc_res");
+				TRY_CAST(IdentifierExpr, assigneer, operator->lhs);
+				if (!assigneer)
+				{
+					log_error(operator->lhs, "Expected IdentifierExpr");
+					return NULL;
+				}
+				save_identifierexpr_llvm_value(assigneer, tmp1);
+			}
+			break;
+		case OP_POSTFIX_DEC:
+			if (!llvm_is_float(lhs))
+			{
+				tmp = lhs;
+				tmp1 = LLVMBuildAdd(sem_ctx.builder, lhs, LLVMConstInt(dest_type, -1, 1), "dec_res");
 				TRY_CAST(IdentifierExpr, assigneer, operator->lhs);
 				if (!assigneer)
 				{
@@ -994,37 +1069,15 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 			}
 			else
 			{
-				tmp = LLVMBuildFAdd(sem_ctx.builder, lhs, LLVMConstReal(dest_type, 1), "inc_res");
-			}
-			break;
-		case OP_DEC:
-			if (!llvm_is_float(lhs))
-			{
-				tmp = LLVMBuildAdd(sem_ctx.builder, lhs, LLVMConstInt(dest_type, -1, 1), "dec_res");
-			}
-			else
-			{
-				tmp = LLVMBuildFAdd(sem_ctx.builder, lhs, LLVMConstReal(dest_type, -1), "dec_res");
-			}
-			break;
-		case OP_POSTFIX_INC:
-			if (!llvm_is_float(lhs))
-			{
-				tmp = LLVMBuildAdd(sem_ctx.builder, lhs, LLVMConstInt(dest_type, 1, 1), "inc_res");
-			}
-			else
-			{
-				tmp = LLVMBuildFAdd(sem_ctx.builder, lhs, LLVMConstReal(dest_type, 1), "inc_res");
-			}
-			break;
-		case OP_POSTFIX_DEC:
-			if (!llvm_is_float(lhs))
-			{
-				tmp = LLVMBuildAdd(sem_ctx.builder, lhs, LLVMConstInt(dest_type, 1, 1), "dec_res");
-			}
-			else
-			{
-				tmp = LLVMBuildFAdd(sem_ctx.builder, lhs, LLVMConstReal(dest_type, -1), "dec_res");
+				tmp = lhs;
+				tmp1 = LLVMBuildFAdd(sem_ctx.builder, lhs, LLVMConstReal(dest_type, -1), "dec_res");
+				TRY_CAST(IdentifierExpr, assigneer, operator->lhs);
+				if (!assigneer)
+				{
+					log_error(operator->lhs, "Expected IdentifierExpr");
+					return NULL;
+				}
+				save_identifierexpr_llvm_value(assigneer, tmp1);
 			}
 			break;
 			// 二元运算符

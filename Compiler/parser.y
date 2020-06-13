@@ -473,7 +473,7 @@ postfix_expression
 	| postfix_expression '.' IDENTIFIER { $$ = make_binary_expr(OP_STACK_ACCESS, $1, make_identifier($3)); }
 	| postfix_expression PTR_OP IDENTIFIER { $$ = make_binary_expr(OP_PTR_ACCESS, $1, make_identifier($3)); }
 	| postfix_expression INC_OP { $$ = make_unary_expr(OP_POSTFIX_INC, $1); }
-	| postfix_expression DEC_OP { $$ = make_unary_expr(OP_POSTFIX_INC, $1); }
+	| postfix_expression DEC_OP { $$ = make_unary_expr(OP_POSTFIX_DEC, $1); }
 	;
 
 primary_expression
