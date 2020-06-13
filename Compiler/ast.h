@@ -342,6 +342,7 @@ AST* make_identifier_with_constant_val(const char* c, AST* constant_val);
 AST* make_number_int(char* c, enum Types type);
 AST* make_number_float(const char* c, int bits);
 AST* make_string(char* c);
+AST* make_char(char* c);
 
 
 // conditional-expression

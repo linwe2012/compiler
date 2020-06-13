@@ -85,6 +85,7 @@ comment		{c_comment}|{cpp_comment}
 
 {identifier}    	{ COPY_STR(); return IDENTIFIER; }
 \"(\\.|[^\\"\n])*\"	{ COPY_STR(); return STRING_LITERAL; }
+\'.\'               { COPY_STR(); return CHAR_LITERAL; }
 {any_int}       	{ COPY_STR(); return NUM_INT; }
 {float}				{ COPY_STR(); return NUM_FLOAT32; }
 {float}"f"			{ COPY_STR(); return NUM_FLOAT64; }
