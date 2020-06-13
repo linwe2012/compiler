@@ -126,10 +126,11 @@ STRUCT_TYPE(VariableInfo)
 struct FunctionInfo
 {
 	char* name;
-	void* value;
+	LLVMValueRef value;
 
-	TypeInfo* return_type;
-	TypeInfo* params;
+	// TypeInfo* return_type;
+	LLVMTypeRef ret_type;
+	LLVMTypeRef* params;
 	struct AST* body;
 };
 STRUCT_TYPE(FunctionInfo)
@@ -225,7 +226,7 @@ Symbol* symbol_create_enum_item(Symbol* type, Symbol* prev, char* name, void* va
 Symbol* symbol_from_type_info(TypeInfo* info);
 Symbol* symbol_create_struct_or_union(TypeInfo* info, TypeInfo* child);
 Symbol* symbol_create_struct_or_union_incomplete(char* name, enum Types struct_or_union);
-Symbol* symbol_create_func(char* name, void* val, TypeInfo* ret, TypeInfo* params, struct AST* body);
+Symbol* symbol_create_func(char* name, LLVMValueRef f, LLVMTypeRef ret_type, LLVMTypeRef* params, struct AST* body);
 Symbol* symbol_create_variable(char* name, enum SymbolAttributes attributes, Symbol* type, void* value, int is_constant);
 
 // 类型管理 & 创建
@@ -235,6 +236,7 @@ TypeInfo* type_create_array(uint64_t n, enum SymbolAttributes qualifers, TypeInf
 TypeInfo* type_create_ptr(enum SymbolAttributes qualifers, struct TypeInfo* pointing);
 TypeInfo* type_create_func(struct TypeInfo* ret, char* name, struct TypeInfo* params);
 TypeInfo* create_struct_field(TypeInfo* type_info, enum SymbolAttributes attributes, char* field_name);
+// TypeInfo* create_struct_bitfield(TypeInfo* type_info, enum SymbolAttributes attributes, char* field_name, int bits);
 
 TypeInfo* type_create_param_ellipse();
 

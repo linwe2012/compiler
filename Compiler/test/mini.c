@@ -1,34 +1,47 @@
-void putchar(int c);
+char *xa[5];
+char *( *(*xvar)() )[10];
 
 /*
+int foo(int x);
 
-int dummy(int a, float b, double c);
+int bar(int a, int b, int c);
 
-int main(int argc, char** argv)
-{
-    putchar(104); // 'h'
-    putchar(111); // 'o'
-    putchar(108); // 'l'
-    putchar(97);  // 'a'
-    putchar(10);  // '\n'
-    int x = dummy(8, 0.8f, (12 + 4 % 3) * 5.5);
-    return 0;
+float test(float a);
+
+struct A {
+	int a;
+	double b;
+};
+
+int foo(int x) {
+	while (1) {
+		if (1) {
+			return bar(1, 2, 3);
+		}
+		else {	
+			int a = 10;
+			float b = 1.0;
+			a = 1 + b * 3;
+			return 0;
+		}
+		if(0)
+		{
+			int c = sizeof(struct A);
+		}
+	}
+	return 0;
 }
 
-*/
 
-int main(int argc, char* argv[]) {
-    int x = 10;
-    if ((x = (++x * 88 << 2) % 7)) {
-        if (!x) {
-            return 2;
-        }
-        return x;
-    } else if (x < 10) {
-        return 1;
-    } else {
-        putchar(--x);
-        return --x;
-    }
-    return 0;
-}
+
+/*int foo(int a);
+
+int main(void) {
+	int h = 104, o = 111, l = 108, a = 97;
+	putchar(h); // 'h'
+	putchar(o); // 'o'
+	putchar(l); // 'l'
+	putchar(a);  // 'a'
+	putchar(10);  // '\n'
+	return 0;
+}*/

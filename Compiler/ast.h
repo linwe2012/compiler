@@ -174,6 +174,7 @@ struct LabelStmt
 	AST super;
 	AST* target;
 	AST* condition; // < swtich case 中的 condition
+	enum LabelType type;
 
 	Symbol* ref;
 };
@@ -298,6 +299,7 @@ struct TypeSpecifier
 	char* name;
 	char* field_name;
 	enum Types type;
+	int paren;
 	
 	struct TypeSpecifier* child;
 	struct TypeSpecifier* params;
@@ -409,7 +411,7 @@ AST* make_declaration(AST* declaration_specifiers, enum SymbolAttributes attribu
 
 // direct_declarator
 //     : IDENTIFIER
-AST* makr_init_direct_declarator(const char * name);
+AST* make_init_direct_declarator(const char * name);
 
 // direct_declarator:
 //     : direct_declarator (wrapped)
@@ -443,7 +445,7 @@ AST* make_enum_define(char* identifier, AST* enum_list);
 //     struct/union identifier { field_list }
 AST* make_struct_field_declaration(AST* specifier_qualifier, AST* struct_declarator);
 AST* make_struct_or_union_define(enum Types type, char* identifier, AST* field_list);
-
+AST* make_mark_declarator_paren(AST* target);
 
 
 
@@ -455,7 +457,7 @@ AST* make_type_declarator(AST* specifier_qualifier, AST* declarator);
 AST* make_paramter_ellipse();
 
 
-void do_eval(AST* ast, struct Context* ctx);
+void do_eval(AST* ast, struct Context* _ctx, char* module_name, const char* output_file);
 
 /*
 

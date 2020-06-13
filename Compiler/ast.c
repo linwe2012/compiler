@@ -248,7 +248,7 @@ V(64, "lld")
 AST* make_string(char* c)
 {
 	NEW_AST(NumberExpr, ast);
-	ast->number_type = TP_INT32;
+	ast->number_type = TP_STR;
 	ast->str = c;
 
 	return SUPER(ast);
@@ -382,23 +382,19 @@ AST* make_label(char* name, AST* statement)
 
 AST* make_label_case(AST* constant, AST* statements)
 {
-	AST_DATA(data);
-	struct AST* item = astlist_pop(&data->pending_labels);
-	CAST(LabelStmt, ast, item);
-
+	NEW_AST(LabelStmt, ast);
 	ast->target = statements;
 	ast->condition = constant;
+	ast->type = LABEL_CASE;
 	return SUPER(ast);
 }
 
 AST* make_label_default(AST* statement)
 {
-	AST_DATA(data);
-	struct AST* item = astlist_pop(&data->pending_labels);
-	CAST(LabelStmt, ast, item);
+	NEW_AST(LabelStmt, ast);
 
 	ast->target = statement;
-
+	ast->type = LABEL_DEFAULT;
 	return SUPER(ast);
 }
 
@@ -419,49 +415,10 @@ AST* make_jump_goto(char* name)
 
 AST* make_jump_cont_or_break(enum JumpType type)
 {
-	AST_DATA(data);
-	struct ASTListItem* item = data->breakable.last;
-
-	if (type == JUMP_CONTINUE)
-	{
-		while (item)
-		{
-			if (item->ast->type == AST_LoopStmt)
-			{
-				break;
-			}
-			item = item->prev;
-		}
-	}
-
-	if (item == NULL)
-	{
-		log_error(NULL, "continue or break must be in a loop or switch case");
-	}
 
 	NEW_AST(JumpStmt, ast);
 	ast->target = NULL;
 	ast->type = type;
-
-	if (item->ast->type == AST_LoopStmt)
-	{
-		CAST(LoopStmt, loop, item->ast);
-		uint64_t id;
-
-		if (type == JUMP_CONTINUE)
-		{
-			id = loop->step_label;
-		}
-		else {
-			id = loop->exit_label;
-		}
-
-		ast->ref = symbol_create_label(NULL, id, 1);
-	}
-	else {
-		CAST(SwitchCaseStmt, sc, item->ast);
-		ast->ref = symbol_create_label(NULL, sc->exit_label, 1);
-	}
 
 	return SUPER(ast);
 }
@@ -520,14 +477,7 @@ void notify_loop(enum LoopType type)
 
 AST* make_loop(AST* condition, AST* before_loop, AST* loop_body, AST* loop_step, enum LoopType loop_type)
 {
-	AST_DATA(data);
-	struct AST* item = astlist_pop(&data->breakable);
-	if (item == NULL)
-	{
-		log_internal_error(item, "corrupted ast data");
-	}
-
-	CAST(LoopStmt, ast, item);
+	NEW_AST(LoopStmt, ast);
 
 	ast->body = loop_body;
 	ast->condition = condition;
@@ -589,7 +539,7 @@ int ast_merge_type_qualifier(int a, int b)
 
 // Declarators
 // ======================================
-AST* makr_init_direct_declarator(const char* name)
+AST* make_init_direct_declarator(const char* name)
 {
 	NEW_AST(DeclaratorExpr, ast);
 	if (name)
@@ -614,7 +564,27 @@ void extend_declarator_with_specifier(DeclaratorExpr* decl, TypeSpecifier* spec)
 	else {
 		decl->type_spec_last->child = spec;
 	}
+	while (spec->child)
+	{
+		spec = spec->child;
+	}
 	decl->type_spec_last = spec;
+}
+
+void extend_declarator_with_specifier_prepend(DeclaratorExpr* decl, TypeSpecifier* spec)
+{
+	spec->child = decl->type_spec;
+	decl->type_spec = spec;
+}
+
+AST* make_mark_declarator_paren(AST* target)
+{
+	CAST(DeclaratorExpr, decl, target);
+	if (decl->type_spec)
+	{
+		decl->type_spec->paren = 1;
+	}
+	return target;
 }
 
 AST* make_extent_direct_declarator(AST* direct, enum Types type, AST* wrapped)
@@ -669,7 +639,7 @@ AST* make_extent_direct_declarator(AST* direct, enum Types type, AST* wrapped)
 		NEW_AST(TypeSpecifier, spec);
 		init_type_specifier(spec, TypeSpecifier_Exclusive);
 		spec->params = first;
-		
+		spec->type = TP_FUNC;
 		// 如果不是 abstract declarator
 		if (direct != NULL)
 		{
@@ -695,13 +665,14 @@ AST* make_declarator(AST* pointer, AST* direct_declarator)
 {
 	CAST(DeclaratorExpr, ptr, pointer);
 	CAST(DeclaratorExpr, decl, direct_declarator);
-
+	extend_declarator_with_specifier(decl, ptr->type_spec);
+	/*
 	ptr->type_spec_last->child = decl->type_spec;
 	decl->type_spec = ptr->type_spec;
 	if (decl->type_spec_last == NULL)
 	{
-		decl->type_spec_last = ptr->type_spec;
-	}
+		decl->type_spec_last = ptr->type_spec_last;
+	}*/
 
 	free(ptr);
 
@@ -740,7 +711,7 @@ AST* make_ptr(int type_qualifier_list, AST* pointing)
 	if (pointing == NULL)
 	{
 		// 利用这个函数帮我们初始化
-		DeclaratorExpr* ast = (DeclaratorExpr*) makr_init_direct_declarator(NULL);
+		DeclaratorExpr* ast = (DeclaratorExpr*) make_init_direct_declarator(NULL);
 		ast->type_spec = ast->type_spec_last = spec;
 
 		return SUPER(ast);
@@ -765,6 +736,7 @@ void init_type_specifier(TypeSpecifier* ts, enum TypeSpecifierFlags flags)
 	ts->type = TP_INCOMPLETE;
 	ts->flags |= flags;
 	ts->params = NULL;
+	ts->paren = 0;
 }
 
 AST* make_type_specifier(enum Types type)
@@ -949,7 +921,7 @@ AST* make_list_expr(AST* child)
 
 AST* make_paramter_ellipse()
 {
-	DeclaratorExpr* decl = (DeclaratorExpr*)makr_init_direct_declarator(NULL);
+	DeclaratorExpr* decl = (DeclaratorExpr*)make_init_direct_declarator(NULL);
 	NEW_AST(TypeSpecifier, spec);
 	init_type_specifier(spec, TypeSpecifier_Exclusive);
 	spec->type = TP_ELLIPSIS;
@@ -1136,7 +1108,7 @@ AST* make_parameter_declaration(AST* declaration_specifiers, AST* declarator)
 	DeclaratorExpr* gdecl = NULL;
 	if (!declarator)
 	{
-		gdecl = (DeclaratorExpr*)(makr_init_direct_declarator(NULL));
+		gdecl = (DeclaratorExpr*)(make_init_direct_declarator(NULL));
 	}
 	else {
 		CAST(DeclaratorExpr, decl, declarator);

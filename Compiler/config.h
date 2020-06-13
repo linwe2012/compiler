@@ -13,7 +13,7 @@
 
 #endif
 
-#define NEW_STRUCT(type, name) struct type* name = (struct type*)malloc(sizeof(struct type));
+#define NEW_STRUCT(type, name) struct type* name = (struct type*)calloc(1, sizeof(struct type));
 
 
 #ifdef CC_DEBUG

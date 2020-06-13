@@ -14,6 +14,7 @@ Symbol builtins[TP_NUM_BUILTINS + TP_NUM_BUILTIN_INTS + 2];
 #endif // !max
 
 Symbol* new_symbol(char* name, enum SymbolTypes type);
+void symbol_init_struct(Symbol* sym, char* name, enum SymbolTypes type);
 
 void symtbl_init(SymbolTable* tbl)
 {
@@ -36,7 +37,7 @@ void symtbl_push(SymbolTable* tbl, Symbol* c)
 	// 如果是这个 scope 的第一个元素
 	if (tbl->stack_top->first == NULL)
 	{
-		tbl->stack_top->first = c;
+		tbl->stack_top->first = tbl->stack_top->last = c;	// NOTE: 这里应该是改成这样吧
 		if (tbl->stack_top->prev)
 		{
 			c->prev = tbl->stack_top->prev->last;
@@ -53,15 +54,15 @@ void symtbl_push(SymbolTable* tbl, Symbol* c)
 	
 }
 
-Symbol* symtbl_find(SymbolTable* tbl, const char* name)
-{
+Symbol* symtbl_find(SymbolTable* tbl, const char* name) {
 	Symbol* top = tbl->stack_top->last;
-	while (top != NULL)
-	{
-		while (!str_equal(top->name, name))
-		{
-			top->prev;
-		}
+	struct SymbolStackInfo* prev_stack = tbl->stack_top->prev;
+	while (top == NULL && prev_stack != NULL) {	// 当前栈帧为空，但是先前栈依然可能有内容，不断向前搜索
+		top = prev_stack->last;
+		prev_stack = prev_stack->prev;
+	}
+	while (top != NULL && !str_equal(top->name, name)) {
+		top = top->prev;
 	}
 
 	return top;
@@ -72,11 +73,19 @@ Symbol* symtbl_find_in_current_scope(SymbolTable* tbl, const char* name)
 	Symbol* top = tbl->stack_top->last;
 	Symbol* bottom = tbl->stack_top->first;
 
-	while (top != bottom)
-	{
-		while (!str_equal(top->name, name))
-		{
-			top->prev;
+	if (top == NULL) {
+		return NULL;
+	}
+
+	while (top != bottom && !str_equal(top->name, name)) {
+		top = top->prev;
+	}
+
+	if (top == bottom) {
+		if (str_equal(top->name, name)) {
+			return top;
+		} else {
+			return NULL;
 		}
 	}
 
@@ -242,6 +251,10 @@ TypeInfo* type_create_array(uint64_t n, enum SymbolAttributes qualifers, TypeInf
 	info->qualifiers = qualifers;
 	info->arr.array_type = array_element_type;
 	info->arr.has_value = 1;
+
+	info->alignment = array_element_type->alignment;
+	info->aligned_size = array_element_type->alignment * n;
+	
 	return info;
 }
 
@@ -281,6 +294,8 @@ TypeInfo* type_create_func(struct TypeInfo* ret, char* name, struct TypeInfo* pa
 	info->type = TP_FUNC;
 	info->fn.params = params;
 	info->fn.return_type = ret;
+	info->aligned_size = 8;
+	info->alignment = 8;
 
 	return info;
 }
@@ -522,6 +537,7 @@ union ConstantValue constant_cast(enum Types from, enum Types to, union Constant
 }
 
 
+
 //TODO: Double check 我算的 对不对
 //TODO: 支持 bit field
 
@@ -530,31 +546,46 @@ Symbol* symbol_create_struct_or_union(TypeInfo* info, TypeInfo* child)
 	TypeInfo* move = child;
 	int max_aligned_size = 0;
 	int max_alignment = 0;
+
+	char* (*a)[10];
+
+	// 每个 field 的对齐要求和最大对其量
 	while (move)
 	{
 		max_aligned_size = max(move->aligned_size, max_aligned_size);
 		max_alignment = max(move->alignment, max_alignment);
+		move = move->next;
 	}
 
+	move = child;
 	if (info->type & TP_UNION)
 	{
-		move->offset = 0;
+		while (move)
+		{
+			move->offset = 0;
+		}
+		
 		info->aligned_size = max_aligned_size;
 		info->alignment = max_alignment;
 	}
+
 	else if (info->type & TP_STRUCT)
 	{
 		int size = 0;
-		move = child;
+		int last_alignment = 0;
+
 		while (move)
 		{
-			if (size != 0)
+			if ((size != 0) && (last_alignment < move->alignment))
 			{
-				size = (size / move->alignment + 1) * move->alignment;
+				int padding = move->alignment - last_alignment;
+				size += padding;
 			}
+			
 
 			move->offset = size;
 			size += move->alignment;
+			last_alignment = move->alignment;
 		}
 
 
@@ -581,13 +612,13 @@ Symbol* symbol_create_struct_or_union_incomplete(char* name, enum Types struct_o
 	return sym;
 }
 
-Symbol* symbol_create_func(char* name, void* val, TypeInfo* ret, TypeInfo* params, AST* body) {
+Symbol* symbol_create_func(char* name, LLVMValueRef f, LLVMTypeRef ret_type, LLVMTypeRef* params, AST* body) {
 	Symbol* sym = new_symbol(name, Symbol_FunctionInfo);
 	sym->func.name = name;
 	sym->func.body = body;
 	sym->func.params = params;
-	sym->func.return_type = ret;
-	sym->func.value = val;		// 这个值是LLVMValueRef吧?
+	sym->func.value = f;
+	sym->func.ret_type = ret_type;
 	return sym;
 }
 
