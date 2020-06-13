@@ -963,14 +963,22 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 		{
 			dest_type = LLVMTypeOf(lhs);
 		}
-		LLVMValueRef tmp = NULL;
+		LLVMValueRef tmp = NULL, tmp1 = NULL;
 		switch (operator->op)
 		{
 			// 一元运算符
 		case OP_INC:
 			if (!llvm_is_float(lhs))
 			{
-				tmp = LLVMBuildAdd(sem_ctx.builder, lhs, LLVMConstInt(dest_type, 1, 1), "inc_res");
+				tmp = lhs;
+				tmp1 = LLVMBuildAdd(sem_ctx.builder, lhs, LLVMConstInt(dest_type, 1, 1), "inc_res");
+				TRY_CAST(IdentifierExpr, assigneer, operator->lhs);
+				if (!assigneer)
+				{
+					log_error(operator->lhs, "Expected IdentifierExpr");
+					return NULL;
+				}
+				save_identifierexpr_llvm_value(assigneer, tmp1);
 			}
 			else
 			{

@@ -64,7 +64,7 @@ AST* parser_result = NULL;
 %%
 // defination part
 translation_unit 
-    : external_declaration                      { parser_result = $1; $$ = $1; }
+    : external_declaration                             { parser_result = $1; $$ = $1; }
     | external_declaration translation_unit     { parser_result = $1; $$ = ast_append($1, $2); }
     ;
 
@@ -88,6 +88,7 @@ function_definition
 declaration
     : declaration_specifiers attribute_specifier init_declarator_list ';'  { $$ = make_declaration($1, $2, $3); }
     | declaration_specifiers init_declarator_list ';'                      { $$ = make_declaration($1, ATTR_NONE, $2); }
+	| declaration_specifiers ';'										   { $$ = make_declaration($1, ATTR_NONE, NULL); }
     ;
 
 declaration_specifiers
