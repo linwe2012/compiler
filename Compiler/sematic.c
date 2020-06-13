@@ -177,14 +177,21 @@ LLVMValueRef eval_ast(AST* ast)
 	return NULL;
 }
 
+static int llvm_is_b(LLVMValueRef inst) {
+	return LLVMIsAReturnInst(inst) || LLVMIsABranchInst(inst) || LLVMIsAIndirectBrInst(inst);
+}
+
 // returns the value of last eval
 LLVMValueRef eval_list(AST* ast)
 {
 	LLVMValueRef last = NULL;
 	while (ast) {
 		last = eval_ast(ast);
-		if (LLVMIsAReturnInst(last)) {
-			break;		// 如果有ret，直接中断同一层后续ast的编译
+		if (llvm_is_b(last)) {
+			// 如果有跳转，直接中断同一层后续ast的编译
+			// 这段代码在加入jump后需要调整，因为没有jump情况下跳转一定不会跳到同bb的后续代码中
+			// 有jump就不好说了
+			break;
 		}
 		ast = ast->next;
 	}
@@ -704,10 +711,9 @@ LLVMValueRef eval_FunctionCallExpr(FunctionCallExpr* ast) {
 		}
 		arg = arg->next;
 	}
-	char* res_name = func_sym->func.ret_type == LLVMVoidType() ? "" : next_temp_id_str();
 	return LLVMBuildCall(sem_ctx.builder, 
 		func_sym->func.value, argv, argc, 
-		res_name);
+		func_sym->func.ret_type == LLVMVoidType() ? "" : next_temp_id_str());
 }
 
 
@@ -1171,10 +1177,8 @@ LLVMValueRef eval_EmptyExpr(EmptyExpr* ast)
 	return NULL;
 }
 
-// TODO: @wushuhui
+// @wushuhu
 void eval_WhileStmt(LoopStmt* ast) {
-	ctx_enter_block_scope(ctx);
-
 	LLVMBasicBlockRef preheader_bb = LLVMGetInsertBlock(sem_ctx.builder);
 	LLVMBasicBlockRef cond_bb = alloc_bb("while.cond");
 	LLVMBasicBlockRef body_bb = alloc_bb("while.body");
@@ -1208,19 +1212,18 @@ void eval_WhileStmt(LoopStmt* ast) {
 	// 3. body
 	LLVMPositionBuilderAtEnd(sem_ctx.builder, body_bb);
 	LLVMValueRef bodyv = eval_BlockExprNoScope(ast->body);
-	if (!LLVMIsAReturnInst(bodyv)) {	// 如果最后一条指令是ret，不能构建br
+	if (!llvm_is_b(bodyv)) {	// 如果最后一条指令是br，不能构建br
 		LLVMBuildBr(sem_ctx.builder, cond_bb);
 	}
 
 	// 4. after
-	ctx_leave_block_scope(ctx, 0);
 	pop_bb(&sem_ctx.breakable_last);
 	pop_bb(&sem_ctx.continue_last);
 	pop_bb(&sem_ctx.after_bb);
 	LLVMPositionBuilderAtEnd(sem_ctx.builder, after_bb);
 }
 
-// TODO: @wushuhui
+// @wushuhui
 void eval_ForStmt(LoopStmt* ast) {
 	ctx_enter_block_scope(ctx);
 
@@ -1238,11 +1241,7 @@ void eval_ForStmt(LoopStmt* ast) {
 	// 2. cond
 	LLVMPositionBuilderAtEnd(sem_ctx.builder, cond_bb);
 	LLVMValueRef condv = eval_ast(ast->condition);
-	if (condv == NULL) {
-		log_error(ast, "for.cond is not expr");
-		return NULL;
-	}
-	else {
+	if (condv != NULL) {
 		if (llvm_is_float(condv)) {
 			fprintf(stderr, "Cond is float, which is not allowed. Implicit converted to true\n");
 			LLVMBuildBr(sem_ctx.builder, body_bb);
@@ -1251,6 +1250,9 @@ void eval_ForStmt(LoopStmt* ast) {
 			condv = LLVMBuildICmp(sem_ctx.builder, LLVMIntNE, condv, LLVMConstInt(LLVMTypeOf(condv), 0, 1), next_temp_id_str());
 			LLVMBuildCondBr(sem_ctx.builder, condv, body_bb, after_bb);
 		}
+	} else {
+		// for循环是允许cond为空的
+		LLVMBuildBr(sem_ctx.builder, body_bb);
 	}
 
 	append_bb(&sem_ctx.breakable_last, after_bb);
@@ -1261,8 +1263,8 @@ void eval_ForStmt(LoopStmt* ast) {
 	// current BB.  Note that we ignore the value computed by the body, but don't
 	// allow an error.
 	LLVMPositionBuilderAtEnd(sem_ctx.builder, body_bb);
-	LLVMValueRef bodyv = eval_BlockExprNoScope(ast->body);
-	if (!LLVMIsAReturnInst(bodyv)) {	// 如果最后一条指令是ret，不能构建br
+	LLVMValueRef bodyv = eval_ast(ast->body);
+	if (!llvm_is_b(bodyv)) {	// 如果最后一条指令是br，不能构建br
 		LLVMBuildBr(sem_ctx.builder, step_bb);
 	}
 
@@ -1282,7 +1284,7 @@ void eval_ForStmt(LoopStmt* ast) {
 	LLVMPositionBuilderAtEnd(sem_ctx.builder, after_bb);
 }
 
-// TODO: @wushuhui
+// @wushuhui
 LLVMValueRef eval_LoopStmt(LoopStmt* ast) {
 	switch (ast->loop_type) {
 	case LOOP_FOR:
@@ -1308,7 +1310,7 @@ void sentence_test()
 	//LLVMValueRef v5 = LLVMBuildStore(sem_ctx.builder, v2, v3);
 }
 
-// TODO: @wushuhui
+// @wushuhui
 LLVMValueRef eval_IfStmt(IfStmt* ast) {
 	LLVMValueRef condv = eval_ast(ast->condition);
 	if (condv == NULL) {
@@ -1343,7 +1345,7 @@ LLVMValueRef eval_IfStmt(IfStmt* ast) {
 		innerv = eval_ast(ast->then);
 		pop_bb(&sem_ctx.after_bb);
 	}
-	if (innerv == NULL || (innerv != NULL && !LLVMIsAReturnInst(innerv))) {	// 如果最后一条指令是ret，不能构建br
+	if (innerv == NULL || (innerv != NULL && !llvm_is_b(innerv))) {	// 如果最后一条指令是br，不能构建br
 		LLVMBuildBr(sem_ctx.builder, after_bb);
 	}
 
@@ -1355,7 +1357,7 @@ LLVMValueRef eval_IfStmt(IfStmt* ast) {
 		innerv = eval_ast(ast->otherwise);
 		pop_bb(&sem_ctx.after_bb);
 	}
-	if (innerv == NULL || (innerv != NULL && !LLVMIsAReturnInst(innerv))) {	// 如果最后一条指令是ret，不能构建br
+	if (innerv == NULL || (innerv != NULL && !llvm_is_b(innerv))) {	// 如果最后一条指令是br，不能构建br
 		LLVMBuildBr(sem_ctx.builder, after_bb);
 	}
 
