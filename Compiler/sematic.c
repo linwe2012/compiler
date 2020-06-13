@@ -697,7 +697,7 @@ LLVMValueRef eval_FunctionCallExpr(FunctionCallExpr* ast) {
 	LLVMValueRef* argv = calloc(argc, sizeof(LLVMValueRef));
 	arg = ast->params;
 	for (int i = 0; arg != NULL; ++i) {
-		argv[i] = eval_ast(arg);
+		argv[i] = llvm_convert_type(func_sym->func.params[i], eval_ast(arg));
 		if (argv[i] == NULL) {
 			log_error(ast, "Pass null value to function call");
 			return NULL;
@@ -759,7 +759,7 @@ LLVMValueRef eval_NumberExpr(NumberExpr* ast) {
 	case TP_INT32:
 		return LLVMConstInt(LLVMInt32Type(), ast->i32, 1);
 	case TP_INT64:
-		return LLVMConstInt(LLVMInt32Type(), ast->i64, 1);
+		return LLVMConstInt(LLVMInt64Type(), ast->i64, 1);
 	case TP_STR:
 		return LLVMBuildGlobalStringPtr(sem_ctx.builder, ast->str, next_temp_id_str());
 	case TP_FLOAT32:
@@ -967,6 +967,9 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 		switch (operator->op)
 		{
 			// 一元运算符
+		case OP_NEGATIVE:
+			tmp = LLVMBuildNeg(sem_ctx.builder, lhs, "neg_res");
+			break;
 		case OP_INC:
 			if (!llvm_is_float(lhs))
 			{
@@ -1118,6 +1121,12 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 			}
 			else
 				tmp = LLVMBuildFCmp(sem_ctx.builder, LLVMRealOEQ, lhs, rhs, "equal_res");
+			break;
+		case OP_NOT_EQUAL:
+			if (!type_is_float(dest_type)) {
+				tmp = LLVMBuildICmp(sem_ctx.builder, LLVMIntNE, lhs, rhs, "equal_res");
+			} else
+				tmp = LLVMBuildFCmp(sem_ctx.builder, LLVMRealONE, lhs, rhs, "equal_res");
 			break;
 			//赋值运算符
 		case OP_ASSIGN:
@@ -1444,11 +1453,15 @@ LLVMValueRef eval_FunctionDefinitionStmt(FunctionDefinitionStmt* ast) {
 	unsigned int n_params = LLVMCountParams(func);
 	LLVMValueRef* params = malloc(sizeof(LLVMValueRef) * n_params);
 	LLVMGetParams(func, params);
+	TypeSpecifier* arg_typesp =  decl_ast->type_spec->params;
 	for (int i = 0; i < n_params; ++i) {
-		LLVMSetValueName(params[i], next_temp_id_str());	// 给参数一个名字
+		LLVMSetValueName(params[i], arg_typesp->field_name);	// 给参数一个名字
 		// 为参数分配栈空间并store
 		LLVMValueRef* ptr = LLVMBuildAlloca(sem_ctx.builder, func_sym->func.params[i], next_temp_id_str());
 		LLVMBuildStore(sem_ctx.builder, params[i], ptr);
+		Symbol* arg_sym = symbol_create_variable(arg_typesp->field_name, arg_typesp->attributes, symbol_from_type_info(arg_typesp), ptr, 0);
+		symtbl_push(ctx->variables, arg_sym);
+		arg_typesp = arg_typesp->super.next;
 	}
 
 	// NOTE: 这里不能直接用Block，要hack一下。FunctionDef的时候是会创建一个scope的

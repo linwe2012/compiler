@@ -293,10 +293,10 @@ DeclaratorExpr* ast_apply_specifier_to_declartor(TypeSpecifier* spec, Declarator
 }
 */
 
-AST* make_unary_expr(enum Operators unary_op, AST* rhs)
+AST* make_unary_expr(enum Operators unary_op, AST* lhs)
 {
 	NEW_AST(OperatorExpr, ast);
-	ast->rhs = rhs;
+	ast->lhs = lhs;
 	ast->op = unary_op;
 	return SUPER(ast);
 }
@@ -1179,3 +1179,11 @@ Value handle_SwitchCaseStmt(Context*ctx, SwitchCaseStmt* ast)
 
 	list_destroy(&list);
 }*/
+
+AST* make_char(char* c) {
+	NEW_AST(NumberExpr, ast);
+	ast->number_type = TP_INT8;
+	ast->i8 = c[1];
+
+	return SUPER(ast);
+}

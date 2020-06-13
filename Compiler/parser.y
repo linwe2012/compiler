@@ -19,7 +19,7 @@ AST* parser_result = NULL;
     char* str;
 }
 
-%token <str> IDENTIFIER CONSTANT STRING_LITERAL
+%token <str> IDENTIFIER CONSTANT STRING_LITERAL CHAR_LITERAL
 %token <str> SIZEOF
 %token <str> PTR_OP INC_OP DEC_OP LEFT_OP RIGHT_OP LE_OP GE_OP EQ_OP NE_OP
 %token <str> AND_OP OR_OP MUL_ASSIGN DIV_ASSIGN MOD_ASSIGN ADD_ASSIGN
@@ -481,6 +481,7 @@ primary_expression
 	| NUM_FLOAT32           { $$ = make_number_float($1, 32); }
 	| NUM_FLOAT64           { $$ = make_number_float($1, 64); }
 	| STRING_LITERAL      { $$ = make_string($1); }  
+	| CHAR_LITERAL			{ $$ = make_char($1); }
 	| '(' expression ')'  { $$ = make_list_expr($2); }
 	;
 
