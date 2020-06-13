@@ -90,3 +90,13 @@ entry:
   %"6" = call i32 (i8*, ...) @printf(i8* getelementptr inbounds ([48 x i8], [48 x i8]* @"4", i32 0, i32 0), i32 22, float 0x3FFCCCCCC0000000, i8* getelementptr inbounds ([10 x i8], [10 x i8]* @"5", i32 0, i32 0))
   ret i32 0
 }
+
+define void @test() {
+entry:
+  %a = alloca [10 x i32]
+  %gep_res = getelementptr [10 x i32], [10 x i32]* %a, i32 1, i32 0
+  %arr_res = load i32, i32* %gep_res
+  %gep_res1 = getelementptr [10 x i32], [10 x i32]* %a, i32 1, i32 0
+  store i32 10, i32* %gep_res1
+  ret void
+}

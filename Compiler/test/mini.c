@@ -28,3 +28,8 @@ int main(void) {
 	printf("My age is %d\n, Im %f m, and my hobby is %d\n", 22, 1.8, "Running");
     return 0;
 }
+void test(void)
+{
+	int a[10];
+	a[1] = 10;
+}

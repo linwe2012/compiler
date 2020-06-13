@@ -454,7 +454,7 @@ TypeInfo* extract_type(TypeSpecifier* spec)
 	return result;
 }
 
-// 测试用，只作了简单的几个
+
 LLVMTypeRef extract_llvm_type(TypeInfo* info) {
 	switch (info->type & TP_CLEAR_SIGNFLAGS) {
 	case TP_INT8:
@@ -475,6 +475,8 @@ LLVMTypeRef extract_llvm_type(TypeInfo* info) {
 		return LLVMFloatType();
 	case TP_PTR:
 		return LLVMPointerType(extract_llvm_type(info->ptr.pointing), 0);
+	case TP_ARRAY:
+		return LLVMArrayType(extract_llvm_type(info->arr.array_type), info->arr.array_count);
 	case TP_ENUM:
 		return LLVMInt64Type();
 	case TP_UNION:
@@ -685,7 +687,7 @@ LLVMValueRef eval_AggregateDeclareStmt(AggregateDeclareStmt* ast)
 	{
 		aggregate = symtbl_find(ctx->types, ast->name);
 	}
-	
+
 	if (aggregate == NULL)
 	{
 		aggregate = symbol_create_struct_or_union_incomplete(NULL, ast->type);
@@ -699,8 +701,8 @@ LLVMValueRef eval_AggregateDeclareStmt(AggregateDeclareStmt* ast)
 	FOR_EACH(field_list, st)
 	{
 		TRY_CAST(DeclaratorExpr, decl, st);
-		TypeInfo * ty = extract_type(decl->type_spec);
-		
+		TypeInfo* ty = extract_type(decl->type_spec);
+
 		if (first == NULL)
 		{
 			first = last = ty;
@@ -718,8 +720,8 @@ LLVMValueRef eval_AggregateDeclareStmt(AggregateDeclareStmt* ast)
 		sem->llvm_type = LLVMArrayType(LLVMInt8Type(), aggregate->type.aligned_size);
 		aggregate->type.value = sem;
 	}
-	
-	
+
+
 	return NULL;
 }
 
@@ -997,6 +999,58 @@ LLVMTypeRef llvm_get_res_type(LLVMValueRef lhs, LLVMValueRef rhs)
 		return LLVMInt32Type();
 }
 
+static LLVMValueRef eval_OP_ARRAY_ACCESS(OperatorExpr* op, int lv) {
+	TRY_CAST(IdentifierExpr, identifier, op->lhs);
+	if (!identifier) {
+		log_error(op, "Expected IdentifierExpr");
+		return NULL;
+	}
+	Symbol* sym = symtbl_find(ctx->variables, identifier->name);
+	LLVMValueRef* indices = calloc(2, sizeof(LLVMValueRef));
+	indices[0] = eval_OperatorExpr(op->rhs);
+	// TODO 这个值的类型是要根据数组类型变的
+	// 并且将来支持struct数组还需要知道offset，所以语义上是否应该在symbol中记录数组类型
+	indices[1] = LLVMConstInt(LLVMInt32Type(), 0, 1);
+	LLVMValueRef gep = LLVMBuildGEP(sem_ctx.builder, sym->value, indices, 2, "gep_res");
+	if (lv) {
+		return gep;
+	}
+	else {
+		return LLVMBuildLoad(sem_ctx.builder, gep, "arr_res");
+	}
+}
+// 临时加一个取左值的
+LLVMValueRef get_OperatorExpr_LeftValue(AST* ast)
+{
+	if (ast->type == AST_IdentifierExpr)
+	{
+		TRY_CAST(IdentifierExpr, identifier, ast);
+		if (!identifier)
+		{
+			log_error(ast, "Expected IdentifierExpr");
+			return NULL;
+		}
+		Symbol* sym = symtbl_find(ctx->variables, identifier->name);
+		if (sym == NULL) {
+			return NULL;
+		}
+		return sym->value;
+	}
+	else if (ast->type == AST_OperatorExpr)
+	{
+		TRY_CAST(OperatorExpr, operator, ast);
+		if (!operator)
+		{
+			log_error(ast, "Expected OperatorExpr");
+			return NULL;
+		}
+		if (operator->op == OP_ARRAY_ACCESS)
+		{
+			return eval_OP_ARRAY_ACCESS(operator, 1);
+		}
+	}
+	return NULL;
+}
 
 // 目前仅考虑signed类型
 LLVMValueRef eval_OperatorExpr(AST* ast)
@@ -1005,6 +1059,7 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 	if (!ast) return NULL;
 	LLVMValueRef lhs, rhs;
 	LLVMTypeRef dest_type;
+	LLVMTypeKind kind;
 	if (ast->type == AST_NumberExpr)
 	{
 		TRY_CAST(NumberExpr, number, ast);
@@ -1033,72 +1088,62 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 			log_error(ast, "Expected OperatorExpr");
 			return NULL;
 		}
+		// 好像确实加不到后面
+		if (operator->op == OP_ARRAY_ACCESS) {
+			// 一些比较特殊的op不适合和后面的一起做
+			return eval_OP_ARRAY_ACCESS(operator, 0);
+		}
+
 		lhs = eval_OperatorExpr(operator->lhs);
 		rhs = eval_OperatorExpr(operator->rhs);
 		if (lhs && rhs && operator->op != OP_ASSIGN)
 		{
 			dest_type = llvm_get_res_type(lhs, rhs);
-			LLVMTypeKind kind = LLVMGetTypeKind(dest_type);
+			kind = LLVMGetTypeKind(dest_type);
 			lhs = llvm_convert_type(dest_type, lhs);
 			rhs = llvm_convert_type(dest_type, rhs);
 		}
 		else
 		{
 			dest_type = LLVMTypeOf(lhs);
+			kind = LLVMGetTypeKind(dest_type);
 		}
-		LLVMValueRef tmp = NULL, tmp1 = NULL;
+		LLVMValueRef tmp = NULL, tmp1 = NULL, value_ptr = NULL;
 		switch (operator->op)
 		{
 			// 一元运算符
 		case OP_NEGATIVE:
 			tmp = LLVMBuildNeg(sem_ctx.builder, lhs, "neg_res");
 			break;
+		case OP_PTR_ACCESS:
+			tmp = LLVMBuildLoad(sem_ctx.builder, lhs, "ptr_res");
+			break;
 		case OP_INC:
 			if (!llvm_is_float(lhs))
 			{
 				tmp = LLVMBuildAdd(sem_ctx.builder, lhs, LLVMConstInt(dest_type, 1, 1), "inc_res");
-				TRY_CAST(IdentifierExpr, assigneer, operator->lhs);
-				if (!assigneer)
-				{
-					log_error(operator->lhs, "Expected IdentifierExpr");
-					return NULL;
-				}
-				save_identifierexpr_llvm_value(assigneer, tmp);
+				value_ptr = get_OperatorExpr_LeftValue(operator->lhs);
+				LLVMBuildStore(sem_ctx.builder, tmp, value_ptr);
 			}
 			else
 			{
-				tmp = LLVMBuildFAdd(sem_ctx.builder, lhs, LLVMConstReal(dest_type, 1), "inc_res");
-				TRY_CAST(IdentifierExpr, assigneer, operator->lhs);
-				if (!assigneer)
-				{
-					log_error(operator->lhs, "Expected IdentifierExpr");
-					return NULL;
-				}
-				save_identifierexpr_llvm_value(assigneer, tmp);
+				tmp = LLVMBuildFAdd(sem_ctx.builder, lhs, LLVMConstReal(dest_type, 1), "inc_res");				
+				value_ptr = get_OperatorExpr_LeftValue(operator->lhs);
+				LLVMBuildStore(sem_ctx.builder, tmp, value_ptr);
 			}
 			break;
 		case OP_DEC:
 			if (!llvm_is_float(lhs))
 			{
 				tmp = LLVMBuildAdd(sem_ctx.builder, lhs, LLVMConstInt(dest_type, -1, 1), "dec_res");
-				TRY_CAST(IdentifierExpr, assigneer, operator->lhs);
-				if (!assigneer)
-				{
-					log_error(operator->lhs, "Expected IdentifierExpr");
-					return NULL;
-				}
-				save_identifierexpr_llvm_value(assigneer, tmp);
+				value_ptr = get_OperatorExpr_LeftValue(operator->lhs);
+				LLVMBuildStore(sem_ctx.builder, tmp, value_ptr);
 			}
 			else
 			{
 				tmp = LLVMBuildFAdd(sem_ctx.builder, lhs, LLVMConstReal(dest_type, -1), "dec_res");
-				TRY_CAST(IdentifierExpr, assigneer, operator->lhs);
-				if (!assigneer)
-				{
-					log_error(operator->lhs, "Expected IdentifierExpr");
-					return NULL;
-				}
-				save_identifierexpr_llvm_value(assigneer, tmp);
+				value_ptr = get_OperatorExpr_LeftValue(operator->lhs);
+				LLVMBuildStore(sem_ctx.builder, tmp, value_ptr);
 			}
 			break;
 		case OP_POSTFIX_INC:
@@ -1106,26 +1151,15 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 			{
 				tmp = lhs;
 				tmp1 = LLVMBuildAdd(sem_ctx.builder, lhs, LLVMConstInt(dest_type, 1, 1), "inc_res");
-				TRY_CAST(IdentifierExpr, assigneer, operator->lhs);
-				if (!assigneer)
-				{
-					log_error(operator->lhs, "Expected IdentifierExpr");
-					return NULL;
-				}
-				save_identifierexpr_llvm_value(assigneer, tmp1);
-
+				value_ptr = get_OperatorExpr_LeftValue(operator->lhs);
+				LLVMBuildStore(sem_ctx.builder, tmp1, value_ptr);
 			}
 			else
 			{
 				tmp = lhs;
 				tmp1 = LLVMBuildFAdd(sem_ctx.builder, lhs, LLVMConstReal(dest_type, 1), "inc_res");
-				TRY_CAST(IdentifierExpr, assigneer, operator->lhs);
-				if (!assigneer)
-				{
-					log_error(operator->lhs, "Expected IdentifierExpr");
-					return NULL;
-				}
-				save_identifierexpr_llvm_value(assigneer, tmp1);
+				value_ptr = get_OperatorExpr_LeftValue(operator->lhs);
+				LLVMBuildStore(sem_ctx.builder, tmp1, value_ptr);
 			}
 			break;
 		case OP_POSTFIX_DEC:
@@ -1133,25 +1167,15 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 			{
 				tmp = lhs;
 				tmp1 = LLVMBuildAdd(sem_ctx.builder, lhs, LLVMConstInt(dest_type, -1, 1), "dec_res");
-				TRY_CAST(IdentifierExpr, assigneer, operator->lhs);
-				if (!assigneer)
-				{
-					log_error(operator->lhs, "Expected IdentifierExpr");
-					return NULL;
-				}
-				save_identifierexpr_llvm_value(assigneer, tmp1);
+				value_ptr = get_OperatorExpr_LeftValue(operator->lhs);
+				LLVMBuildStore(sem_ctx.builder, tmp1, value_ptr);
 			}
 			else
 			{
 				tmp = lhs;
 				tmp1 = LLVMBuildFAdd(sem_ctx.builder, lhs, LLVMConstReal(dest_type, -1), "dec_res");
-				TRY_CAST(IdentifierExpr, assigneer, operator->lhs);
-				if (!assigneer)
-				{
-					log_error(operator->lhs, "Expected IdentifierExpr");
-					return NULL;
-				}
-				save_identifierexpr_llvm_value(assigneer, tmp1);
+				value_ptr = get_OperatorExpr_LeftValue(operator->lhs);
+				LLVMBuildStore(sem_ctx.builder, tmp1, value_ptr);
 			}
 			break;
 			// 二元运算符
@@ -1269,20 +1293,16 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 		case OP_NOT_EQUAL:
 			if (!type_is_float(dest_type)) {
 				tmp = LLVMBuildICmp(sem_ctx.builder, LLVMIntNE, lhs, rhs, "equal_res");
-			} else
+			}
+			else
 				tmp = LLVMBuildFCmp(sem_ctx.builder, LLVMRealONE, lhs, rhs, "equal_res");
 			break;
 			//赋值运算符
 		case OP_ASSIGN:
 			dest_type = LLVMTypeOf(lhs);
 			rhs = llvm_convert_type(dest_type, rhs);
-			TRY_CAST(IdentifierExpr, assigneer, operator->lhs);
-			if (!assigneer)
-			{
-				log_error(operator->lhs, "Expected IdentifierExpr");
-				return NULL;
-			}
-			save_identifierexpr_llvm_value(assigneer, rhs);
+			value_ptr = get_OperatorExpr_LeftValue(operator->lhs);
+			LLVMBuildStore(sem_ctx.builder, rhs, value_ptr);
 			tmp = rhs;
 			break;
 
@@ -1294,7 +1314,7 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 			if (id != NULL)
 			{
 				Symbol* variable = symtbl_find(ctx->variables, id->name);
-				
+
 				if (variable == NULL)
 				{
 					log_error(operator->lhs, "Undeclared identifier");
@@ -1433,7 +1453,8 @@ void eval_ForStmt(LoopStmt* ast) {
 			condv = LLVMBuildICmp(sem_ctx.builder, LLVMIntNE, condv, LLVMConstInt(LLVMTypeOf(condv), 0, 1), next_temp_id_str());
 			LLVMBuildCondBr(sem_ctx.builder, condv, body_bb, after_bb);
 		}
-	} else {
+	}
+	else {
 		// for循环是允许cond为空的
 		LLVMBuildBr(sem_ctx.builder, body_bb);
 	}
@@ -1639,7 +1660,7 @@ LLVMValueRef eval_FunctionDefinitionStmt(FunctionDefinitionStmt* ast) {
 	unsigned int n_params = LLVMCountParams(func);
 	LLVMValueRef* params = malloc(sizeof(LLVMValueRef) * n_params);
 	LLVMGetParams(func, params);
-	TypeSpecifier* arg_typesp =  decl_ast->type_spec->params;
+	TypeSpecifier* arg_typesp = decl_ast->type_spec->params;
 	for (int i = 0; i < n_params; ++i) {
 		LLVMSetValueName(params[i], arg_typesp->field_name);	// 给参数一个名字
 		// 为参数分配栈空间并store
