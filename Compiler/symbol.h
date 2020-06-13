@@ -220,7 +220,7 @@ void symtbl_leave_scope(SymbolTable* tbl, int free_all_symols);
 
 // 符号创建函数
 // ================================
-TypeInfo* type_fetch_buildtin(enum Types type);
+TypeInfo* type_fetch_buildtin(enum Types type, char* name);
 Symbol* symbol_create_label(char* name, uint64_t label, int resolved);
 Symbol* symbol_create_constant(Symbol* enum_sym, char* name, void* val);
 Symbol* symbol_create_enum(char* name);
@@ -230,6 +230,7 @@ Symbol* symbol_create_struct_or_union(TypeInfo* info, TypeInfo* child);
 Symbol* symbol_create_struct_or_union_incomplete(char* name, enum Types struct_or_union);
 Symbol* symbol_create_func(char* name, LLVMValueRef f, LLVMTypeRef ret_type, LLVMTypeRef* params, struct AST* body, int is_variadic, int argc);
 Symbol* symbol_create_variable(char* name, enum SymbolAttributes attributes, Symbol* type, void* value, int is_constant);
+
 
 // 类型管理 & 创建
 // ================================
@@ -241,6 +242,14 @@ TypeInfo* create_struct_field(TypeInfo* type_info, enum SymbolAttributes attribu
 // TypeInfo* create_struct_bitfield(TypeInfo* type_info, enum SymbolAttributes attributes, char* field_name, int bits);
 
 TypeInfo* type_create_param_ellipse();
+struct TypeFindResult
+{
+	int offset;
+	TypeInfo* type;
+};
+
+struct TypeFindResult type_find_field(TypeInfo* type, const char* name);
+
 
 void variable_append(Symbol* last, Symbol* new_last);
 

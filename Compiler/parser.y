@@ -88,7 +88,7 @@ function_definition
 declaration
     : declaration_specifiers attribute_specifier init_declarator_list ';'  { $$ = make_declaration($1, $2, $3); }
     | declaration_specifiers init_declarator_list ';'                      { $$ = make_declaration($1, ATTR_NONE, $2); }
-	// | declaration_specifiers ';'										   { $$ = make_declaration($1, ATTR_NONE, NULL); }
+	| declaration_specifiers ';'										   { $$ = make_declaration($1, ATTR_NONE, NULL); }
     ;
 
 declaration_specifiers

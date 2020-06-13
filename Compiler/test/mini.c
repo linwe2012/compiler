@@ -1,5 +1,8 @@
 // char *xa[5];
 // char *( *(*xvar)() )[10]; <- 可以解析但是没法LLVM 编译
+
+
+
 int printf(char const* format, ...);
 
 int gcd(int a, int b) {
@@ -21,6 +24,11 @@ void disp_num(int n) {
 }
 
 int main(void) {
+	struct A{
+	int A_a;
+	double A_b;
+	} st_A;
+
     disp_num(gcd(3 * 12, 60));
 	putchar(10);
 

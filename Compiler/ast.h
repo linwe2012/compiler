@@ -308,6 +308,7 @@ struct TypeSpecifier
 
 	enum TypeSpecifierFlags flags;
 	AST* array_element_count;
+	AST* struct_or_union;
 };
 
 

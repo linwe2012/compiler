@@ -737,6 +737,7 @@ void init_type_specifier(TypeSpecifier* ts, enum TypeSpecifierFlags flags)
 	ts->flags |= flags;
 	ts->params = NULL;
 	ts->paren = 0;
+	ts->struct_or_union = NULL;
 }
 
 AST* make_type_specifier(enum Types type)
@@ -1071,12 +1072,19 @@ AST* make_struct_field_declaration(AST* specifier_qualifier, AST* struct_declara
 
 AST* make_struct_or_union_define(enum Types type, char* identifier, AST* field_list)
 {
-	NEW_AST(AggregateDeclareStmt, ast);
-	ast->type = type;
-	ast->fields = field_list;
-	ast->name = identifier;
-	ast->ref = NULL;
-	return SUPER(ast);
+	NEW_AST(TypeSpecifier, spec);
+	init_type_specifier(spec, TypeSpecifier_Exclusive);
+
+	spec->type = type;
+	spec->name = identifier;
+	spec->struct_or_union = field_list;
+
+	//NEW_AST(AggregateDeclareStmt, ast);
+	//ast->type = type;
+	//ast->fields = field_list;
+	//ast->name = identifier;
+	//ast->ref = NULL;
+	return SUPER(spec);
 }
 
 AST* ast_merge_specifier_qualifier(AST* me, AST* other, enum SymbolAttributes qualifier)

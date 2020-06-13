@@ -83,6 +83,7 @@ if.after:                                         ; preds = %if.after6, %if.then
 
 define i32 @main() {
 entry:
+  %st_A = alloca [16 x i8]
   %"0" = call i32 @gcd(i32 36, i32 60)
   call void @disp_num(i32 %"0")
   %"1" = call i32 @putchar(i32 10)

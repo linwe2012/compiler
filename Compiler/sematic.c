@@ -348,7 +348,7 @@ TypeInfo* extract_type(TypeSpecifier* spec)
 			log_error(SUPER(spec), "Incompatible type specifier");
 			break;
 		}
-		result = type_fetch_buildtin(spec->type);
+		result = type_fetch_buildtin(spec->type, spec->field_name);
 		break;
 
 	case TP_STRUCT: // fall through
@@ -359,25 +359,93 @@ TypeInfo* extract_type(TypeSpecifier* spec)
 			break;
 		}
 
-		name = str_concat(ty == TP_STRUCT ? "struct " : "union ", spec->name);
-		sym_in_tbl = symtbl_find(ctx->types, name);
-
-		if (sym_in_tbl == NULL)
+		if (spec->struct_or_union)
 		{
-			sym_in_tbl = symbol_create_struct_or_union_incomplete(name, ty);
-			symtbl_push(ctx->types, sym_in_tbl);
+			TypeInfo* first = NULL;
+			TypeInfo* last = NULL;
+			AST* field_list = spec->struct_or_union;
+			Symbol* aggregate = NULL;
+			int found_in_symtbl = 0;
+			if (spec->name != NULL)
+			{
+				aggregate = symtbl_find(ctx->types, spec->name);
+				if (aggregate)
+				{
+					found_in_symtbl = 1;
+				}
+			}
+
+			if (aggregate == NULL)
+			{
+				aggregate = symbol_create_struct_or_union_incomplete(NULL, spec->type);
+			}
+
+			if (field_list == NULL)
+			{
+				log_error(SUPER(spec), "Expected at least on field for struct");
+			}
+
+			FOR_EACH(field_list, st)
+			{
+				TRY_CAST(DeclaratorExpr, decl, st);
+				// TODO: 可能不是 block scope
+				ctx_enter_block_scope(ctx);
+				decl->type_spec->field_name = decl->name;
+				
+				TypeInfo* ty = extract_type(decl->type_spec);
+				ctx_leave_block_scope(ctx, 0);
+
+				if (first == NULL)
+				{
+					first = last = ty;
+				}
+				else {
+					type_append(last, ty);
+					last = ty;
+				}
+			}
+
+			if (first != NULL)
+			{
+				symbol_create_struct_or_union(&aggregate->type, first);
+				NEW_STRUCT(TypeSematic, sem);
+				if (!found_in_symtbl && spec->name != NULL)
+				{
+					aggregate->name = spec->name;
+					symtbl_push(ctx->types, aggregate);
+				}
+				
+				sem->llvm_type = LLVMArrayType(LLVMInt8Type(), aggregate->type.aligned_size);
+				aggregate->type.value = sem;
+				result = &aggregate->type;
+			}
+			break;
+		}
+		else {
+			name = str_concat(ty == TP_STRUCT ? "struct " : "union ", spec->name);
+			sym_in_tbl = symtbl_find(ctx->types, name);
+
+			if (sym_in_tbl == NULL)
+			{
+				sym_in_tbl = symbol_create_struct_or_union_incomplete(name, ty);
+				symtbl_push(ctx->types, sym_in_tbl);
+			}
+			else {
+				free(name);
+			}
+			
+			result = &sym_in_tbl->type;
+			break;
 		}
 
-		free(name);
-		result = &sym_in_tbl->type;
-		break;
+		
 
 	case TP_ENUM:
 		name = str_concat("enum ", spec->name);
 		sym_in_tbl = symtbl_find(ctx->types, name);
 		if (sym_in_tbl == NULL)
 		{
-			log_error(SUPER(spec), "'enum %s' is not defined", name);
+			log_error(SUPER(spec), "'%s' is not defined", name);
 			break;
 		}
 
@@ -481,7 +549,8 @@ LLVMTypeRef extract_llvm_type(TypeInfo* info) {
 		return LLVMInt64Type();
 	case TP_UNION:
 	case TP_STRUCT:
-		return LLVMArrayType(LLVMInt8Type(), info->aligned_size);
+		// return LLVMArrayType(LLVMInt8Type(), info->aligned_size);
+		return ((struct TypeSematic*)info->value)->llvm_type;
 
 	default:
 		break;
@@ -581,10 +650,13 @@ LLVMValueRef eval_DeclareStmt(DeclareStmt* ast)
 				continue;
 			}
 
+			TypeInfo* type_info = extract_type(id_spec);
 			// TODO 更加复杂的构建
-			LLVMTypeRef decl_type = extract_llvm_type(extract_type(id_spec));
-			LLVMValueRef ptr = LLVMBuildAlloca(sem_ctx.builder, decl_type, id->name);
-
+			LLVMTypeRef decl_type = extract_llvm_type(type_info);
+			
+			LLVMValueRef ptr = NULL;
+			ptr = LLVMBuildAlloca(sem_ctx.builder, decl_type, id->name);
+			
 			// TODO: 检查合并 attributes 的时候问题
 			id->attributes |= ast->attributes;
 			LLVMValueRef value = NULL;
@@ -679,50 +751,7 @@ LLVMValueRef eval_EnumDeclareStmt(EnumDeclareStmt* ast)
 // TODO: Add type from symbol table
 LLVMValueRef eval_AggregateDeclareStmt(AggregateDeclareStmt* ast)
 {
-	TypeInfo* first = NULL;
-	TypeInfo* last = NULL;
-	AST* field_list = ast->fields;
-	Symbol* aggregate = NULL;
-	if (ast->name != NULL)
-	{
-		aggregate = symtbl_find(ctx->types, ast->name);
-	}
-
-	if (aggregate == NULL)
-	{
-		aggregate = symbol_create_struct_or_union_incomplete(NULL, ast->type);
-	}
-
-	if (field_list == NULL)
-	{
-		log_error(ast, "Expected at least on field for struct");
-	}
-
-	FOR_EACH(field_list, st)
-	{
-		TRY_CAST(DeclaratorExpr, decl, st);
-		TypeInfo* ty = extract_type(decl->type_spec);
-
-		if (first == NULL)
-		{
-			first = last = ty;
-		}
-		else {
-			type_append(last, ty);
-			last = ty;
-		}
-	}
-
-	if (first != NULL)
-	{
-		symbol_create_struct_or_union(&aggregate->type, first);
-		NEW_STRUCT(TypeSematic, sem);
-		sem->llvm_type = LLVMArrayType(LLVMInt8Type(), aggregate->type.aligned_size);
-		aggregate->type.value = sem;
-	}
-
-
-	return NULL;
+	
 }
 
 LLVMValueRef eval_BlockExpr(BlockExpr* ast)

@@ -227,7 +227,7 @@ void sym_make_alias(Context* ctx, Symbol* sym, const char* alias)
 
 void type_info_init(TypeInfo* info)
 {
-	memset(info, 0, sizeof(TypeInfo));
+	// memset(info, 0, sizeof(TypeInfo));
 	info->alignment = -1;
 	info->aligned_size = -1;
 	info->offset = -1;
@@ -368,10 +368,11 @@ void symbol_init_context(struct Context* context)
 }
 
 
-TypeInfo* type_fetch_buildtin(enum Types type)
+TypeInfo* type_fetch_buildtin(enum Types type, char* name)
 {
 	int is_unsign = (type & TP_SIGNED);
 	int inc = is_unsign ? TP_NUM_BUILTINS : 0;
+	Symbol* result = NULL;
 
 	switch (type & TP_CLEAR_SIGNFLAGS)
 	{
@@ -383,16 +384,30 @@ TypeInfo* type_fetch_buildtin(enum Types type)
 	case TP_INT32:
 	case TP_INT64:
 	case TP_INT128:
-		return &builtins[inc + type & TP_CLEAR_SIGNFLAGS];
+		result = &builtins[inc + type & TP_CLEAR_SIGNFLAGS];
+		break;
+
 	case TP_FLOAT32:
 	case TP_FLOAT64:
 	case TP_FLOAT128:
-		return &builtins[type & TP_CLEAR_SIGNFLAGS];
+		result = &builtins[type & TP_CLEAR_SIGNFLAGS];
+		break;
 	default:
 		break;
 	}
 
-	return NULL;
+	if (result == NULL)
+	{
+		return NULL;
+	}
+	else {
+		NEW_STRUCT(Symbol, sym);
+		
+		memcpy(sym, result, sizeof(Symbol));
+		sym->type.field_name = name;
+		return &sym->type;
+	}
+	
 }
 
 void symbol_init_struct(Symbol* sym, char* name, enum SymbolTypes type)
@@ -563,6 +578,7 @@ Symbol* symbol_create_struct_or_union(TypeInfo* info, TypeInfo* child)
 		while (move)
 		{
 			move->offset = 0;
+			move = move->next;
 		}
 		
 		info->aligned_size = max_aligned_size;
@@ -586,13 +602,14 @@ Symbol* symbol_create_struct_or_union(TypeInfo* info, TypeInfo* child)
 			move->offset = size;
 			size += move->alignment;
 			last_alignment = move->alignment;
+			move = move->next;
 		}
 
 
 		info->aligned_size = size;
 		info->alignment = max_alignment;
 	}
-
+	info->struc.child = child;
 	return symbol_from_type_info(info);
 }
 TypeInfo* type_get_error_type()
@@ -642,6 +659,44 @@ TypeInfo* type_create_param_ellipse()
 	type_info_init(info);
 	info->type = TP_ELLIPSIS;
 	return info;
+}
+
+struct TypeFindResult type_find_field(TypeInfo* type, const char* name)
+{
+	TypeInfo* child = type->struc.child;
+	struct TypeFindResult result;
+	result.offset = 0;
+	result.type = NULL;
+
+	while (child)
+	{
+		// 
+		// struct { union{ int a}; } A; 
+		// A.a 是可以访问的
+		if (child->type == TP_UNION && child->field_name == NULL)
+		{
+			result = type_find_field(child, name);
+			if (result.type != NULL) {
+				if (child->offset > 0)
+				{
+					result.offset += child->offset;
+				}
+				return result;
+			}
+		}
+
+
+		if (str_equal(child->field_name, name))
+		{
+			result.offset = child->offset;
+			result.type = child;
+			break;
+		}
+
+		child = child->next;
+	}
+
+	return result;
 }
 
 int type_append(TypeInfo* tail, TypeInfo* new_tail)
