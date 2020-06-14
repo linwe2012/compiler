@@ -266,7 +266,10 @@ void do_eval(AST* ast, struct Context* _ctx, char* module_name, const char* outp
 	sem_ctx.tmp_top = NULL;
 
 	LLVMPassManagerRef passes = LLVMCreatePassManager();
-	LLVMAddMergedLoadStoreMotionPass(passes);
+	// LLVMAddGlobalOptimizerPass(passes);
+	LLVMAddStripDeadPrototypesPass(passes);
+	LLVMAddScalarReplAggregatesPassSSA(passes);
+	// LLVMAddNewGVNPass(passes);
 	LLVMAddVerifierPass(passes);
 
 	ctx = _ctx;
@@ -447,7 +450,7 @@ TypeInfo* extract_type(TypeSpecifier* spec)
 				NEW_STRUCT(TypeSematic, sem);
 				sem->llvm_type = LLVMStructCreateNamed(LLVMGetGlobalContext(), aggregate->name);
 				aggregate->type.value = sem;
-				
+
 				symtbl_push(ctx->types, aggregate);
 			}
 			else {
@@ -472,7 +475,8 @@ TypeInfo* extract_type(TypeSpecifier* spec)
 
 				if (first == NULL) {
 					first = last = ty;
-				} else {
+				}
+				else {
 					type_append(last, ty);
 					last = ty;
 				}
@@ -487,21 +491,22 @@ TypeInfo* extract_type(TypeSpecifier* spec)
 					llvm_fields[i] = extract_llvm_type(cur);
 					cur = cur->next;
 				}
-			} else if (spec->type == TP_UNION) {
+			}
+			else if (spec->type == TP_UNION) {
 				// TODO union的话只有最大的那个field
 				field_cnt = 1;
 			}
-		
+
 
 			if (first != NULL)
 			{
 				symbol_create_struct_or_union(&aggregate->type, first);
-				
+
 				struct TypeSematic* sem = aggregate->type.value;
 				// sem->llvm_type = LLVMArrayType(LLVMInt8Type(), aggregate->type.aligned_size);
-				
+
 				LLVMStructSetBody(sem->llvm_type, llvm_fields, field_cnt, 0);
-				
+
 				result = &aggregate->type;
 			}
 			break;
@@ -518,12 +523,12 @@ TypeInfo* extract_type(TypeSpecifier* spec)
 			else {
 				free(name);
 			}
-			
+
 			result = &sym_in_tbl->type;
 			break;
 		}
 
-		
+
 
 	case TP_ENUM:
 		name = str_concat("enum ", spec->name);
@@ -635,10 +640,10 @@ LLVMTypeRef extract_llvm_type(TypeInfo* info) {
 		{
 			return LLVMPointerType(LLVMInt8Type(), 0);
 		}
-		
+
 		ptr = extract_llvm_type(info->ptr.pointing);
 		return LLVMPointerType(ptr, 0);
-		
+
 	case TP_ARRAY:
 		return LLVMArrayType(extract_llvm_type(info->arr.array_type), info->arr.array_count);
 	case TP_ENUM:
@@ -689,8 +694,8 @@ static Symbol* eval_FuncDeclareStmt(AST* ast, TypeSpecifier* ret_typesp, const c
 			tmp = tmp->super.next;
 		}
 	}
-	
-	
+
+
 	LLVMTypeRef func_type = LLVMFunctionType(
 		ret_type,	// 返回类型
 		argv,		// 形参数组
@@ -733,9 +738,11 @@ static Symbol* eval_FuncDeclareStmt(AST* ast, TypeSpecifier* ret_typesp, const c
 static LLVMValueRef llvm_get_default(LLVMTypeRef type) {
 	if (llvm_is_int(type)) {
 		return LLVMConstInt(type, 0, 1);
-	} else if (llvm_is_float(type)) {
+	}
+	else if (llvm_is_float(type)) {
 		return LLVMConstReal(type, 0);
-	} else {
+	}
+	else {
 		// TODO 更多的默认类型
 		return NULL;
 	}
@@ -878,7 +885,7 @@ LLVMValueRef eval_DeclareStmt(DeclareStmt* ast)
 			TypeInfo* type_info = extract_type(id_spec);
 			// TODO 更加复杂的构建
 			LLVMTypeRef decl_type = extract_llvm_type(type_info);
-			
+
 			LLVMValueRef ptr = NULL;
 			LLVMValueRef value = NULL;
 			if (ctx->variables->stack_top->prev == NULL) {
@@ -890,15 +897,17 @@ LLVMValueRef eval_DeclareStmt(DeclareStmt* ast)
 							value = llvm_convert_type(decl_type, value);
 						}
 						last_value = value;
-					} else {
+					}
+					else {
 						// 没有初始化的也要做初始化
 						value = llvm_get_default(decl_type);
 					}
 					LLVMSetInitializer(ptr, value);
 				}
-			} else {
+			}
+			else {
 				ptr = LLVMBuildAlloca(sem_ctx.builder, decl_type, id->name);
-			
+
 				// TODO: 检查合并 attributes 的时候问题
 				id->attributes |= ast->attributes;
 				if (id->init_value)
@@ -972,7 +981,7 @@ LLVMValueRef eval_FunctionCallExpr(FunctionCallExpr* ast) {
 	AST* arg = ast->params;
 	for (; arg != NULL; arg = arg->next, ++argc);
 	LLVMValueRef* argv = calloc(argc, sizeof(LLVMValueRef));
-	
+
 	arg = ast->params;
 	int i = 0;
 	for (; i < func_sym->func.argc; ++i)
@@ -992,9 +1001,9 @@ LLVMValueRef eval_FunctionCallExpr(FunctionCallExpr* ast) {
 			arg = arg->next;
 		}
 	}
-	
-	return LLVMBuildCall(sem_ctx.builder, 
-		func_sym->func.value, argv, argc, 
+
+	return LLVMBuildCall(sem_ctx.builder,
+		func_sym->func.value, argv, argc,
 		func_sym->func.ret_type == LLVMVoidType() ? "" : next_temp_id_str());
 }
 
@@ -1199,7 +1208,8 @@ static LLVMValueRef eval_OP_ARRAY_ACCESS(OperatorExpr* op, int lv) {
 	LLVMValueRef gep = LLVMBuildGEP(sem_ctx.builder, lhs_ptr, indices, 2, "gep_res");
 	if (lv) {
 		return gep;
-	} else {
+	}
+	else {
 		return LLVMBuildLoad(sem_ctx.builder, gep, "arr_res");
 	}
 }
@@ -1239,7 +1249,8 @@ static LLVMValueRef eval_OP_ACCESS(OperatorExpr* op, int lv, int stack_or_ptr) {
 	LLVMValueRef gep = LLVMBuildStructGEP(sem_ctx.builder, lhs_ptr, idx, "gep_res");
 	if (lv) {
 		return gep;
-	} else {
+	}
+	else {
 		return LLVMBuildLoad(sem_ctx.builder, gep, "struct_res");
 	}
 }
@@ -1248,7 +1259,8 @@ static LLVMValueRef eval_OP_POINTER(OperatorExpr* op, int lv) {
 	LLVMValueRef lhs = eval_OperatorExpr(op->lhs);
 	if (lv) {
 		return lhs;
-	} else {
+	}
+	else {
 		return LLVMBuildLoad(sem_ctx.builder, lhs, "ptr_res");
 	}
 }
@@ -1280,14 +1292,18 @@ LLVMValueRef get_OperatorExpr_LeftValue(AST* ast)
 		}
 		if (operator->op == OP_ARRAY_ACCESS) {
 			return eval_OP_ARRAY_ACCESS(operator, 1);
-		} else if (operator->op == OP_STACK_ACCESS) {
+		}
+		else if (operator->op == OP_STACK_ACCESS) {
 			return eval_OP_ACCESS(operator, 1, 0);
-		} else if (operator->op == OP_PTR_ACCESS) {
+		}
+		else if (operator->op == OP_PTR_ACCESS) {
 			return eval_OP_ACCESS(operator, 1, 1);
-		} else if (operator->op == OP_POINTER) {
+		}
+		else if (operator->op == OP_POINTER) {
 			return eval_OP_POINTER(operator, 1);
 		}
-	} else if (ast->type == AST_ListExpr) {
+	}
+	else if (ast->type == AST_ListExpr) {
 		TRY_CAST(ListExpr, list, ast);
 		return get_OperatorExpr_LeftValue(list->first_child);
 	}
@@ -1321,10 +1337,16 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 			return NULL;
 		}
 		return get_identifierxpr_llvm_value(identifier);
-	} else if (ast->type == AST_ListExpr) {
+	}
+	else if (ast->type == AST_ListExpr) {
 		TRY_CAST(ListExpr, list, ast);
 		return eval_OperatorExpr(list->first_child);
-	} else if (ast->type == AST_OperatorExpr)
+	}
+	else if (ast->type == AST_FunctionCallExpr)
+	{
+		return eval_FunctionCallExpr(ast);
+	}
+	else if (ast->type == AST_OperatorExpr)
 	{
 		TRY_CAST(OperatorExpr, operator, ast);
 		if (!operator)
@@ -1336,9 +1358,11 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 		if (operator->op == OP_ARRAY_ACCESS) {
 			// 一些比较特殊的op不适合和后面的一起做
 			return eval_OP_ARRAY_ACCESS(operator, 0);
-		} else if (operator->op == OP_STACK_ACCESS) {
+		}
+		else if (operator->op == OP_STACK_ACCESS) {
 			return eval_OP_ACCESS(operator, 0, 0);
-		} else if (operator->op == OP_PTR_ACCESS) {
+		}
+		else if (operator->op == OP_PTR_ACCESS) {
 			return eval_OP_ACCESS(operator, 0, 1);
 		}
 
@@ -1371,7 +1395,7 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 				}
 				else
 				{
-					
+
 					TypeInfo* ty = extract_type(decl->type_spec);
 					if (ty == NULL || ty->incomplete)
 					{
@@ -1391,7 +1415,7 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 					LLVMValueRef ty = LLVMTypeOf(val);
 					tmp = LLVMSizeOf(ty);
 				}
-			}			
+			}
 			return tmp;
 		}
 		lhs = eval_OperatorExpr(operator->lhs);
@@ -1411,7 +1435,7 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 		LLVMValueRef tmp = NULL, tmp1 = NULL, value_ptr = NULL;
 		switch (operator->op)
 		{
-		// 一元运算符
+			// 一元运算符
 		case OP_NEGATIVE:
 			if (!llvm_is_float(lhs))
 			{
@@ -1420,7 +1444,7 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 			else
 			{
 				tmp = LLVMBuildFNeg(sem_ctx.builder, lhs, "fneg_res");
-			}		
+			}
 			break;
 		case OP_COMPLEMENT:
 			if (!llvm_is_float(lhs))
@@ -1438,13 +1462,13 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 		case OP_INC:
 			if (!llvm_is_float(lhs))
 			{
-				tmp = LLVMBuildAdd(sem_ctx.builder, lhs, LLVMConstInt(dest_type, 1, 1), "inc_res");
+				tmp = LLVMBuildAdd(sem_ctx.builder, lhs, LLVMConstInt(dest_type, 1, 1), "prefix_inc_res");
 				value_ptr = get_OperatorExpr_LeftValue(operator->lhs);
 				LLVMBuildStore(sem_ctx.builder, tmp, value_ptr);
 			}
 			else
 			{
-				tmp = LLVMBuildFAdd(sem_ctx.builder, lhs, LLVMConstReal(dest_type, 1), "inc_res");				
+				tmp = LLVMBuildFAdd(sem_ctx.builder, lhs, LLVMConstReal(dest_type, 1), "prefix_finc_res");
 				value_ptr = get_OperatorExpr_LeftValue(operator->lhs);
 				LLVMBuildStore(sem_ctx.builder, tmp, value_ptr);
 			}
@@ -1452,13 +1476,13 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 		case OP_DEC:
 			if (!llvm_is_float(lhs))
 			{
-				tmp = LLVMBuildAdd(sem_ctx.builder, lhs, LLVMConstInt(dest_type, -1, 1), "dec_res");
+				tmp = LLVMBuildAdd(sem_ctx.builder, lhs, LLVMConstInt(dest_type, -1, 1), "prefix_dec_res");
 				value_ptr = get_OperatorExpr_LeftValue(operator->lhs);
 				LLVMBuildStore(sem_ctx.builder, tmp, value_ptr);
 			}
 			else
 			{
-				tmp = LLVMBuildFAdd(sem_ctx.builder, lhs, LLVMConstReal(dest_type, -1), "dec_res");
+				tmp = LLVMBuildFAdd(sem_ctx.builder, lhs, LLVMConstReal(dest_type, -1), "prefix_fdec_res");
 				value_ptr = get_OperatorExpr_LeftValue(operator->lhs);
 				LLVMBuildStore(sem_ctx.builder, tmp, value_ptr);
 			}
@@ -1467,14 +1491,14 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 			if (!llvm_is_float(lhs))
 			{
 				tmp = lhs;
-				tmp1 = LLVMBuildAdd(sem_ctx.builder, lhs, LLVMConstInt(dest_type, 1, 1), "inc_res");
+				tmp1 = LLVMBuildAdd(sem_ctx.builder, lhs, LLVMConstInt(dest_type, 1, 1), "postfix_inc_res");
 				value_ptr = get_OperatorExpr_LeftValue(operator->lhs);
 				LLVMBuildStore(sem_ctx.builder, tmp1, value_ptr);
 			}
 			else
 			{
 				tmp = lhs;
-				tmp1 = LLVMBuildFAdd(sem_ctx.builder, lhs, LLVMConstReal(dest_type, 1), "inc_res");
+				tmp1 = LLVMBuildFAdd(sem_ctx.builder, lhs, LLVMConstReal(dest_type, 1), "postfix_finc_res");
 				value_ptr = get_OperatorExpr_LeftValue(operator->lhs);
 				LLVMBuildStore(sem_ctx.builder, tmp1, value_ptr);
 			}
@@ -1483,19 +1507,19 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 			if (!llvm_is_float(lhs))
 			{
 				tmp = lhs;
-				tmp1 = LLVMBuildAdd(sem_ctx.builder, lhs, LLVMConstInt(dest_type, -1, 1), "dec_res");
+				tmp1 = LLVMBuildAdd(sem_ctx.builder, lhs, LLVMConstInt(dest_type, -1, 1), "postfix_dec_res");
 				value_ptr = get_OperatorExpr_LeftValue(operator->lhs);
 				LLVMBuildStore(sem_ctx.builder, tmp1, value_ptr);
 			}
 			else
 			{
 				tmp = lhs;
-				tmp1 = LLVMBuildFAdd(sem_ctx.builder, lhs, LLVMConstReal(dest_type, -1), "dec_res");
+				tmp1 = LLVMBuildFAdd(sem_ctx.builder, lhs, LLVMConstReal(dest_type, -1), "postfix_fdec_res");
 				value_ptr = get_OperatorExpr_LeftValue(operator->lhs);
 				LLVMBuildStore(sem_ctx.builder, tmp1, value_ptr);
 			}
-			break;		
-		// 二元运算符
+			break;
+			// 二元运算符
 		case OP_ADD:
 			if (!type_is_float(dest_type))
 			{
@@ -1503,7 +1527,7 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 			}
 			else
 			{
-				tmp = LLVMBuildFAdd(sem_ctx.builder, lhs, rhs, "add_res");
+				tmp = LLVMBuildFAdd(sem_ctx.builder, lhs, rhs, "fadd_res");
 			}
 			break;
 		case OP_SUB:
@@ -1513,7 +1537,7 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 			}
 			else
 			{
-				tmp = LLVMBuildFSub(sem_ctx.builder, lhs, rhs, "dec_res");
+				tmp = LLVMBuildFSub(sem_ctx.builder, lhs, rhs, "fdec_res");
 			}
 			break;
 		case OP_MUL:
@@ -1523,7 +1547,7 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 			}
 			else
 			{
-				tmp = LLVMBuildFMul(sem_ctx.builder, lhs, rhs, "mul_res");
+				tmp = LLVMBuildFMul(sem_ctx.builder, lhs, rhs, "fmul_res");
 			}
 			break;
 		case OP_DIV:
@@ -1533,7 +1557,7 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 			}
 			else
 			{
-				tmp = LLVMBuildFDiv(sem_ctx.builder, lhs, rhs, "div_res");
+				tmp = LLVMBuildFDiv(sem_ctx.builder, lhs, rhs, "fdiv_res");
 			}
 			break;
 		case OP_MOD:
@@ -1543,7 +1567,7 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 			}
 			else
 			{
-				tmp = LLVMBuildFRem(sem_ctx.builder, lhs, rhs, "mod_res");
+				tmp = LLVMBuildFRem(sem_ctx.builder, lhs, rhs, "fmod_res");
 			}
 			break;
 		case OP_SHIFT_LEFT:
@@ -1566,11 +1590,11 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 				log_error(ast, "SHIFT Op Expected INT Type");
 			}
 			break;
-		//位运算
+			//位运算
 		case OP_BIT_AND:
 			if (!type_is_float(dest_type))
 			{
-				tmp = LLVMBuildAnd(sem_ctx.builder, lhs, rhs, "and_res"); 
+				tmp = LLVMBuildAnd(sem_ctx.builder, lhs, rhs, "and_res");
 			}
 			else
 			{
@@ -1580,7 +1604,7 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 		case OP_BIT_OR:
 			if (!type_is_float(dest_type))
 			{
-				tmp = LLVMBuildOr(sem_ctx.builder, lhs, rhs, "or_res"); 
+				tmp = LLVMBuildOr(sem_ctx.builder, lhs, rhs, "or_res");
 			}
 			else
 			{
@@ -1590,7 +1614,7 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 		case OP_BIT_XOR:
 			if (!type_is_float(dest_type))
 			{
-				tmp = LLVMBuildXor(sem_ctx.builder, lhs, rhs, "xor_res"); 
+				tmp = LLVMBuildXor(sem_ctx.builder, lhs, rhs, "xor_res");
 			}
 			else
 			{
@@ -1619,9 +1643,9 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 			else
 			{
 				log_error(ast, "SHIFT Op Expected INT Type");
-			}	
+			}
 			break;
-		//比较运算符返回的是INT_1类型
+			//比较运算符返回的是INT_1类型
 		case OP_LESS:
 			if (!type_is_float(dest_type))
 			{
@@ -1669,14 +1693,14 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 			else
 				tmp = LLVMBuildFCmp(sem_ctx.builder, LLVMRealONE, lhs, rhs, "equal_res");
 			break;
-		//赋值运算符
+			//赋值运算符
 		case OP_ASSIGN:
 			dest_type = LLVMTypeOf(lhs);
 			rhs = llvm_convert_type(dest_type, rhs);
 			value_ptr = get_OperatorExpr_LeftValue(operator->lhs);
 			LLVMBuildStore(sem_ctx.builder, rhs, value_ptr);
 			tmp = rhs;
-			break;	
+			break;
 		default:
 			return NULL;
 			break;
@@ -1830,7 +1854,7 @@ void sentence_test()
 	LLVMValueRef v1 = LLVMConstInt(LLVMInt32Type(), 10, 1);
 	LLVMValueRef v2 = LLVMConstInt(LLVMInt32Type(), 10, 1);
 	LLVMValueRef v3 = LLVMBuildFNeg(sem_ctx.builder, v2, "test");
-	LLVMValueRef v4 = LLVMBuildAlloca(sem_ctx.builder, LLVMFloatType(),"test");
+	LLVMValueRef v4 = LLVMBuildAlloca(sem_ctx.builder, LLVMFloatType(), "test");
 	LLVMBuildStore(sem_ctx.builder, v3, v4);
 	//LLVMValueRef v7 = LLVMBuildSIToFP(sem_ctx.builder, v1, LLVMFloatType(), "float_cast");
 	//LLVMValueRef v5 = LLVMBuildStore(sem_ctx.builder, v2, v3);
@@ -2029,12 +2053,12 @@ LLVMValueRef eval_TypeSpecifier(TypeSpecifier* ast)
 {
 	NOT_IMPLEMENTED;
 
-	
+
 }
 /*
 LLVMValueRef handle_initializer_list(TypeInfo* info, ListExpr* ast)
 {
-	
+
 }
 
 */
