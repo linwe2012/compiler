@@ -6,6 +6,8 @@
 
 
 #include <llvm-c/Core.h>
+#include <llvm-c/TargetMachine.h>
+#include <llvm-c/Analysis.h>
 
 #define SUPER(ptr) &(ptr->super)
 #define NOT_IMPLEMENTED return NULL
@@ -192,6 +194,39 @@ LLVMValueRef eval_ast(AST* ast)
 static int llvm_is_b(LLVMValueRef inst) {
 	return LLVMIsAReturnInst(inst) || LLVMIsABranchInst(inst) || LLVMIsAIndirectBrInst(inst);
 }
+
+static int llvm_is_float(LLVMValueRef v) {
+	return LLVMTypeOf(v) == LLVMFloatType()
+		|| LLVMTypeOf(v) == LLVMDoubleType();
+}
+
+static int llvm_is_int(LLVMValueRef v) {
+	return LLVMTypeOf(v) == LLVMInt64Type()
+		|| LLVMTypeOf(v) == LLVMInt32Type()
+		|| LLVMTypeOf(v) == LLVMInt16Type()
+		|| LLVMTypeOf(v) == LLVMInt8Type()
+		|| LLVMTypeOf(v) == LLVMInt1Type()
+		|| LLVMTypeOf(v) == LLVMInt128Type();
+}
+
+static int llvm_is_bit(LLVMValueRef v) {
+	return LLVMTypeOf(v) == LLVMInt1Type();
+}
+
+static int type_is_float(LLVMTypeRef type) {
+	return type == LLVMFloatType()
+		|| type == LLVMDoubleType();
+}
+
+static int type_is_int(LLVMTypeRef type) {
+	return type == LLVMInt1Type() ||
+		type == LLVMInt8Type() ||
+		type == LLVMInt16Type() ||
+		type == LLVMInt32Type() ||
+		type == LLVMInt64Type();
+}
+
+static LLVMValueRef get_OperatorExpr_LeftValue(AST* ast);
 
 // returns the value of last eval
 LLVMValueRef eval_list(AST* ast)
@@ -617,6 +652,17 @@ static Symbol* eval_FuncDeclareStmt(AST* ast, TypeSpecifier* ret_typesp, const c
 	return func_sym;
 }
 
+static LLVMValueRef llvm_get_default(LLVMTypeRef type) {
+	if (llvm_is_int(type)) {
+		return LLVMConstInt(type, 0, 1);
+	} else if (llvm_is_float(type)) {
+		return LLVMConstReal(type, 0);
+	} else {
+		// TODO 更多的默认类型
+		return NULL;
+	}
+}
+
 LLVMValueRef eval_DeclareStmt(DeclareStmt* ast)
 {
 	TRY_CAST(TypeSpecifier, spec, ast->type);
@@ -664,22 +710,36 @@ LLVMValueRef eval_DeclareStmt(DeclareStmt* ast)
 			LLVMTypeRef decl_type = extract_llvm_type(type_info);
 			
 			LLVMValueRef ptr = NULL;
-			ptr = LLVMBuildAlloca(sem_ctx.builder, decl_type, id->name);
-			
-			// TODO: 检查合并 attributes 的时候问题
-			id->attributes |= ast->attributes;
 			LLVMValueRef value = NULL;
-			if (id->init_value)
-			{
-				value = eval_ast(id->init_value);
-				if (LLVMTypeOf(value) != decl_type) {
-					value = llvm_convert_type(decl_type, value);
+			if (ctx->variables->stack_top->prev == NULL) {
+				ptr = LLVMAddGlobal(sem_ctx.module, decl_type, id->name);
+				if (id->init_value) {
+					value = eval_ast(id->init_value);
+					if (LLVMTypeOf(value) != decl_type) {
+						value = llvm_convert_type(decl_type, value);
+					}
+					last_value = value;
+				} else {
+					// 没有初始化的也要做初始化
+					value = llvm_get_default(decl_type);
 				}
-				last_value = value;
-				LLVMBuildStore(sem_ctx.builder, value, ptr);
+				LLVMSetInitializer(ptr, value);
+			} else {
+				ptr = LLVMBuildAlloca(sem_ctx.builder, decl_type, id->name);
+			
+				// TODO: 检查合并 attributes 的时候问题
+				id->attributes |= ast->attributes;
+				if (id->init_value)
+				{
+					value = eval_ast(id->init_value);
+					if (LLVMTypeOf(value) != decl_type) {
+						value = llvm_convert_type(decl_type, value);
+					}
+					last_value = value;
+					LLVMBuildStore(sem_ctx.builder, value, ptr);
+				}
 			}
-			TypeInfo* typeinfo = extract_type(id_spec);
-			Symbol* sym = symbol_create_variable(id->name, id->attributes, symbol_from_type_info(typeinfo), ptr, 0);
+			Symbol* sym = symbol_create_variable(id->name, id->attributes, symbol_from_type_info(type_info), ptr, 0);
 
 
 			symtbl_push(ctx->variables, sym);
@@ -841,32 +901,7 @@ LLVMOpcode eval_binary_opcode_llvm(enum Operators op)
 	}
 }
 
-static int llvm_is_float(LLVMValueRef v)
-{
-	return LLVMTypeOf(v) == LLVMFloatType()
-		|| LLVMTypeOf(v) == LLVMDoubleType();
-}
 
-static int llvm_is_int(LLVMValueRef v)
-{
-	return LLVMTypeOf(v) == LLVMInt64Type()
-		|| LLVMTypeOf(v) == LLVMInt32Type()
-		|| LLVMTypeOf(v) == LLVMInt16Type()
-		|| LLVMTypeOf(v) == LLVMInt8Type()
-		|| LLVMTypeOf(v) == LLVMInt1Type()
-		|| LLVMTypeOf(v) == LLVMInt128Type();
-}
-
-static int llvm_is_bit(LLVMValueRef v)
-{
-	return LLVMTypeOf(v) == LLVMInt1Type();
-}
-
-static int type_is_float(LLVMTypeRef type)
-{
-	return type == LLVMFloatType()
-		|| type == LLVMDoubleType();
-}
 
 LLVMValueRef eval_IdentifierExpr(IdentifierExpr* ast)
 {
@@ -1039,18 +1074,13 @@ LLVMTypeRef llvm_get_res_type(LLVMValueRef lhs, LLVMValueRef rhs)
 }
 
 static LLVMValueRef eval_OP_ARRAY_ACCESS(OperatorExpr* op, int lv) {
-	TRY_CAST(IdentifierExpr, identifier, op->lhs);
-	if (!identifier) {
-		log_error(SUPER(op), "Expected IdentifierExpr");
-		return NULL;
-	}
-	Symbol* sym = symtbl_find(ctx->variables, identifier->name);
+	LLVMValueRef lhs_v = get_OperatorExpr_LeftValue(op->lhs);
 	LLVMValueRef* indices = calloc(2, sizeof(LLVMValueRef));
 	indices[0] = eval_OperatorExpr(op->rhs);
 	// TODO 这个值的类型是要根据数组类型变的
 	// 并且将来支持struct数组还需要知道offset，所以语义上是否应该在symbol中记录数组类型
 	indices[1] = LLVMConstInt(LLVMInt32Type(), 0, 1);
-	LLVMValueRef gep = LLVMBuildGEP(sem_ctx.builder, sym->value, indices, 2, "gep_res");
+	LLVMValueRef gep = LLVMBuildGEP(sem_ctx.builder, lhs_v, indices, 2, "gep_res");
 	if (lv) {
 		return gep;
 	}
@@ -1551,9 +1581,6 @@ void eval_ForStmt(LoopStmt* ast) {
 	append_bb(&sem_ctx.continue_last, step_bb);
 	append_bb(&sem_ctx.after_bb, after_bb);
 	// 3. body
-	// Emit the body of the loop.  This, like any other expr, can change the
-	// current BB.  Note that we ignore the value computed by the body, but don't
-	// allow an error.
 	LLVMPositionBuilderAtEnd(sem_ctx.builder, body_bb);
 	LLVMValueRef bodyv = eval_ast(ast->body);
 	if (!llvm_is_b(bodyv)) {	// 如果最后一条指令是br，不能构建br

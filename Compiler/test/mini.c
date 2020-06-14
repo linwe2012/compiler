@@ -37,13 +37,17 @@ int main(void) {
 	printf("My age is %d\n, Im %f m, and my hobby is %d\n", 22, 1.8, "Running");
     return 0;
 }
-void test()
+
+int g_a = 10;
+
+void test(void)
 {
+	g_a = 100;
 	int a[10];
-	a[1] = 10;
+	int arr[10][2];
+	a[1] = arr[2][1];
+	arr[3][1] = a[2];
 	double d[3][10];
 	int na = sizeof(a);
 	int nd = sizeof(d);
-	// d[1][5] = 2;
-
 }
