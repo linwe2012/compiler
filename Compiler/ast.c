@@ -297,6 +297,9 @@ AST* make_unary_expr(enum Operators unary_op, AST* lhs)
 {
 	NEW_AST(OperatorExpr, ast);
 	ast->lhs = lhs;
+	ast->rhs = NULL;
+	ast->cond = NULL;
+	ast->number_type = TP_INCOMPLETE;
 	ast->op = unary_op;
 	return SUPER(ast);
 }
@@ -981,12 +984,12 @@ AST* make_type_declarator(AST* specifier_qualifier, AST* declarator)
 {
 	
 	CAST(TypeSpecifier, spec, specifier_qualifier);
-	CAST(DeclaratorExpr, decl, declarator);
+	// CAST(DeclaratorExpr, decl, declarator);
 
 
 	return make_parameter_declaration(specifier_qualifier, declarator);
 
-	return SUPER(decl);
+	// return SUPER(decl);
 }
 
 

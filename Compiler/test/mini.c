@@ -28,6 +28,7 @@ int main(void) {
 	int A_a;
 	double A_b;
 	} st_A;
+	int nb = sizeof(struct A);
 
     disp_num(gcd(3 * 12, 60));
 	putchar(10);
@@ -36,8 +37,13 @@ int main(void) {
 	printf("My age is %d\n, Im %f m, and my hobby is %d\n", 22, 1.8, "Running");
     return 0;
 }
-void test(void)
+void test()
 {
 	int a[10];
 	a[1] = 10;
+	double d[3][10];
+	int na = sizeof(a);
+	int nd = sizeof(d);
+	// d[1][5] = 2;
+
 }

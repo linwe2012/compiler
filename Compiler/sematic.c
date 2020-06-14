@@ -244,7 +244,7 @@ LLVMValueRef eval_JumpStmt(JumpStmt* ast) {
 	switch (ast->type) {
 	case JUMP_BREAK:
 		if (sem_ctx.breakable_last == NULL) {
-			log_error(ast, "No loop to break");
+			log_error(SUPER(ast), "No loop to break");
 		}
 		else {
 			LLVMBuildBr(sem_ctx.builder, sem_ctx.breakable_last->block);
@@ -252,7 +252,7 @@ LLVMValueRef eval_JumpStmt(JumpStmt* ast) {
 		break;
 	case JUMP_CONTINUE:
 		if (sem_ctx.continue_last == NULL) {
-			log_error(ast, "No loop to continue");
+			log_error(SUPER(ast), "No loop to continue");
 		}
 		else {
 			LLVMBuildBr(sem_ctx.builder, sem_ctx.continue_last->block);
@@ -290,7 +290,12 @@ struct SematicData* sematic_data_new() {
 	return sem;
 }
 
-
+char* get_struct_or_union_name(enum Types type, const char* name)
+{
+	return (
+		str_concat(type == TP_STRUCT ? "struct " : "union ", name)
+		);
+}
 TypeInfo* extract_type(TypeSpecifier* spec)
 {
 	if (spec == NULL)
@@ -366,9 +371,10 @@ TypeInfo* extract_type(TypeSpecifier* spec)
 			AST* field_list = spec->struct_or_union;
 			Symbol* aggregate = NULL;
 			int found_in_symtbl = 0;
+			char* type_name = get_struct_or_union_name(spec->type, spec->name);
 			if (spec->name != NULL)
 			{
-				aggregate = symtbl_find(ctx->types, spec->name);
+				aggregate = symtbl_find(ctx->types, type_name);
 				if (aggregate)
 				{
 					found_in_symtbl = 1;
@@ -411,8 +417,11 @@ TypeInfo* extract_type(TypeSpecifier* spec)
 				NEW_STRUCT(TypeSematic, sem);
 				if (!found_in_symtbl && spec->name != NULL)
 				{
-					aggregate->name = spec->name;
+					aggregate->name = type_name;
 					symtbl_push(ctx->types, aggregate);
+				}
+				else {
+					free(type_name);
 				}
 				
 				sem->llvm_type = LLVMArrayType(LLVMInt8Type(), aggregate->type.aligned_size);
@@ -540,7 +549,7 @@ LLVMTypeRef extract_llvm_type(TypeInfo* info) {
 	case TP_FLOAT32:
 		return LLVMFloatType();
 	case TP_FLOAT64:
-		return LLVMFloatType();
+		return LLVMDoubleType();
 	case TP_PTR:
 		return LLVMPointerType(extract_llvm_type(info->ptr.pointing), 0);
 	case TP_ARRAY:
@@ -633,7 +642,7 @@ LLVMValueRef eval_DeclareStmt(DeclareStmt* ast)
 
 		if (id->type_spec != NULL && id->type_spec->type == TP_FUNC) {
 			// 应该是这样区分函数和变量的吧
-			eval_FuncDeclareStmt(ast, spec, id->name, id->type_spec->params);
+			eval_FuncDeclareStmt(SUPER(ast), spec, id->name, id->type_spec->params);
 			last_value = NULL;
 		}
 		else {
@@ -748,10 +757,10 @@ LLVMValueRef eval_EnumDeclareStmt(EnumDeclareStmt* ast)
 	return LLVMConstInt(LLVMInt64Type(), enum_val, 1);
 }
 
-// TODO: Add type from symbol table
+// TODO: 这个不需要了, AggregateDeclareStmt 已经没了
 LLVMValueRef eval_AggregateDeclareStmt(AggregateDeclareStmt* ast)
 {
-	
+	NOT_IMPLEMENTED;
 }
 
 LLVMValueRef eval_BlockExpr(BlockExpr* ast)
@@ -773,21 +782,21 @@ LLVMValueRef eval_BlockExprNoScope(AST* ast) {
 }
 
 
-
+// 对于 Initializer List 不能调用这个
 LLVMValueRef eval_ListExpr(ListExpr* ast)
 {
-	NOT_IMPLEMENTED;
+	return eval_list(ast->first_child);
 }
 
 LLVMValueRef eval_FunctionCallExpr(FunctionCallExpr* ast) {
 	TRY_CAST(IdentifierExpr, func_ast, ast->function);
 	if (func_ast == NULL) {
-		log_error(ast, "Empty function identifier ast");
+		log_error(SUPER(ast), "Empty function identifier ast");
 		return NULL;
 	}
 	Symbol* func_sym = symtbl_find(ctx->functions, func_ast->name);
 	if (func_sym == NULL) {
-		log_error(ast, "Called function not declared");
+		log_error(SUPER(ast), "Called function not declared");
 		return NULL;
 	}
 	unsigned int argc = 0;
@@ -801,7 +810,7 @@ LLVMValueRef eval_FunctionCallExpr(FunctionCallExpr* ast) {
 	{
 		argv[i] = llvm_convert_type(func_sym->func.params[i], eval_ast(arg));
 		if (argv[i] == NULL) {
-			log_error(ast, "Pass null value to function call");
+			log_error(SUPER(ast), "Pass null value to function call");
 			return NULL;
 		}
 		arg = arg->next;
@@ -844,7 +853,8 @@ static int llvm_is_int(LLVMValueRef v)
 		|| LLVMTypeOf(v) == LLVMInt32Type()
 		|| LLVMTypeOf(v) == LLVMInt16Type()
 		|| LLVMTypeOf(v) == LLVMInt8Type()
-		|| LLVMTypeOf(v) == LLVMInt1Type();
+		|| LLVMTypeOf(v) == LLVMInt1Type()
+		|| LLVMTypeOf(v) == LLVMInt128Type();
 }
 
 static int llvm_is_bit(LLVMValueRef v)
@@ -881,7 +891,7 @@ LLVMValueRef eval_NumberExpr(NumberExpr* ast) {
 	case TP_FLOAT64:
 		return LLVMConstReal(LLVMDoubleType(), ast->f64);
 	default:
-		log_error(ast, "type %d currently not supported", type);
+		log_error(SUPER(ast), "type %d currently not supported", type);
 	}
 	return NULL;
 }
@@ -1031,7 +1041,7 @@ LLVMTypeRef llvm_get_res_type(LLVMValueRef lhs, LLVMValueRef rhs)
 static LLVMValueRef eval_OP_ARRAY_ACCESS(OperatorExpr* op, int lv) {
 	TRY_CAST(IdentifierExpr, identifier, op->lhs);
 	if (!identifier) {
-		log_error(op, "Expected IdentifierExpr");
+		log_error(SUPER(op), "Expected IdentifierExpr");
 		return NULL;
 	}
 	Symbol* sym = symtbl_find(ctx->variables, identifier->name);
@@ -1122,6 +1132,99 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 			// 一些比较特殊的op不适合和后面的一起做
 			return eval_OP_ARRAY_ACCESS(operator, 0);
 		}
+
+		if (operator->op == OP_SIZEOF)
+		{
+			LLVMValueRef tmp = NULL;
+			uint64_t result = 0;
+			//TRY_CAST(IdentifierExpr, id, operator->lhs);
+			//TRY_CAST(TypeSpecifier, spec, operator->lhs);
+			TRY_CAST(DeclaratorExpr, decl, operator->lhs);
+			if (decl != NULL)
+			{
+				if (decl->name != NULL)
+				{
+					Symbol* variable = symtbl_find(ctx->variables, decl->name);
+
+					if (variable == NULL)
+					{
+						log_error(operator->lhs, "Undeclared identifier");
+					}
+					else {
+						if (variable->var.type->type.incomplete)
+						{
+							log_error(operator->lhs, "Identifier's type is not declared or incomplete");
+						}
+						else {
+							result = variable->var.type->type.aligned_size;
+						}
+					}
+				}
+				else
+				{
+					
+					TypeInfo* ty = extract_type(decl->type_spec);
+					if (ty == NULL || ty->incomplete)
+					{
+						log_error(operator->lhs, "Type specifier is incomplete");
+					}
+					result = ty->aligned_size;
+				}
+				tmp = LLVMConstInt(
+					LLVMInt64Type(),
+					result,
+					0);
+			}
+			else {
+				LLVMValueRef val = eval_ast(operator->lhs);
+				if (val != NULL)
+				{
+					LLVMValueRef ty = LLVMTypeOf(val);
+					tmp = LLVMSizeOf(ty);
+				}
+			}
+			/*
+			if (id != NULL)
+			{
+				Symbol* variable = symtbl_find(ctx->variables, id->name);
+
+				if (variable == NULL)
+				{
+					log_error(operator->lhs, "Undeclared identifier");
+				}
+				else {
+					if (variable->var.type->type.incomplete)
+					{
+						log_error(operator->lhs, "Identifier's type is not declared or incomplete");
+					}
+					else {
+						result = variable->var.type->type.aligned_size;
+					}
+				}
+			}
+			// TODO: Specifier 是否也可以用 value ref?
+			else if (spec != NULL)
+			{
+				TypeInfo* ty = extract_type(spec);
+				if (ty == NULL || ty->incomplete)
+				{
+					log_error(operator->lhs, "Type specifier is incomplete");
+				}
+				result = ty->aligned_size;
+			}
+			else {
+				LLVMValueRef val = eval_ast(operator->lhs);
+				if (val != NULL)
+				{
+					LLVMValueRef ty = LLVMTypeOf(val);
+					tmp = LLVMSizeOf(ty);
+				}
+			}
+			*/
+			
+			return tmp;
+		}
+
 
 		lhs = eval_OperatorExpr(operator->lhs);
 		rhs = eval_OperatorExpr(operator->rhs);
@@ -1335,52 +1438,8 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 			tmp = rhs;
 			break;
 
-		case OP_SIZEOF:
-		{
-			uint64_t result = 0;
-			TRY_CAST(IdentifierExpr, id, operator->lhs);
-			TRY_CAST(TypeSpecifier, spec, operator->lhs);
-			if (id != NULL)
-			{
-				Symbol* variable = symtbl_find(ctx->variables, id->name);
-
-				if (variable == NULL)
-				{
-					log_error(operator->lhs, "Undeclared identifier");
-				}
-				else {
-					if (variable->var.type->type.incomplete)
-					{
-						log_error(operator->lhs, "Identifier's type is not declared or incomplete");
-					}
-					else {
-						result = variable->var.type->type.aligned_size;
-					}
-				}
-			}
-			// TODO: Specifier 是否也可以用 value ref?
-			else if (spec != NULL)
-			{
-				TypeInfo* ty = extract_type(spec);
-				if (ty == NULL || ty->incomplete)
-				{
-					log_error(operator->lhs, "Type specifier is incomplete");
-				}
-				result = ty->aligned_size;
-			}
-			else {
-				LLVMValueRef val = eval_ast(operator->lhs);
-				if (val != NULL)
-				{
-					LLVMValueRef ty = LLVMTypeOf(val);
-					tmp = LLVMSizeOf(ty);
-				}
-			}
-			tmp = LLVMConstInt(
-				LLVMInt64Type(),
-				result,
-				0);
-		}
+		
+		break;
 
 		default:
 			return NULL;
