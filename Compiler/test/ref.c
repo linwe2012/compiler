@@ -15,7 +15,7 @@ struct A {
     double s;
     char x[10];
   }u;
-  
+  struct A* sta;
 };
 
 //#include <stdio.h>
@@ -37,6 +37,9 @@ int main()
     int u = A_ins.d.e.k;
     int x = -10;
     int ck = x | 2;
+    char arr[10] = { 0 };
+    *(int*)(arr + 8) = 10;
+
     putchar(104); // 'h'
     putchar(111); // 'o'
     putchar(108); // 'l'

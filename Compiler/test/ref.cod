@@ -17,7 +17,7 @@ EXTRN	__security_cookie:QWORD
 EXTRN	_fltused:DWORD
 pdata	SEGMENT
 $pdata$main DD	imagerel $LN6
-	DD	imagerel $LN6+296
+	DD	imagerel $LN6+327
 	DD	imagerel $unwind$main
 pdata	ENDS
 ;	COMDAT __real@3fe999999999999a
@@ -30,10 +30,10 @@ __real@3dcccccd DD 03dcccccdr			; 0.1
 CONST	ENDS
 xdata	SEGMENT
 $unwind$main DD	031b19H
-	DD	0360109H
+	DD	03a0109H
 	DD	07002H
 	DD	imagerel __GSHandlerCheck
-	DD	01a0H
+	DD	01c0H
 xdata	ENDS
 ; Function compile flags: /Odtp
 ; File C:\Users\leon\source\repos\Compiler\Compiler\test\ref.c
@@ -44,20 +44,21 @@ x$ = 40
 ch$ = 44
 u$ = 48
 A_ins$ = 56
-c$ = 96
-__$ArrayPad$ = 416
+c$ = 112
+arr$ = 432
+__$ArrayPad$ = 448
 main	PROC
 
 ; 33   : {
 
 $LN6:
   00000	40 57		 push	 rdi
-  00002	48 81 ec b0 01
-	00 00		 sub	 rsp, 432		; 000001b0H
+  00002	48 81 ec d0 01
+	00 00		 sub	 rsp, 464		; 000001d0H
   00009	48 8b 05 00 00
 	00 00		 mov	 rax, QWORD PTR __security_cookie
   00010	48 33 c4	 xor	 rax, rsp
-  00013	48 89 84 24 a0
+  00013	48 89 84 24 c0
 	01 00 00	 mov	 QWORD PTR __$ArrayPad$[rsp], rax
 
 ; 34   :     struct Ch ch= { .a = 10 }; 
@@ -87,114 +88,130 @@ $LN6:
   0003f	83 c8 02	 or	 eax, 2
   00042	89 44 24 24	 mov	 DWORD PTR ck$[rsp], eax
 
-; 40   :     putchar(104); // 'h'
+; 40   :     char arr[10] = { 0 };
 
-  00046	b9 68 00 00 00	 mov	 ecx, 104		; 00000068H
-  0004b	e8 00 00 00 00	 call	 putchar
+  00046	48 8d 84 24 b0
+	01 00 00	 lea	 rax, QWORD PTR arr$[rsp]
+  0004e	48 8b f8	 mov	 rdi, rax
+  00051	33 c0		 xor	 eax, eax
+  00053	b9 0a 00 00 00	 mov	 ecx, 10
+  00058	f3 aa		 rep stosb
 
-; 41   :     putchar(111); // 'o'
+; 41   :     *(int*)(arr + 8) = 10;
 
-  00050	b9 6f 00 00 00	 mov	 ecx, 111		; 0000006fH
-  00055	e8 00 00 00 00	 call	 putchar
+  0005a	c7 84 24 b8 01
+	00 00 0a 00 00
+	00		 mov	 DWORD PTR arr$[rsp+8], 10
 
-; 42   :     putchar(108); // 'l'
+; 42   : 
+; 43   :     putchar(104); // 'h'
 
-  0005a	b9 6c 00 00 00	 mov	 ecx, 108		; 0000006cH
-  0005f	e8 00 00 00 00	 call	 putchar
+  00065	b9 68 00 00 00	 mov	 ecx, 104		; 00000068H
+  0006a	e8 00 00 00 00	 call	 putchar
 
-; 43   :     putchar(97);  // 'a'
+; 44   :     putchar(111); // 'o'
 
-  00064	b9 61 00 00 00	 mov	 ecx, 97			; 00000061H
-  00069	e8 00 00 00 00	 call	 putchar
+  0006f	b9 6f 00 00 00	 mov	 ecx, 111		; 0000006fH
+  00074	e8 00 00 00 00	 call	 putchar
 
-; 44   :     putchar(10);  // '\n'
+; 45   :     putchar(108); // 'l'
 
-  0006e	b9 0a 00 00 00	 mov	 ecx, 10
-  00073	e8 00 00 00 00	 call	 putchar
+  00079	b9 6c 00 00 00	 mov	 ecx, 108		; 0000006cH
+  0007e	e8 00 00 00 00	 call	 putchar
 
-; 45   :     dummy(1, 0.1);
+; 46   :     putchar(97);  // 'a'
 
-  00078	f3 0f 10 0d 00
+  00083	b9 61 00 00 00	 mov	 ecx, 97			; 00000061H
+  00088	e8 00 00 00 00	 call	 putchar
+
+; 47   :     putchar(10);  // '\n'
+
+  0008d	b9 0a 00 00 00	 mov	 ecx, 10
+  00092	e8 00 00 00 00	 call	 putchar
+
+; 48   :     dummy(1, 0.1);
+
+  00097	f3 0f 10 0d 00
 	00 00 00	 movss	 xmm1, DWORD PTR __real@3dcccccd
-  00080	b9 01 00 00 00	 mov	 ecx, 1
-  00085	e8 00 00 00 00	 call	 dummy
+  0009f	b9 01 00 00 00	 mov	 ecx, 1
+  000a4	e8 00 00 00 00	 call	 dummy
 
-; 46   :     dummy2(8, ch, 0.8);
+; 49   :     dummy2(8, ch, 0.8);
 
-  0008a	f2 0f 10 15 00
+  000a9	f2 0f 10 15 00
 	00 00 00	 movsd	 xmm2, QWORD PTR __real@3fe999999999999a
-  00092	8b 54 24 2c	 mov	 edx, DWORD PTR ch$[rsp]
-  00096	b9 08 00 00 00	 mov	 ecx, 8
-  0009b	e8 00 00 00 00	 call	 dummy2
+  000b1	8b 54 24 2c	 mov	 edx, DWORD PTR ch$[rsp]
+  000b5	b9 08 00 00 00	 mov	 ecx, 8
+  000ba	e8 00 00 00 00	 call	 dummy2
 
-; 47   :     int a = 10;
+; 50   :     int a = 10;
 
-  000a0	c7 44 24 20 0a
+  000bf	c7 44 24 20 0a
 	00 00 00	 mov	 DWORD PTR a$[rsp], 10
 
-; 48   :     if(ck == 1 && ck == 2){
+; 51   :     if(ck == 1 && ck == 2){
 
-  000a8	83 7c 24 24 01	 cmp	 DWORD PTR ck$[rsp], 1
-  000ad	75 11		 jne	 SHORT $LN2@main
-  000af	83 7c 24 24 02	 cmp	 DWORD PTR ck$[rsp], 2
-  000b4	75 0a		 jne	 SHORT $LN2@main
-
-; 49   :       ++a;
-
-  000b6	8b 44 24 20	 mov	 eax, DWORD PTR a$[rsp]
-  000ba	ff c0		 inc	 eax
-  000bc	89 44 24 20	 mov	 DWORD PTR a$[rsp], eax
-$LN2@main:
-
-; 50   :     }
-; 51   :     if(ck==1 || ck==2){
-
-  000c0	83 7c 24 24 01	 cmp	 DWORD PTR ck$[rsp], 1
-  000c5	74 07		 je	 SHORT $LN4@main
-  000c7	83 7c 24 24 02	 cmp	 DWORD PTR ck$[rsp], 2
-  000cc	75 0a		 jne	 SHORT $LN3@main
-$LN4@main:
+  000c7	83 7c 24 24 01	 cmp	 DWORD PTR ck$[rsp], 1
+  000cc	75 11		 jne	 SHORT $LN2@main
+  000ce	83 7c 24 24 02	 cmp	 DWORD PTR ck$[rsp], 2
+  000d3	75 0a		 jne	 SHORT $LN2@main
 
 ; 52   :       ++a;
 
-  000ce	8b 44 24 20	 mov	 eax, DWORD PTR a$[rsp]
-  000d2	ff c0		 inc	 eax
-  000d4	89 44 24 20	 mov	 DWORD PTR a$[rsp], eax
-$LN3@main:
+  000d5	8b 44 24 20	 mov	 eax, DWORD PTR a$[rsp]
+  000d9	ff c0		 inc	 eax
+  000db	89 44 24 20	 mov	 DWORD PTR a$[rsp], eax
+$LN2@main:
 
 ; 53   :     }
-; 54   : 	int c[10][8] = {{ 2, a }};
+; 54   :     if(ck==1 || ck==2){
 
-  000d8	c7 44 24 60 02
+  000df	83 7c 24 24 01	 cmp	 DWORD PTR ck$[rsp], 1
+  000e4	74 07		 je	 SHORT $LN4@main
+  000e6	83 7c 24 24 02	 cmp	 DWORD PTR ck$[rsp], 2
+  000eb	75 0a		 jne	 SHORT $LN3@main
+$LN4@main:
+
+; 55   :       ++a;
+
+  000ed	8b 44 24 20	 mov	 eax, DWORD PTR a$[rsp]
+  000f1	ff c0		 inc	 eax
+  000f3	89 44 24 20	 mov	 DWORD PTR a$[rsp], eax
+$LN3@main:
+
+; 56   :     }
+; 57   : 	int c[10][8] = {{ 2, a }};
+
+  000f7	c7 44 24 70 02
 	00 00 00	 mov	 DWORD PTR c$[rsp], 2
-  000e0	8b 44 24 20	 mov	 eax, DWORD PTR a$[rsp]
-  000e4	89 44 24 64	 mov	 DWORD PTR c$[rsp+4], eax
-  000e8	48 8d 44 24 68	 lea	 rax, QWORD PTR c$[rsp+8]
-  000ed	48 8b f8	 mov	 rdi, rax
-  000f0	33 c0		 xor	 eax, eax
-  000f2	b9 18 00 00 00	 mov	 ecx, 24
-  000f7	f3 aa		 rep stosb
-  000f9	48 8d 84 24 80
+  000ff	8b 44 24 20	 mov	 eax, DWORD PTR a$[rsp]
+  00103	89 44 24 74	 mov	 DWORD PTR c$[rsp+4], eax
+  00107	48 8d 44 24 78	 lea	 rax, QWORD PTR c$[rsp+8]
+  0010c	48 8b f8	 mov	 rdi, rax
+  0010f	33 c0		 xor	 eax, eax
+  00111	b9 18 00 00 00	 mov	 ecx, 24
+  00116	f3 aa		 rep stosb
+  00118	48 8d 84 24 90
 	00 00 00	 lea	 rax, QWORD PTR c$[rsp+32]
-  00101	48 8b f8	 mov	 rdi, rax
-  00104	33 c0		 xor	 eax, eax
-  00106	b9 20 01 00 00	 mov	 ecx, 288		; 00000120H
-  0010b	f3 aa		 rep stosb
+  00120	48 8b f8	 mov	 rdi, rax
+  00123	33 c0		 xor	 eax, eax
+  00125	b9 20 01 00 00	 mov	 ecx, 288		; 00000120H
+  0012a	f3 aa		 rep stosb
 
-; 55   :     return 0;
+; 58   :     return 0;
 
-  0010d	33 c0		 xor	 eax, eax
+  0012c	33 c0		 xor	 eax, eax
 
-; 56   : }
+; 59   : }
 
-  0010f	48 8b 8c 24 a0
+  0012e	48 8b 8c 24 c0
 	01 00 00	 mov	 rcx, QWORD PTR __$ArrayPad$[rsp]
-  00117	48 33 cc	 xor	 rcx, rsp
-  0011a	e8 00 00 00 00	 call	 __security_check_cookie
-  0011f	48 81 c4 b0 01
-	00 00		 add	 rsp, 432		; 000001b0H
-  00126	5f		 pop	 rdi
-  00127	c3		 ret	 0
+  00136	48 33 cc	 xor	 rcx, rsp
+  00139	e8 00 00 00 00	 call	 __security_check_cookie
+  0013e	48 81 c4 d0 01
+	00 00		 add	 rsp, 464		; 000001d0H
+  00145	5f		 pop	 rdi
+  00146	c3		 ret	 0
 main	ENDP
 _TEXT	ENDS
 END

@@ -12,6 +12,7 @@ struct Demo {
 		int i;
 		double c;
 	} k;
+	struct Demo* demo;
 };
 
 int printf(char const* format, ...);
