@@ -982,7 +982,7 @@ LLVMValueRef get_identifierxpr_llvm_value(IdentifierExpr* expr) {
 	if (sym == NULL) {
 		return NULL;
 	}
-	return LLVMBuildLoad(sem_ctx.builder, sym->value, "load_val");
+	return LLVMBuildLoad(sem_ctx.builder, sym->value, expr->name);
 }
 
 void save_identifierexpr_llvm_value(IdentifierExpr* expr, LLVMValueRef val)
@@ -1276,9 +1276,26 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 		LLVMValueRef tmp = NULL, tmp1 = NULL, value_ptr = NULL;
 		switch (operator->op)
 		{
-			// 一元运算符
+		// 一元运算符
 		case OP_NEGATIVE:
-			tmp = LLVMBuildNeg(sem_ctx.builder, lhs, "neg_res");
+			if (!llvm_is_float(lhs))
+			{
+				tmp = LLVMBuildNeg(sem_ctx.builder, lhs, "neg_res");
+			}
+			else
+			{
+				tmp = LLVMBuildFNeg(sem_ctx.builder, lhs, "fneg_res");
+			}		
+			break;
+		case OP_COMPLEMENT:
+			if (!llvm_is_float(lhs))
+			{
+				tmp = LLVMBuildNot(sem_ctx.builder, lhs, "not_res");
+			}
+			else
+			{
+				log_error(ast, "COMPLEMENT Op Expected INT Type");
+			}
 			break;
 		case OP_POINTER:
 			tmp = LLVMBuildLoad(sem_ctx.builder, lhs, "ptr_res");
@@ -1342,9 +1359,8 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 				value_ptr = get_OperatorExpr_LeftValue(operator->lhs);
 				LLVMBuildStore(sem_ctx.builder, tmp1, value_ptr);
 			}
-			break;
-		
-			// 二元运算符
+			break;		
+		// 二元运算符
 		case OP_ADD:
 			if (!type_is_float(dest_type))
 			{
@@ -1402,7 +1418,7 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 			}
 			else
 			{
-				log_error(ast, "SHIFT OP Expected INT TYPE");
+				log_error(ast, "SHIFT Op Expected INT Type");
 			}
 			break;
 		case OP_SHIFT_RIGHT:
@@ -1412,10 +1428,65 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 			}
 			else
 			{
-				log_error(ast, "SHIFT OP Expected INT TYPE");
+				log_error(ast, "SHIFT Op Expected INT Type");
 			}
 			break;
-			//比较运算符返回的是INT_1类型
+		//位运算
+		case OP_BIT_AND:
+			if (!type_is_float(dest_type))
+			{
+				tmp = LLVMBuildAnd(sem_ctx.builder, lhs, rhs, "and_res"); 
+			}
+			else
+			{
+				log_error(ast, "And Op Expected INT Type");
+			}
+			break;
+		case OP_BIT_OR:
+			if (!type_is_float(dest_type))
+			{
+				tmp = LLVMBuildOr(sem_ctx.builder, lhs, rhs, "or_res"); 
+			}
+			else
+			{
+				log_error(ast, "BIT_OR Op Expected INT Type");
+			}
+			break;
+		case OP_BIT_XOR:
+			if (!type_is_float(dest_type))
+			{
+				tmp = LLVMBuildXor(sem_ctx.builder, lhs, rhs, "xor_res"); 
+			}
+			else
+			{
+				log_error(ast, "BIT_XOR Op Expected INT Type");
+			}
+			break;
+		case OP_AND:
+			if (!type_is_float(dest_type))
+			{
+				lhs = LLVMBuildICmp(sem_ctx.builder, LLVMIntNE, lhs, LLVMConstInt(dest_type, 0, 1), "equal_res");
+				rhs = LLVMBuildICmp(sem_ctx.builder, LLVMIntNE, rhs, LLVMConstInt(dest_type, 0, 1), "equal_res");
+				tmp = LLVMBuildAnd(sem_ctx.builder, lhs, rhs, "and_res");
+			}
+			else
+			{
+				log_error(ast, "And Op Expected INT Type");
+			}
+			break;
+		case OP_OR:
+			if (!type_is_float(dest_type))
+			{
+				lhs = LLVMBuildICmp(sem_ctx.builder, LLVMIntNE, lhs, LLVMConstInt(dest_type, 0, 1), "equal_res");
+				rhs = LLVMBuildICmp(sem_ctx.builder, LLVMIntNE, rhs, LLVMConstInt(dest_type, 0, 1), "equal_res");
+				tmp = LLVMBuildOr(sem_ctx.builder, lhs, rhs, "or_res");
+			}
+			else
+			{
+				log_error(ast, "SHIFT Op Expected INT Type");
+			}	
+			break;
+		//比较运算符返回的是INT_1类型
 		case OP_LESS:
 			if (!type_is_float(dest_type))
 			{
@@ -1463,18 +1534,14 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 			else
 				tmp = LLVMBuildFCmp(sem_ctx.builder, LLVMRealONE, lhs, rhs, "equal_res");
 			break;
-			//赋值运算符
+		//赋值运算符
 		case OP_ASSIGN:
 			dest_type = LLVMTypeOf(lhs);
 			rhs = llvm_convert_type(dest_type, rhs);
 			value_ptr = get_OperatorExpr_LeftValue(operator->lhs);
 			LLVMBuildStore(sem_ctx.builder, rhs, value_ptr);
 			tmp = rhs;
-			break;
-
-		
-		break;
-
+			break;	
 		default:
 			return NULL;
 			break;
@@ -1626,9 +1693,10 @@ LLVMValueRef eval_LoopStmt(LoopStmt* ast) {
 void sentence_test()
 {
 	LLVMValueRef v1 = LLVMConstInt(LLVMInt32Type(), 10, 1);
-	//LLVMValueRef v2 = LLVMBuildTrunc(sem_ctx.builder, v1, LLVMInt64Type(), "trunc");
-	//LLVMValueRef v3 = LLVMBuildAlloca(sem_ctx.builder, LLVMInt1Type(), "test_float");		
-	//LLVMValueRef v6 = LLVMBuildLoad(sem_ctx.builder, v3, "fuck");
+	LLVMValueRef v2 = LLVMConstInt(LLVMInt32Type(), 10, 1);
+	LLVMValueRef v3 = LLVMBuildFNeg(sem_ctx.builder, v2, "test");
+	LLVMValueRef v4 = LLVMBuildAlloca(sem_ctx.builder, LLVMFloatType(),"test");
+	LLVMBuildStore(sem_ctx.builder, v3, v4);
 	//LLVMValueRef v7 = LLVMBuildSIToFP(sem_ctx.builder, v1, LLVMFloatType(), "float_cast");
 	//LLVMValueRef v5 = LLVMBuildStore(sem_ctx.builder, v2, v3);
 }
