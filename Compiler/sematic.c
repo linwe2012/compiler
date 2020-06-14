@@ -450,6 +450,7 @@ TypeInfo* extract_type(TypeSpecifier* spec)
 				}
 			}
 
+
 			LLVMValueRef* llvm_fields = NULL;
 			if (spec->type == TP_STRUCT) {
 				llvm_fields = malloc(sizeof(LLVMValueRef) * field_cnt);
@@ -1151,10 +1152,18 @@ static LLVMValueRef eval_OP_ARRAY_ACCESS(OperatorExpr* op, int lv) {
 	}
 }
 
-static LLVMValueRef eval_OP_STACK_ACCESS(OperatorExpr* op, int lv) {
+/// <summary>
+///  
+/// </summary>
+/// <param name="op"></param>
+/// <param name="lv"></param>
+/// <param name="stack_or_ptr">0: stack, 1: ptr</param>
+/// <returns></returns>
+static LLVMValueRef eval_OP_ACCESS(OperatorExpr* op, int lv, int stack_or_ptr) {
 	LLVMValueRef lhs_ptr = get_OperatorExpr_LeftValue(op->lhs);
-	LLVMTypeKind kind = LLVMGetTypeKind(LLVMTypeOf(lhs_ptr));
-	kind = LLVMGetTypeKind(LLVMGetElementType(LLVMTypeOf(lhs_ptr)));
+	if (stack_or_ptr) {
+		lhs_ptr = LLVMBuildLoad(sem_ctx.builder, lhs_ptr, "load_res");
+	}
 	char* struct_name = LLVMGetStructName(LLVMGetElementType(LLVMTypeOf(lhs_ptr)));
 	Symbol* struct_sym = symtbl_find(ctx->types, struct_name);
 	TRY_CAST(IdentifierExpr, field_id, op->rhs);
@@ -1163,16 +1172,32 @@ static LLVMValueRef eval_OP_STACK_ACCESS(OperatorExpr* op, int lv) {
 		return NULL;
 	}
 	int idx = 0;
-	for (TypeInfo* cur = struct_sym->type.struc.child; cur != NULL; cur = cur->next, ++idx) {
+	TypeInfo* cur = struct_sym->type.struc.child;
+	for (; cur != NULL; cur = cur->next, ++idx) {
 		if (strcmp(cur->field_name, field_id->name) == 0) {
 			break;
 		}
 	}
+
+	if (cur == NULL) {
+		log_error(op, "struct %s doesn't have field named %s", struct_name, field_id->name);
+		return NULL;
+	}
+
 	LLVMValueRef gep = LLVMBuildStructGEP(sem_ctx.builder, lhs_ptr, idx, "gep_res");
 	if (lv) {
 		return gep;
 	} else {
 		return LLVMBuildLoad(sem_ctx.builder, gep, "struct_res");
+	}
+}
+
+static LLVMValueRef eval_OP_POINTER(OperatorExpr* op, int lv) {
+	LLVMValueRef lhs = eval_OperatorExpr(op->lhs);
+	if (lv) {
+		return lhs;
+	} else {
+		return LLVMBuildLoad(sem_ctx.builder, lhs, "ptr_res");
 	}
 }
 
@@ -1201,12 +1226,18 @@ LLVMValueRef get_OperatorExpr_LeftValue(AST* ast)
 			log_error(ast, "Expected OperatorExpr");
 			return NULL;
 		}
-		if (operator->op == OP_ARRAY_ACCESS)
-		{
+		if (operator->op == OP_ARRAY_ACCESS) {
 			return eval_OP_ARRAY_ACCESS(operator, 1);
 		} else if (operator->op == OP_STACK_ACCESS) {
-			return eval_OP_STACK_ACCESS(operator, 1);
+			return eval_OP_ACCESS(operator, 1, 0);
+		} else if (operator->op == OP_PTR_ACCESS) {
+			return eval_OP_ACCESS(operator, 1, 1);
+		} else if (operator->op == OP_POINTER) {
+			return eval_OP_POINTER(operator, 1);
 		}
+	} else if (ast->type == AST_ListExpr) {
+		TRY_CAST(ListExpr, list, ast);
+		return get_OperatorExpr_LeftValue(list->first_child);
 	}
 	return NULL;
 }
@@ -1238,8 +1269,10 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 			return NULL;
 		}
 		return get_identifierxpr_llvm_value(identifier);
-	}
-	else if (ast->type == AST_OperatorExpr)
+	} else if (ast->type == AST_ListExpr) {
+		TRY_CAST(ListExpr, list, ast);
+		return eval_OperatorExpr(list->first_child);
+	} else if (ast->type == AST_OperatorExpr)
 	{
 		TRY_CAST(OperatorExpr, operator, ast);
 		if (!operator)
@@ -1252,7 +1285,9 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 			// 一些比较特殊的op不适合和后面的一起做
 			return eval_OP_ARRAY_ACCESS(operator, 0);
 		} else if (operator->op == OP_STACK_ACCESS) {
-			return eval_OP_STACK_ACCESS(operator, 0);
+			return eval_OP_ACCESS(operator, 0, 0);
+		} else if (operator->op == OP_PTR_ACCESS) {
+			return eval_OP_ACCESS(operator, 0, 1);
 		}
 
 		if (operator->op == OP_SIZEOF)

@@ -453,6 +453,9 @@ void _write_TypeSpecifier(TypeSpecifier *expr) {
     case TP_VOID:
         APPEND_NAME(void);
         break;
+    case TP_STRUCT:
+        APPEND_NAME(struct);
+        break;
     default:
         APPEND_NAME(UNK);
         break;
