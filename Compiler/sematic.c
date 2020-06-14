@@ -521,7 +521,8 @@ TypeInfo* extract_type(TypeSpecifier* spec)
 	case TP_PTR:
 		return type_create_ptr(
 			spec->attributes,
-			extract_type(spec->child)
+			extract_type(spec->child),
+			spec->field_name
 		);
 
 	case TP_FUNC:
