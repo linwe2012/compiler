@@ -225,6 +225,8 @@ static int type_is_int(LLVMTypeRef type) {
 		type == LLVMInt64Type();
 }
 
+static LLVMValueRef get_OperatorExpr_LeftValue(AST* ast);
+
 // returns the value of last eval
 LLVMValueRef eval_list(AST* ast)
 {
@@ -1060,18 +1062,13 @@ LLVMTypeRef llvm_get_res_type(LLVMValueRef lhs, LLVMValueRef rhs)
 }
 
 static LLVMValueRef eval_OP_ARRAY_ACCESS(OperatorExpr* op, int lv) {
-	TRY_CAST(IdentifierExpr, identifier, op->lhs);
-	if (!identifier) {
-		log_error(op, "Expected IdentifierExpr");
-		return NULL;
-	}
-	Symbol* sym = symtbl_find(ctx->variables, identifier->name);
+	LLVMValueRef lhs_v = get_OperatorExpr_LeftValue(op->lhs);
 	LLVMValueRef* indices = calloc(2, sizeof(LLVMValueRef));
 	indices[0] = eval_OperatorExpr(op->rhs);
 	// TODO 这个值的类型是要根据数组类型变的
 	// 并且将来支持struct数组还需要知道offset，所以语义上是否应该在symbol中记录数组类型
 	indices[1] = LLVMConstInt(LLVMInt32Type(), 0, 1);
-	LLVMValueRef gep = LLVMBuildGEP(sem_ctx.builder, sym->value, indices, 2, "gep_res");
+	LLVMValueRef gep = LLVMBuildGEP(sem_ctx.builder, lhs_v, indices, 2, "gep_res");
 	if (lv) {
 		return gep;
 	}
@@ -1523,9 +1520,6 @@ void eval_ForStmt(LoopStmt* ast) {
 	append_bb(&sem_ctx.continue_last, step_bb);
 	append_bb(&sem_ctx.after_bb, after_bb);
 	// 3. body
-	// Emit the body of the loop.  This, like any other expr, can change the
-	// current BB.  Note that we ignore the value computed by the body, but don't
-	// allow an error.
 	LLVMPositionBuilderAtEnd(sem_ctx.builder, body_bb);
 	LLVMValueRef bodyv = eval_ast(ast->body);
 	if (!llvm_is_b(bodyv)) {	// 如果最后一条指令是br，不能构建br

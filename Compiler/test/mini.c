@@ -43,5 +43,7 @@ void test(void)
 {
 	g_a = 100;
 	int a[10];
-	a[1] = 10;
+	int arr[10][2];
+	a[1] = arr[2][1];
+	arr[3][1] = a[2];
 }
