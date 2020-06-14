@@ -4,6 +4,7 @@ source_filename = "mini.c"
 @"2" = private unnamed_addr constant [16 x i8] c"\22\5CnHello world\22\00"
 @"4" = private unnamed_addr constant [48 x i8] c"\22My age is %d\5Cn, Im %f m, and my hobby is %d\5Cn\22\00"
 @"5" = private unnamed_addr constant [10 x i8] c"\22Running\22\00"
+@g_a = global i32 10
 
 declare i32 @putchar(i32)
 
@@ -94,6 +95,8 @@ entry:
 
 define void @test() {
 entry:
+  %load_val = load i32, i32* @g_a
+  store i32 100, i32* @g_a
   %a = alloca [10 x i32]
   %gep_res = getelementptr [10 x i32], [10 x i32]* %a, i32 1, i32 0
   %arr_res = load i32, i32* %gep_res

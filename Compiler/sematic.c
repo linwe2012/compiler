@@ -6,6 +6,8 @@
 
 
 #include <llvm-c/Core.h>
+#include <llvm-c/TargetMachine.h>
+#include <llvm-c/Analysis.h>
 
 #define SUPER(ptr) &(ptr->super)
 #define NOT_IMPLEMENTED return NULL
@@ -191,6 +193,36 @@ LLVMValueRef eval_ast(AST* ast)
 
 static int llvm_is_b(LLVMValueRef inst) {
 	return LLVMIsAReturnInst(inst) || LLVMIsABranchInst(inst) || LLVMIsAIndirectBrInst(inst);
+}
+
+static int llvm_is_float(LLVMValueRef v) {
+	return LLVMTypeOf(v) == LLVMFloatType()
+		|| LLVMTypeOf(v) == LLVMDoubleType();
+}
+
+static int llvm_is_int(LLVMValueRef v) {
+	return LLVMTypeOf(v) == LLVMInt64Type()
+		|| LLVMTypeOf(v) == LLVMInt32Type()
+		|| LLVMTypeOf(v) == LLVMInt16Type()
+		|| LLVMTypeOf(v) == LLVMInt8Type()
+		|| LLVMTypeOf(v) == LLVMInt1Type();
+}
+
+static int llvm_is_bit(LLVMValueRef v) {
+	return LLVMTypeOf(v) == LLVMInt1Type();
+}
+
+static int type_is_float(LLVMTypeRef type) {
+	return type == LLVMFloatType()
+		|| type == LLVMDoubleType();
+}
+
+static int type_is_int(LLVMTypeRef type) {
+	return type == LLVMInt1Type() ||
+		type == LLVMInt8Type() ||
+		type == LLVMInt16Type() ||
+		type == LLVMInt32Type() ||
+		type == LLVMInt64Type();
 }
 
 // returns the value of last eval
@@ -608,6 +640,17 @@ static Symbol* eval_FuncDeclareStmt(AST* ast, TypeSpecifier* ret_typesp, const c
 	return func_sym;
 }
 
+static LLVMValueRef llvm_get_default(LLVMTypeRef type) {
+	if (llvm_is_int(type)) {
+		return LLVMConstInt(type, 0, 1);
+	} else if (llvm_is_float(type)) {
+		return LLVMConstReal(type, 0);
+	} else {
+		// TODO 更多的默认类型
+		return NULL;
+	}
+}
+
 LLVMValueRef eval_DeclareStmt(DeclareStmt* ast)
 {
 	TRY_CAST(TypeSpecifier, spec, ast->type);
@@ -655,22 +698,36 @@ LLVMValueRef eval_DeclareStmt(DeclareStmt* ast)
 			LLVMTypeRef decl_type = extract_llvm_type(type_info);
 			
 			LLVMValueRef ptr = NULL;
-			ptr = LLVMBuildAlloca(sem_ctx.builder, decl_type, id->name);
-			
-			// TODO: 检查合并 attributes 的时候问题
-			id->attributes |= ast->attributes;
 			LLVMValueRef value = NULL;
-			if (id->init_value)
-			{
-				value = eval_ast(id->init_value);
-				if (LLVMTypeOf(value) != decl_type) {
-					value = llvm_convert_type(decl_type, value);
+			if (ctx->variables->stack_top->prev == NULL) {
+				ptr = LLVMAddGlobal(sem_ctx.module, decl_type, id->name);
+				if (id->init_value) {
+					value = eval_ast(id->init_value);
+					if (LLVMTypeOf(value) != decl_type) {
+						value = llvm_convert_type(decl_type, value);
+					}
+					last_value = value;
+				} else {
+					// 没有初始化的也要做初始化
+					value = llvm_get_default(decl_type);
 				}
-				last_value = value;
-				LLVMBuildStore(sem_ctx.builder, value, ptr);
+				LLVMSetInitializer(ptr, value);
+			} else {
+				ptr = LLVMBuildAlloca(sem_ctx.builder, decl_type, id->name);
+			
+				// TODO: 检查合并 attributes 的时候问题
+				id->attributes |= ast->attributes;
+				if (id->init_value)
+				{
+					value = eval_ast(id->init_value);
+					if (LLVMTypeOf(value) != decl_type) {
+						value = llvm_convert_type(decl_type, value);
+					}
+					last_value = value;
+					LLVMBuildStore(sem_ctx.builder, value, ptr);
+				}
 			}
-			TypeInfo* typeinfo = extract_type(id_spec);
-			Symbol* sym = symbol_create_variable(id->name, id->attributes, symbol_from_type_info(typeinfo), ptr, 0);
+			Symbol* sym = symbol_create_variable(id->name, id->attributes, symbol_from_type_info(type_info), ptr, 0);
 
 
 			symtbl_push(ctx->variables, sym);
@@ -830,32 +887,6 @@ LLVMOpcode eval_binary_opcode_llvm(enum Operators op)
 	{
 
 	}
-}
-
-static int llvm_is_float(LLVMValueRef v)
-{
-	return LLVMTypeOf(v) == LLVMFloatType()
-		|| LLVMTypeOf(v) == LLVMDoubleType();
-}
-
-static int llvm_is_int(LLVMValueRef v)
-{
-	return LLVMTypeOf(v) == LLVMInt64Type()
-		|| LLVMTypeOf(v) == LLVMInt32Type()
-		|| LLVMTypeOf(v) == LLVMInt16Type()
-		|| LLVMTypeOf(v) == LLVMInt8Type()
-		|| LLVMTypeOf(v) == LLVMInt1Type();
-}
-
-static int llvm_is_bit(LLVMValueRef v)
-{
-	return LLVMTypeOf(v) == LLVMInt1Type();
-}
-
-static int type_is_float(LLVMTypeRef type)
-{
-	return type == LLVMFloatType()
-		|| type == LLVMDoubleType();
 }
 
 LLVMValueRef eval_IdentifierExpr(IdentifierExpr* ast)

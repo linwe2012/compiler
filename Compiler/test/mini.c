@@ -36,8 +36,12 @@ int main(void) {
 	printf("My age is %d\n, Im %f m, and my hobby is %d\n", 22, 1.8, "Running");
     return 0;
 }
+
+int g_a = 10;
+
 void test(void)
 {
+	g_a = 100;
 	int a[10];
 	a[1] = 10;
 }
