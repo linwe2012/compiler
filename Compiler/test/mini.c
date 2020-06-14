@@ -3,6 +3,7 @@
 // Windows API
 int __stdcall SetConsoleTextAttribute(void * hConsoleOutput, unsigned short wAttributes);
 void __stdcall *  GetStdHandle(unsigned int nStdHandle); 
+extern int a ;
 
 struct Demo {
 	int a;
