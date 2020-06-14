@@ -481,7 +481,11 @@ void _write_DeclareStmt(DeclareStmt* stmt) {
     fputs(",\n\"children\": [", s_fp);
     _write_ast(stmt->type);
     fputs(",\n", s_fp);
-    _write_ast(stmt->identifiers);
+    if (stmt->identifiers != NULL)
+    {
+        _write_ast(stmt->identifiers);
+    }
+    
     fputs("]\n", s_fp);
 }
 

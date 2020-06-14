@@ -77,6 +77,7 @@ comment		{c_comment}|{cpp_comment}
 
 "__cdecl"        { return MS_CDECL; }  /*  Microsoft extension */
 "__stdcall"      { return MS_STDCALL; }
+"__fastcall"     { return MS_FASTCALL; }
 "__inline"       { return INLINE; }
 "__int8"         { return CHAR; }
 "__int16"        { return SHORT; }

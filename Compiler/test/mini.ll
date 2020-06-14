@@ -84,6 +84,7 @@ if.after:                                         ; preds = %if.after6, %if.then
 
 define i32 @main() {
 entry:
+  %demo_b = alloca [24 x i8]
   %st_A = alloca [16 x i8]
   %nb = alloca i32
   store i32 16, i32* %nb

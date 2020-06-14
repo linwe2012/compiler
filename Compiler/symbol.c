@@ -606,6 +606,10 @@ Symbol* symbol_create_struct_or_union(TypeInfo* info, TypeInfo* child)
 			move = move->next;
 		}
 
+		if (size % max_alignment != 0)
+		{
+			size = ((size / max_alignment) + 1) * max_alignment;
+		}
 
 		info->aligned_size = size;
 		info->alignment = max_alignment;
