@@ -10,6 +10,6 @@ with open(outfile, 'wt', encoding='utf-8') as ofs:
             print('found file: ', f)
             with open(f, 'rt', encoding='utf-8') as ifs:
                 ofs.write(ifs.read())
-                ofs.write('\n')
+                ofs.write('\n\n')
 
         
