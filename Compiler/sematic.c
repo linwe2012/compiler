@@ -1086,6 +1086,18 @@ static LLVMValueRef eval_OP_ARRAY_ACCESS(OperatorExpr* op, int lv) {
 		return LLVMBuildLoad(sem_ctx.builder, gep, "arr_res");
 	}
 }
+
+static LLVMValueRef eval_OP_STACK_ACCESS(OperatorExpr* op, int lv) {
+	LLVMValueRef lhs_ptr = get_OperatorExpr_LeftValue(op->lhs);
+	LLVMValueRef rhs_v = eval_OperatorExpr(op->rhs);
+	LLVMValueRef gep = LLVMBuildStructGEP(sem_ctx.builder, lhs_ptr, 0, "gep_res");
+	if (lv) {
+		return gep;
+	} else {
+		return LLVMBuildLoad(sem_ctx.builder, gep, "struct_res");
+	}
+}
+
 // 临时加一个取左值的
 LLVMValueRef get_OperatorExpr_LeftValue(AST* ast)
 {
@@ -1114,6 +1126,8 @@ LLVMValueRef get_OperatorExpr_LeftValue(AST* ast)
 		if (operator->op == OP_ARRAY_ACCESS)
 		{
 			return eval_OP_ARRAY_ACCESS(operator, 1);
+		} else if (operator->op == OP_STACK_ACCESS) {
+			return eval_OP_STACK_ACCESS(operator, 1);
 		}
 	}
 	return NULL;
@@ -1159,6 +1173,8 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 		if (operator->op == OP_ARRAY_ACCESS) {
 			// 一些比较特殊的op不适合和后面的一起做
 			return eval_OP_ARRAY_ACCESS(operator, 0);
+		} else if (operator->op == OP_STACK_ACCESS) {
+			return eval_OP_STACK_ACCESS(operator, 0);
 		}
 
 		if (operator->op == OP_SIZEOF)
@@ -1275,7 +1291,7 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 		case OP_NEGATIVE:
 			tmp = LLVMBuildNeg(sem_ctx.builder, lhs, "neg_res");
 			break;
-		case OP_PTR_ACCESS:
+		case OP_POINTER:
 			tmp = LLVMBuildLoad(sem_ctx.builder, lhs, "ptr_res");
 			break;
 		case OP_INC:
