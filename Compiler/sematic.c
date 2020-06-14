@@ -349,6 +349,7 @@ char* get_struct_or_union_name(enum Types type, const char* name)
 		str_concat(type == TP_STRUCT ? "struct " : "union ", name)
 		);
 }
+
 TypeInfo* extract_type(TypeSpecifier* spec)
 {
 	if (spec == NULL)
@@ -506,7 +507,7 @@ TypeInfo* extract_type(TypeSpecifier* spec)
 			break;
 		}
 		else {
-			name = str_concat(ty == TP_STRUCT ? "struct " : "union ", spec->name);
+			name = get_struct_or_union_name(ty, spec->name);
 			sym_in_tbl = symtbl_find(ctx->types, name);
 
 			if (sym_in_tbl == NULL)
@@ -740,6 +741,86 @@ static LLVMValueRef llvm_get_default(LLVMTypeRef type) {
 	}
 }
 
+LLVMValueRef handle_enum_decalre(DeclareStmt* ast)
+{
+	int64_t enum_val = 0;
+	TRY_CAST(TypeSpecifier, spec, ast->type);
+
+	Symbol* enum_type = symbol_create_enum(spec->name ? spec->name : strdup("@anon enum"));
+	symtbl_push(ctx->types, enum_type);
+
+	Symbol* first_enum_item = NULL;
+	Symbol* last_enum_item = NULL;
+
+	FOR_EACH(spec->struct_or_union, enu_ast)
+	{
+		TRY_CAST(OperatorExpr, op, enu_ast);
+		TRY_CAST(IdentifierExpr, id, enu_ast);
+
+
+		if (!op && !id)
+		{
+			log_internal_error(enu_ast, "Expected constant as enum");
+		}
+
+		if (op)
+		{
+			if (!op->lhs || op->lhs->type != AST_IdentifierExpr)
+			{
+				log_error(enu_ast, "Lhs must be idenifier");
+				continue;
+			}
+			else if (op->op != OP_ASSIGN)
+			{
+				log_error(enu_ast, "Only '=' is supported in enum");
+				continue;
+			}
+			LLVMValueRef val = eval_ast(op->rhs);
+			if (!LLVMIsConstant(val))
+			{
+				log_error(enu_ast, "Enum value must be constant!");
+				continue;
+			}
+			enum_val = LLVMConstIntGetSExtValue(val);
+			id = (IdentifierExpr*)op->lhs;
+		}
+
+		if (id == NULL)
+		{
+			log_error(enu_ast, "Expected idenfieer");
+			continue;
+		}
+		if (id && id->val)
+		{
+			LLVMValueRef val = eval_ast(id->val);
+			if (!LLVMIsConstant(val))
+			{
+				log_error(enu_ast, "Enum value must be constant!");
+				continue;
+			}
+			enum_val = LLVMConstIntGetSExtValue(val);
+		}
+
+		//TODO: Check for duplicate enums
+		Symbol* enum_item = symbol_create_enum_item(
+			enum_type, last_enum_item, id->name,
+			LLVMConstInt(LLVMInt64Type(), enum_val, 1));
+
+		symtbl_push(ctx->variables, enum_item);
+		variable_append(last_enum_item, enum_item);
+
+		last_enum_item = enum_item;
+		if (first_enum_item == NULL)
+		{
+			first_enum_item = enum_item;
+		}
+
+		++enum_val;
+	}
+
+	return LLVMConstInt(LLVMInt64Type(), enum_val, 1);
+}
+
 LLVMValueRef eval_DeclareStmt(DeclareStmt* ast)
 {
 	TRY_CAST(TypeSpecifier, spec, ast->type);
@@ -751,6 +832,11 @@ LLVMValueRef eval_DeclareStmt(DeclareStmt* ast)
 		{
 			extract_type(spec);
 		}
+	}
+
+	if (spec && (spec->type == TP_ENUM))
+	{
+		return handle_enum_decalre(ast);
 	}
 
 	FOR_EACH(ast->identifiers, id_ast) {
@@ -834,73 +920,10 @@ LLVMValueRef eval_DeclareStmt(DeclareStmt* ast)
 	return last_value;
 }
 
+//TODO: 这个不需要, 待删除
 LLVMValueRef eval_EnumDeclareStmt(EnumDeclareStmt* ast)
 {
-	int64_t enum_val = 0;
-
-	Symbol* enum_type = symbol_create_enum(ast->name ? ast->name : strdup("@anon enum"));
-	symtbl_push(ctx->types, enum_type);
-
-	Symbol* first_enum_item = NULL;
-	Symbol* last_enum_item = NULL;
-
-	FOR_EACH(ast->enums, enu_ast)
-	{
-		TRY_CAST(OperatorExpr, op, enu_ast);
-		TRY_CAST(IdentifierExpr, id, enu_ast);
-
-
-		if (!op && !id)
-		{
-			log_internal_error(enu_ast, "Expected constant as enum");
-		}
-
-		if (op)
-		{
-			if (!op->lhs || op->lhs->type != AST_IdentifierExpr)
-			{
-				log_error(enu_ast, "Lhs must be idenifier");
-				continue;
-			}
-			else if (op->op != OP_ASSIGN)
-			{
-				log_error(enu_ast, "Only '=' is supported in enum");
-				continue;
-			}
-			LLVMValueRef val = eval_ast(op->rhs);
-			if (!LLVMIsConstant(val))
-			{
-				log_error(enu_ast, "Enum value must be constant!");
-				continue;
-			}
-			enum_val = LLVMConstIntGetSExtValue(val);
-			id = (IdentifierExpr*)op->lhs;
-		}
-
-		if (id == NULL)
-		{
-			log_error(enu_ast, "Expected idenfieer");
-			continue;
-		}
-
-		//TODO: Check for duplicate enums
-		Symbol* enum_item = symbol_create_enum_item(
-			enum_type, last_enum_item, id->name,
-			LLVMConstInt(LLVMInt64Type(), enum_val, 1));
-
-		symtbl_push(ctx->variables, enum_item);
-		variable_append(last_enum_item, enum_item);
-
-		last_enum_item = enum_item;
-		if (first_enum_item == NULL)
-		{
-			first_enum_item = enum_item;
-		}
-
-		++enum_val;
-	}
-
-	return LLVMConstInt(LLVMInt64Type(), enum_val, 1);
+	NOT_IMPLEMENTED;
 }
 
 // TODO: 这个不需要了, AggregateDeclareStmt 已经没了
@@ -992,7 +1015,15 @@ LLVMOpcode eval_binary_opcode_llvm(enum Operators op)
 LLVMValueRef eval_IdentifierExpr(IdentifierExpr* ast)
 {
 	Symbol* sym = symtbl_find(ctx->variables, ast->name);
-	return LLVMBuildLoad(sem_ctx.builder, sym->var.value, next_temp_id_str());
+	if (sym == NULL)
+	{
+		log_error(ast, "Identifier %s is not defined", ast->name);
+		return NULL;
+	}
+	if (sym->var.type->type.type == TP_ENUM) {
+		return sym->var.value;
+	}
+	return LLVMBuildLoad(sem_ctx.builder, sym->var.value, ast->name);
 }
 
 // TODO: support more types
@@ -1863,48 +1894,48 @@ LLVMValueRef eval_IfStmt(IfStmt* ast) {
 
 // TODO: @wushuhui 优先级低，暂时先不实现
 LLVMValueRef eval_SwitchCaseStmt(SwitchCaseStmt* ast) {
-	//if (ast->cases == NULL) {
-	//	log_error(ast, "switch.body should not be empty");
-	//	return NULL;
-	//}
-	//ctx_enter_block_scope(ctx);
-	//LLVMValueRef condv = eval_ast(ast->switch_value);
-	//if (condv == NULL) {
-	//	log_error(ast, "switch.cond is not expr");
-	//	return NULL;
-	//}
-	//LLVMValueRef func = LLVMGetBasicBlockParent(LLVMGetInsertBlock(sem_ctx.builder));
-	//LLVMBasicBlockRef else_bb = LLVMAppendBasicBlock(func, "else");
-	//AST* case_ast = ((BlockExpr*)ast->cases)->first_child;
-	//unsigned int casec = 0;
-	//for (; case_ast != NULL; case_ast = case_ast->next, ++casec);
-	//LLVMValueRef switchv = LLVMBuildSwitch(sem_ctx.builder, condv, else_bb, casec);
-	//append_bb(&sem_ctx.breakable_last, else_bb);
-	//append_bb(&sem_ctx.after_bb, else_bb);
+	if (ast->cases == NULL) {
+		log_error(ast, "switch.body should not be empty");
+		return NULL;
+	}
+	ctx_enter_block_scope(ctx);
+	LLVMValueRef condv = eval_ast(ast->switch_value);
+	if (condv == NULL) {
+		log_error(ast, "switch.cond is not expr");
+		return NULL;
+	}
+	LLVMValueRef func = LLVMGetBasicBlockParent(LLVMGetInsertBlock(sem_ctx.builder));
+	LLVMBasicBlockRef else_bb = LLVMAppendBasicBlock(func, "else");
+	AST* case_ast = ((BlockExpr*)ast->cases)->first_child;
+	unsigned int casec = 0;
+	for (; case_ast != NULL; case_ast = case_ast->next, ++casec);
+	LLVMValueRef switchv = LLVMBuildSwitch(sem_ctx.builder, condv, else_bb, casec);
+	append_bb(&sem_ctx.breakable_last, else_bb);
+	append_bb(&sem_ctx.after_bb, else_bb);
 
-	//char* last_id;
-	//for (case_ast = ((BlockExpr*)ast->cases)->first_child; case_ast != NULL; case_ast = case_ast->next) {
-	//	TRY_CAST(LabelStmt, case_stmt, case_ast);
-	//	if (case_stmt == NULL) {
-	//		continue;
-	//	} else if (case_stmt->type == LABEL_CASE) {
-	//		// 
-	//	} else if (case_stmt->type == LABEL_DEFAULT) {
+	char* last_id;
+	for (case_ast = ((BlockExpr*)ast->cases)->first_child; case_ast != NULL; case_ast = case_ast->next) {
+		TRY_CAST(LabelStmt, case_stmt, case_ast);
+		if (case_stmt == NULL) {
+			continue;
+		} else if (case_stmt->type == LABEL_CASE) {
+			// 
+		} else if (case_stmt->type == LABEL_DEFAULT) {
 
-	//	} else {
-	//		continue;
-	//	}
-	//	last_id = next_temp_id_str();
-	//	LLVMBasicBlockRef case_bb = alloc_bb(last_id);
-	//	LLVMPositionBuilderAtEnd(sem_ctx.builder, case_bb);
-	//	eval_ast(case_stmt->target);
-	//	// TODO 理论上cond只能是可以计算出来的常数
-	//	LLVMAddCase(switchv, eval_ast(case_stmt->condition), case_bb);
-	//}
+		} else {
+			continue;
+		}
+		last_id = next_temp_id_str();
+		LLVMBasicBlockRef case_bb = alloc_bb(last_id);
+		LLVMPositionBuilderAtEnd(sem_ctx.builder, case_bb);
+		eval_ast(case_stmt->target);
+		// TODO 理论上cond只能是可以计算出来的常数
+		LLVMAddCase(switchv, eval_ast(case_stmt->condition), case_bb);
+	}
 
-	//pop_bb(&sem_ctx.breakable_last);
-	//pop_bb(&sem_ctx.after_bb);
-	//ctx_leave_block_scope(ctx, 0);
+	pop_bb(&sem_ctx.breakable_last);
+	pop_bb(&sem_ctx.after_bb);
+	ctx_leave_block_scope(ctx, 0);
 
 }
 

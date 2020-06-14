@@ -197,6 +197,7 @@
     <ClInclude Include="types.h" />
     <ClInclude Include="utils.h" />
     <ClInclude Include="x86_64-asm.h" />
+    <ClInclude Include="yacc-error.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="ast.c" />
@@ -212,6 +213,7 @@
     <ClCompile Include="symbol.c" />
     <ClCompile Include="utils.c" />
     <ClCompile Include="x86_64-gen.c" />
+    <ClCompile Include="yacc-error.c" />
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="lex.l">

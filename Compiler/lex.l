@@ -1,6 +1,11 @@
 %{
+#include "yacc-error.h"
 
-
+#define YY_INPUT(buf,result,max_size)  {\
+    result = GetNextChar(buf, max_size); \
+    if (  result <= 0  ) \
+      result = YY_NULL; \
+    }
 
 #include "config.h"
 #include <stdio.h>
@@ -12,10 +17,11 @@
 #include "parser.h"
 
 #define COPY_STR()             yylval.str = strcpy((char*)malloc(strlen(yytext)+1), yytext)
-
+#define PREPARE()              BeginToken(yytext)
 %}
 
 %option noyywrap
+
 
 oct_int		0[0-7]*
 dec_int		0|([1-9][0-9]*)
@@ -31,92 +37,93 @@ c_comment	\/\*[^*]*\*+([^/*][^*]*\*+)*\/
 cpp_comment	\/\/.*
 comment		{c_comment}|{cpp_comment}
 
+
 %%
 
-"auto"			{ return AUTO; }
-"void"          { return VOID; }
-"char"          { return CHAR; }
-"short"         { return SHORT; }
-"int"           { return INT; }
-"long"          { return LONG; }
-"float"         { return FLOAT; }
-"double"        { return DOUBLE; }
+"auto"			{ PREPARE(); return AUTO; }
+"void"          { PREPARE(); return VOID; }
+"char"          { PREPARE(); return CHAR; }
+"short"         { PREPARE(); return SHORT; }
+"int"           { PREPARE(); return INT; }
+"long"          { PREPARE(); return LONG; }
+"float"         { PREPARE(); return FLOAT; }
+"double"        { PREPARE(); return DOUBLE; }
 
-"signed"        { return SIGNED; }
-"unsigned"      { return UNSIGNED; }
+"signed"        { PREPARE(); return SIGNED; }
+"unsigned"      { PREPARE(); return UNSIGNED; }
 
-"const"			{ return CONST; }
-"extern"		{ return EXTERN; }
-"inline"		{ return INLINE; }
-"static"		{ return STATIC; }
-"volatile"		{ return VOLATILE; }
+"const"			{ PREPARE(); return CONST; }
+"extern"		{ PREPARE(); return EXTERN; }
+"inline"		{ PREPARE(); return INLINE; }
+"static"		{ PREPARE(); return STATIC; }
+"volatile"		{ PREPARE(); return VOLATILE; }
 
-"enum"			{ return ENUM; }
-"struct"		{ return STRUCT; }
+"enum"			{ PREPARE(); return ENUM; }
+"struct"		{ PREPARE(); return STRUCT; }
 
-"typedef"		{ return TYPEDEF; }
+"typedef"		{ PREPARE(); return TYPEDEF; }
 
-"break"			{ return BREAK; }
-"case"			{ return CASE; }
-"continue"		{ return CONTINUE; }
-"default"		{ return DEFAULT; }
-"do"			{ return DO; }
-"else"			{ return ELSE; }
-"for"			{ return FOR; }
-"goto"			{ return GOTO; }
-"if"			{ return IF; }
-"return"        { return RETURN; }
-"sizeof"		{ return SIZEOF; }
-"switch"		{ return SWITCH; }
-"union"			{ return UNION; }
-"while"			{ return WHILE; }
+"break"			{ PREPARE(); return BREAK; }
+"case"			{ PREPARE(); return CASE; }
+"continue"		{ PREPARE(); return CONTINUE; }
+"default"		{ PREPARE(); return DEFAULT; }
+"do"			{ PREPARE(); return DO; }
+"else"			{ PREPARE(); return ELSE; }
+"for"			{ PREPARE(); return FOR; }
+"goto"			{ PREPARE(); return GOTO; }
+"if"			{ PREPARE(); return IF; }
+"return"        { PREPARE(); return RETURN; }
+"sizeof"		{ PREPARE(); return SIZEOF; }
+"switch"		{ PREPARE(); return SWITCH; }
+"union"			{ PREPARE(); return UNION; }
+"while"			{ PREPARE(); return WHILE; }
 
-"register"		{ return REGISTER; }
-"restrict"		{ return RESTRICT; }
+"register"		{ PREPARE(); return REGISTER; }
+"restrict"		{ PREPARE(); return RESTRICT; }
 
 
-"__cdecl"        { return MS_CDECL; }  /*  Microsoft extension */
-"__stdcall"      { return MS_STDCALL; }
-"__fastcall"     { return MS_FASTCALL; }
-"__inline"       { return INLINE; }
-"__int8"         { return CHAR; }
-"__int16"        { return SHORT; }
-"__int32"        { return INT; }
-"__int64"        { return INT64; }
+"__cdecl"        { PREPARE(); return MS_CDECL; }  /*  Microsoft extension */
+"__stdcall"      { PREPARE(); return MS_STDCALL; }
+"__fastcall"     { PREPARE(); return MS_FASTCALL; }
+"__inline"       { PREPARE(); return INLINE; }
+"__int8"         { PREPARE(); return CHAR; }
+"__int16"        { PREPARE(); return SHORT; }
+"__int32"        { PREPARE(); return INT; }
+"__int64"        { PREPARE(); return INT64; }
 
-{identifier}    	{ COPY_STR(); return IDENTIFIER; }
-\"(\\.|[^\\"\n])*\"	{ COPY_STR(); return STRING_LITERAL; }
-\'.\'               { COPY_STR(); return CHAR_LITERAL; }
-{any_int}       	{ COPY_STR(); return NUM_INT; }
-{float}				{ COPY_STR(); return NUM_FLOAT32; }
-{float}"f"			{ COPY_STR(); return NUM_FLOAT64; }
+{identifier}    	{ PREPARE(); COPY_STR(); return IDENTIFIER; }
+\"(\\.|[^\\"\n])*\"	{ PREPARE(); COPY_STR(); return STRING_LITERAL; }
+\'.\'               { PREPARE(); COPY_STR(); return CHAR_LITERAL; }
+{any_int}       	{ PREPARE(); COPY_STR(); return NUM_INT; }
+{float}				{ PREPARE(); COPY_STR(); return NUM_FLOAT32; }
+{float}"f"			{ PREPARE(); COPY_STR(); return NUM_FLOAT64; }
 
 {whitespace}    {}
 {comment}    	{}
 
-"..."			{ return ELLIPSIS; }
-">>="			{ return RIGHT_ASSIGN; }
-"<<="			{ return LEFT_ASSIGN; }
-"+="			{ return ADD_ASSIGN; }
-"-="			{ return SUB_ASSIGN; }
-"*="			{ return MUL_ASSIGN; }
-"/="			{ return DIV_ASSIGN; }
-"%="			{ return MOD_ASSIGN; }
-"&="			{ return AND_ASSIGN; }
-"^="			{ return XOR_ASSIGN; }
-"|="			{ return OR_ASSIGN; }
-">>"			{ return RIGHT_OP; }
-"<<"			{ return LEFT_OP; }
-"++"			{ return INC_OP; }
-"--"			{ return DEC_OP; }
-"->"			{ return PTR_OP; }
-"&&"			{ return AND_OP; }
-"||"			{ return OR_OP; }
-"<="			{ return LE_OP; }
-">="			{ return GE_OP; }
-"=="			{ return EQ_OP; }
-"!="			{ return NE_OP; }
+"..."			{ PREPARE(); return ELLIPSIS; }
+">>="			{ PREPARE(); return RIGHT_ASSIGN; }
+"<<="			{ PREPARE(); return LEFT_ASSIGN; }
+"+="			{ PREPARE(); return ADD_ASSIGN; }
+"-="			{ PREPARE(); return SUB_ASSIGN; }
+"*="			{ PREPARE(); return MUL_ASSIGN; }
+"/="			{ PREPARE(); return DIV_ASSIGN; }
+"%="			{ PREPARE(); return MOD_ASSIGN; }
+"&="			{ PREPARE(); return AND_ASSIGN; }
+"^="			{ PREPARE(); return XOR_ASSIGN; }
+"|="			{ PREPARE(); return OR_ASSIGN; }
+">>"			{ PREPARE(); return RIGHT_OP; }
+"<<"			{ PREPARE(); return LEFT_OP; }
+"++"			{ PREPARE(); return INC_OP; }
+"--"			{ PREPARE(); return DEC_OP; }
+"->"			{ PREPARE(); return PTR_OP; }
+"&&"			{ PREPARE(); return AND_OP; }
+"||"			{ PREPARE(); return OR_OP; }
+"<="			{ PREPARE(); return LE_OP; }
+">="			{ PREPARE(); return GE_OP; }
+"=="			{ PREPARE(); return EQ_OP; }
+"!="			{ PREPARE(); return NE_OP; }
 
-.               { return yytext[0]; }
+.               { PREPARE(); return yytext[0]; }
 
 %%

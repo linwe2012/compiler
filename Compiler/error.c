@@ -1,6 +1,7 @@
 #include "error.h"
 #include <stdio.h>
 #include <windows.h>   // WinApi header
+#include "yacc-error.h"
 
 void cc_log_error(const char* file, int line,  AST* ast, const char* message, ...)
 {
@@ -30,6 +31,25 @@ void yyerror(char const* s) {
 
 	SetConsoleTextAttribute(hConsole, FOREGROUND_RED);
 	fprintf(stderr, "%s\n", s);
-	SetConsoleTextAttribute(hConsole, FOREGROUND_GREEN | FOREGROUND_RED | FOREGROUND_BLUE);
+	
 
+	printf("At line %d:\n", fileloc.first_line);
+	printf("%s", fileloc.current_line);
+	int i = 0;
+	for ( ;i < fileloc.first_column; ++i)
+	{
+		putchar(' ');
+	}
+
+	putchar('^');
+	++i;
+	for (; i < fileloc.last_column; ++i)
+	{
+		putchar('~');
+	}
+	printf("\n");
+	SetConsoleTextAttribute(hConsole, FOREGROUND_GREEN | FOREGROUND_RED | FOREGROUND_BLUE);
 }
+
+
+

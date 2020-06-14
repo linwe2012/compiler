@@ -5,6 +5,8 @@
 #include "context.h"
 #include "x86_64-asm.h"
 #include "json.h"
+#include "yacc-error.h"
+
 extern AST* parser_result;
 
 extern int yydebug;
@@ -22,6 +24,10 @@ int main()
 	// yydebug = 1;
 #endif
 	yyin = fopen("test/mini.c", "rt");
+	char b[120];
+	fgets(b, 120, yyin);
+	yyin = NULL;
+	SetFile(fopen("test/mini.c", "rt"));
 	int res = yyparse();
 	if (res == 0)
 	{

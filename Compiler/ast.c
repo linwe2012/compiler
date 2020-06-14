@@ -1043,12 +1043,14 @@ void list_destroy(struct List* list)
 
 AST* make_enum_define(char* identifier, AST* enum_list)
 {
-	NEW_AST(EnumDeclareStmt, ast);
+	// NEW_AST(EnumDeclareStmt, ast);
+	NEW_AST(TypeSpecifier, ast);
+	init_type_specifier(ast, TypeSpecifier_Exclusive);
 
 	ast->name = identifier;
-	ast->ref = NULL;
-	
-	ast->enums = enum_list;
+	ast->struct_or_union = enum_list;
+	ast->type = TP_ENUM;
+	// ast->enums = enum_list;
 
 	return SUPER(ast);
 }
@@ -1220,3 +1222,4 @@ AST* make_char(char* c) {
 
 	return SUPER(ast);
 }
+

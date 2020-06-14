@@ -1,19 +1,26 @@
 // char *xa[5];
 // char *( *(*xvar)() )[10]; <- 可以解析但是没法LLVM 编译
 // Windows API
+enum Enum {
+	kVal1,
+	kVal2,
+	kVal3 = 100,
+	kVal4 
+};
+
 int __stdcall SetConsoleTextAttribute(void * hConsoleOutput, unsigned short wAttributes);
-void __stdcall *  GetStdHandle(unsigned int nStdHandle); 
+void __stdcall *  GetStdHandle Hi(unsigned int nStdHandle); 
 extern int a ;
 
 struct Demo {
 	int a;
 	void* b;
-	char c;
+	c;
 	struct K{
 		int i;
-		double c;
+		double u;
 	} k;
-	struct Demo* demo;
+	struct  * demo;
 };
 
 int printf(char const* format, ...);
@@ -36,6 +43,7 @@ void disp_num(int n) {
 	putchar(n % 10 + '0');
 }
 
+
 int main(void) {
 	struct Demo demo_b;
 	struct A{
@@ -43,7 +51,8 @@ int main(void) {
 	double A_b;
 	} st_A;
 	int nb = sizeof(struct A);
-
+	
+	int ss1 = kVal4;
     disp_num(gcd(3 * 12, 60));
 	putchar(10);
 

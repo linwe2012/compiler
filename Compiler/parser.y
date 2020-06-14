@@ -13,8 +13,9 @@
 AST* parser_result = NULL;
 %}
 
+%locations
 %union {
-	AST *val;
+	struct AST *val;
 	int type;
     char* str;
 }
@@ -89,7 +90,8 @@ declaration
     : declaration_specifiers attribute_specifier init_declarator_list ';'  { $$ = make_declaration($1, $2, $3); }
     | declaration_specifiers init_declarator_list ';'                      { $$ = make_declaration($1, ATTR_NONE, $2); }
 	| declaration_specifiers ';'										   { $$ = make_declaration($1, ATTR_NONE, NULL); }
-    ;
+    | error ';' { yyerrok; $$ = make_empty(); }
+	;
 
 declaration_specifiers
     : type_specifier                                   { $$ = $1; }

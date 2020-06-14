@@ -17,7 +17,7 @@
 
 
 #ifdef CC_DEBUG
-#define YYDEBUG 1
+// #define YYDEBUG 1
 #endif
 
 // 如果是 C++ 的话, struct X 自动声明了 X 这个类型

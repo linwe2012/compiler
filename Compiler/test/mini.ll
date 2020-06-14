@@ -15,8 +15,6 @@ declare i32 @putchar(i32)
 
 declare x86_stdcallcc i32 @SetConsoleTextAttribute(i8*, i16)
 
-declare x86_stdcallcc void @GetStdHandle(i32)
-
 declare i32 @printf(i8*, ...)
 
 define i32 @gcd(i32 %a, i32 %b) {
@@ -33,19 +31,19 @@ entry:
   br i1 %"2", label %if.then, label %if.else
 
 if.then:                                          ; preds = %entry
-  %"3" = load i32, i32* %"1"
-  ret i32 %"3"
+  %b3 = load i32, i32* %"1"
+  ret i32 %b3
 
 if.else:                                          ; preds = %entry
   br label %if.after
 
 if.after:                                         ; preds = %if.else
-  %"4" = load i32, i32* %"1"
-  %a3 = load i32, i32* %"0"
   %b4 = load i32, i32* %"1"
-  %mod_res5 = srem i32 %a3, %b4
-  %"5" = call i32 @gcd(i32 %"4", i32 %mod_res5)
-  ret i32 %"5"
+  %a5 = load i32, i32* %"0"
+  %b6 = load i32, i32* %"1"
+  %mod_res7 = srem i32 %a5, %b6
+  %"3" = call i32 @gcd(i32 %b4, i32 %mod_res7)
+  ret i32 %"3"
 }
 
 define void @disp_num(i32 %n) {
@@ -97,6 +95,8 @@ entry:
   %st_A = alloca %"struct A"
   %nb = alloca i32
   store i32 16, i32* %nb
+  %ss1 = alloca i32
+  store i32 101, i32* %ss1
   %"0" = call i32 @gcd(i32 36, i32 60)
   call void @disp_num(i32 %"0")
   %"1" = call i32 @putchar(i32 10)
@@ -128,10 +128,10 @@ entry:
   store i32 %arr_res9, i32* %gep_res11
   %d = alloca [3 x [10 x double]]
   %na = alloca i32
-  %"0" = load [10 x i32], [10 x i32]* %a
+  %a12 = load [10 x i32], [10 x i32]* %a
   store i32 trunc (i64 mul nuw (i64 ptrtoint (i32* getelementptr (i32, i32* null, i32 1) to i64), i64 10) to i32), i32* %na
   %nd = alloca i32
-  %"1" = load [3 x [10 x double]], [3 x [10 x double]]* %d
+  %d13 = load [3 x [10 x double]], [3 x [10 x double]]* %d
   store i32 trunc (i64 mul (i64 ptrtoint (double* getelementptr (double, double* null, i32 1) to i64), i64 30) to i32), i32* %nd
   ret void
 }
