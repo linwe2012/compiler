@@ -5,7 +5,7 @@ source_filename = "mini.c"
 %"struct K" = type { i32, double }
 %"struct A" = type { i32, double }
 
-@a = global i32 10
+@a = external global i32
 @"2" = private unnamed_addr constant [16 x i8] c"\22\5CnHello world\22\00"
 @"4" = private unnamed_addr constant [48 x i8] c"\22My age is %d\5Cn, Im %f m, and my hobby is %d\5Cn\22\00"
 @"5" = private unnamed_addr constant [10 x i8] c"\22Running\22\00"

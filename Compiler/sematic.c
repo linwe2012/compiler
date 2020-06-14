@@ -6,8 +6,14 @@
 
 
 #include <llvm-c/Core.h>
-#include <llvm-c/TargetMachine.h>
 #include <llvm-c/Analysis.h>
+#include <llvm-c/ErrorHandling.h>
+#include <llvm-c/Target.h>
+#include <llvm-c/TargetMachine.h>
+#include <llvm-c/Transforms/PassManagerBuilder.h>
+#include <llvm-c/Transforms/Vectorize.h>
+#include <llvm-c/Transforms/IPO.h>
+#include <llvm-c/Transforms/Scalar.h>
 
 #define SUPER(ptr) &(ptr->super)
 #define NOT_IMPLEMENTED return NULL
@@ -259,9 +265,16 @@ void do_eval(AST* ast, struct Context* _ctx, char* module_name, const char* outp
 	sem_ctx.cur_func_sym = sem_ctx.breakable_last = sem_ctx.continue_last = NULL;
 	sem_ctx.tmp_top = NULL;
 
+	LLVMPassManagerRef passes = LLVMCreatePassManager();
+	LLVMAddMergedLoadStoreMotionPass(passes);
+	LLVMAddVerifierPass(passes);
+
 	ctx = _ctx;
 	build_putchar();		// 内建putchar
 	eval_list(ast);
+
+	LLVMRunPassManager(passes, sem_ctx.module);
+	LLVMDisposePassManager(passes);
 
 	char** msg = NULL;
 	LLVMBool res = LLVMPrintModuleToFile(sem_ctx.module, output_file, msg);
@@ -784,17 +797,19 @@ LLVMValueRef eval_DeclareStmt(DeclareStmt* ast)
 			LLVMValueRef value = NULL;
 			if (ctx->variables->stack_top->prev == NULL) {
 				ptr = LLVMAddGlobal(sem_ctx.module, decl_type, id->name);
-				if (id->init_value) {
-					value = eval_ast(id->init_value);
-					if (LLVMTypeOf(value) != decl_type) {
-						value = llvm_convert_type(decl_type, value);
+				if (id_spec->attributes != ATTR_EXTERN) {
+					if (id->init_value) {
+						value = eval_ast(id->init_value);
+						if (LLVMTypeOf(value) != decl_type) {
+							value = llvm_convert_type(decl_type, value);
+						}
+						last_value = value;
+					} else {
+						// 没有初始化的也要做初始化
+						value = llvm_get_default(decl_type);
 					}
-					last_value = value;
-				} else {
-					// 没有初始化的也要做初始化
-					value = llvm_get_default(decl_type);
+					LLVMSetInitializer(ptr, value);
 				}
-				LLVMSetInitializer(ptr, value);
 			} else {
 				ptr = LLVMBuildAlloca(sem_ctx.builder, decl_type, id->name);
 			
