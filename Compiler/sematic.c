@@ -6,10 +6,12 @@
 
 
 #include <llvm-c/Core.h>
-#include <llvm-c/TargetMachine.h>
 #include <llvm-c/Analysis.h>
 #include <llvm-c/ErrorHandling.h>
+#include <llvm-c/Target.h>
+#include <llvm-c/TargetMachine.h>
 #include <llvm-c/Transforms/PassManagerBuilder.h>
+#include <llvm-c/Transforms/Vectorize.h>
 #include <llvm-c/Transforms/IPO.h>
 #include <llvm-c/Transforms/Scalar.h>
 
@@ -264,10 +266,8 @@ void do_eval(AST* ast, struct Context* _ctx, char* module_name, const char* outp
 	sem_ctx.tmp_top = NULL;
 
 	LLVMPassManagerRef passes = LLVMCreatePassManager();
-	//LLVMAddTailCallEliminationPass(passes);
-	//LLVMAddConstantMergePass(passes);
-	//LLVMAddConstantPropagationPass(passes);
-	//LLVMAddVerifierPass(passes);
+	LLVMAddMergedLoadStoreMotionPass(passes);
+	LLVMAddVerifierPass(passes);
 
 	ctx = _ctx;
 	build_putchar();		// 内建putchar
