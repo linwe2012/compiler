@@ -797,17 +797,19 @@ LLVMValueRef eval_DeclareStmt(DeclareStmt* ast)
 			LLVMValueRef value = NULL;
 			if (ctx->variables->stack_top->prev == NULL) {
 				ptr = LLVMAddGlobal(sem_ctx.module, decl_type, id->name);
-				if (id->init_value) {
-					value = eval_ast(id->init_value);
-					if (LLVMTypeOf(value) != decl_type) {
-						value = llvm_convert_type(decl_type, value);
+				if (id_spec->attributes != ATTR_EXTERN) {
+					if (id->init_value) {
+						value = eval_ast(id->init_value);
+						if (LLVMTypeOf(value) != decl_type) {
+							value = llvm_convert_type(decl_type, value);
+						}
+						last_value = value;
+					} else {
+						// 没有初始化的也要做初始化
+						value = llvm_get_default(decl_type);
 					}
-					last_value = value;
-				} else {
-					// 没有初始化的也要做初始化
-					value = llvm_get_default(decl_type);
+					LLVMSetInitializer(ptr, value);
 				}
-				LLVMSetInitializer(ptr, value);
 			} else {
 				ptr = LLVMBuildAlloca(sem_ctx.builder, decl_type, id->name);
 			
