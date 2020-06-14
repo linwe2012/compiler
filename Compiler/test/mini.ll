@@ -85,6 +85,8 @@ if.after:                                         ; preds = %if.after6, %if.then
 define i32 @main() {
 entry:
   %st_A = alloca [16 x i8]
+  %nb = alloca i32
+  store i32 16, i32* %nb
   %"0" = call i32 @gcd(i32 36, i32 60)
   call void @disp_num(i32 %"0")
   %"1" = call i32 @putchar(i32 10)
@@ -114,5 +116,12 @@ entry:
   %gep_res10 = getelementptr [10 x [2 x i32]], [10 x [2 x i32]]* %arr, i32 3, i32 0
   %gep_res11 = getelementptr [2 x i32], [2 x i32]* %gep_res10, i32 1, i32 0
   store i32 %arr_res9, i32* %gep_res11
+  %d = alloca [3 x [10 x double]]
+  %na = alloca i32
+  %"0" = load [10 x i32], [10 x i32]* %a
+  store i32 trunc (i64 mul nuw (i64 ptrtoint (i32* getelementptr (i32, i32* null, i32 1) to i64), i64 10) to i32), i32* %na
+  %nd = alloca i32
+  %"1" = load [3 x [10 x double]], [3 x [10 x double]]* %d
+  store i32 trunc (i64 mul (i64 ptrtoint (double* getelementptr (double, double* null, i32 1) to i64), i64 30) to i32), i32* %nd
   ret void
 }

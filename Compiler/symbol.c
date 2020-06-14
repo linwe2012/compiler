@@ -562,7 +562,8 @@ Symbol* symbol_create_struct_or_union(TypeInfo* info, TypeInfo* child)
 	int max_aligned_size = 0;
 	int max_alignment = 0;
 
-	char* (*a)[10];
+	// char* (*a)[10];
+	info->incomplete = 0;
 
 	// 每个 field 的对齐要求和最大对其量
 	while (move)

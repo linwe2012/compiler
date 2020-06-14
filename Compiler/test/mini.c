@@ -28,6 +28,7 @@ int main(void) {
 	int A_a;
 	double A_b;
 	} st_A;
+	int nb = sizeof(struct A);
 
     disp_num(gcd(3 * 12, 60));
 	putchar(10);
@@ -46,4 +47,7 @@ void test(void)
 	int arr[10][2];
 	a[1] = arr[2][1];
 	arr[3][1] = a[2];
+	double d[3][10];
+	int na = sizeof(a);
+	int nd = sizeof(d);
 }
