@@ -227,6 +227,11 @@ static int type_is_int(LLVMTypeRef type) {
 }
 
 static LLVMValueRef get_OperatorExpr_LeftValue(AST* ast);
+static LLVMTypeRef extract_llvm_type(TypeInfo* info);
+
+
+/***********************************************************************************/
+
 
 // returns the value of last eval
 LLVMValueRef eval_list(AST* ast)
@@ -399,19 +404,16 @@ TypeInfo* extract_type(TypeSpecifier* spec)
 			break;
 		}
 
-		if (spec->struct_or_union)
-		{
+		if (spec->struct_or_union) {
 			TypeInfo* first = NULL;
 			TypeInfo* last = NULL;
 			AST* field_list = spec->struct_or_union;
 			Symbol* aggregate = NULL;
 			int found_in_symtbl = 0;
 			char* type_name = get_struct_or_union_name(spec->type, spec->name);
-			if (spec->name != NULL)
-			{
+			if (spec->name != NULL) {
 				aggregate = symtbl_find(ctx->types, type_name);
-				if (aggregate)
-				{
+				if (aggregate) {
 					found_in_symtbl = 1;
 					if (!aggregate->type.incomplete) {
 						result = &aggregate->type;
@@ -419,36 +421,48 @@ TypeInfo* extract_type(TypeSpecifier* spec)
 					}
 				}
 			}
-			
-			if (aggregate == NULL)
-			{
+
+			if (aggregate == NULL) {
 				aggregate = symbol_create_struct_or_union_incomplete(NULL, spec->type);
 			}
 
-			if (field_list == NULL)
-			{
+			if (field_list == NULL) {
 				log_error(SUPER(spec), "Expected at least on field for struct");
 			}
 
-			FOR_EACH(field_list, st)
-			{
+			int field_cnt = 0;
+
+			FOR_EACH(field_list, st) {
+				field_cnt++;
 				TRY_CAST(DeclaratorExpr, decl, st);
 				// TODO: 可能不是 block scope
 				ctx_enter_block_scope(ctx);
 				decl->type_spec->field_name = decl->name;
-				
+
 				TypeInfo* ty = extract_type(decl->type_spec);
 				ctx_leave_block_scope(ctx, 0);
 
-				if (first == NULL)
-				{
+				if (first == NULL) {
 					first = last = ty;
-				}
-				else {
+				} else {
 					type_append(last, ty);
 					last = ty;
 				}
 			}
+
+			LLVMValueRef* llvm_fields = NULL;
+			if (spec->type == TP_STRUCT) {
+				llvm_fields = malloc(sizeof(LLVMValueRef) * field_cnt);
+				TypeInfo* cur = first;
+				for (int i = 0; i < field_cnt; ++i) {
+					llvm_fields[i] = extract_llvm_type(cur);
+					cur = cur->next;
+				}
+			} else if (spec->type == TP_UNION) {
+				// TODO union的话只有最大的那个field
+				field_cnt = 1;
+			}
+		
 
 			if (first != NULL)
 			{
@@ -463,7 +477,10 @@ TypeInfo* extract_type(TypeSpecifier* spec)
 					free(type_name);
 				}
 				
-				sem->llvm_type = LLVMArrayType(LLVMInt8Type(), aggregate->type.aligned_size);
+				// sem->llvm_type = LLVMArrayType(LLVMInt8Type(), aggregate->type.aligned_size);
+				sem->llvm_type = LLVMStructCreateNamed(LLVMGetGlobalContext(), aggregate->name);
+				LLVMStructSetBody(sem->llvm_type, llvm_fields, field_cnt, 0);
+				
 				aggregate->type.value = sem;
 				result = &aggregate->type;
 			}
@@ -1135,8 +1152,22 @@ static LLVMValueRef eval_OP_ARRAY_ACCESS(OperatorExpr* op, int lv) {
 
 static LLVMValueRef eval_OP_STACK_ACCESS(OperatorExpr* op, int lv) {
 	LLVMValueRef lhs_ptr = get_OperatorExpr_LeftValue(op->lhs);
-	LLVMValueRef rhs_v = eval_OperatorExpr(op->rhs);
-	LLVMValueRef gep = LLVMBuildStructGEP(sem_ctx.builder, lhs_ptr, 0, "gep_res");
+	LLVMTypeKind kind = LLVMGetTypeKind(LLVMTypeOf(lhs_ptr));
+	kind = LLVMGetTypeKind(LLVMGetElementType(LLVMTypeOf(lhs_ptr)));
+	char* struct_name = LLVMGetStructName(LLVMGetElementType(LLVMTypeOf(lhs_ptr)));
+	Symbol* struct_sym = symtbl_find(ctx->types, struct_name);
+	TRY_CAST(IdentifierExpr, field_id, op->rhs);
+	if (!field_id) {
+		log_error(op, "rhs of OP_STACK_ACCESS expects IdentifierExpr");
+		return NULL;
+	}
+	int idx = 0;
+	for (TypeInfo* cur = struct_sym->type.struc.child; cur != NULL; cur = cur->next, ++idx) {
+		if (strcmp(cur->field_name, field_id->name) == 0) {
+			break;
+		}
+	}
+	LLVMValueRef gep = LLVMBuildStructGEP(sem_ctx.builder, lhs_ptr, idx, "gep_res");
 	if (lv) {
 		return gep;
 	} else {
