@@ -1306,8 +1306,6 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 			}			
 			return tmp;
 		}
-
-
 		lhs = eval_OperatorExpr(operator->lhs);
 		rhs = eval_OperatorExpr(operator->rhs);
 		if (lhs && rhs && operator->op != OP_ASSIGN)
