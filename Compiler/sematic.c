@@ -1252,8 +1252,6 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 			
 			return tmp;
 		}
-
-
 		lhs = eval_OperatorExpr(operator->lhs);
 		rhs = eval_OperatorExpr(operator->rhs);
 		if (lhs && rhs && operator->op != OP_ASSIGN)
@@ -1275,7 +1273,7 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 		case OP_NEGATIVE:
 			tmp = LLVMBuildNeg(sem_ctx.builder, lhs, "neg_res");
 			break;
-		case OP_PTR_ACCESS:
+		case OP_POINTER:
 			tmp = LLVMBuildLoad(sem_ctx.builder, lhs, "ptr_res");
 			break;
 		case OP_INC:
