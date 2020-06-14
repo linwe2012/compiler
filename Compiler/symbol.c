@@ -268,7 +268,7 @@ TypeInfo* type_create_array(uint64_t n, enum SymbolAttributes qualifers, TypeInf
 //	return info;
 //}
 
-TypeInfo* type_create_ptr(enum SymbolAttributes qualifers, struct TypeInfo* pointing)
+TypeInfo* type_create_ptr(enum SymbolAttributes qualifers, struct TypeInfo* pointing, const char* name)
 {
 	Symbol* sym = new_symbol(NULL, Symbol_TypeInfo);
 	TypeInfo* info = &sym->type;
@@ -280,6 +280,7 @@ TypeInfo* type_create_ptr(enum SymbolAttributes qualifers, struct TypeInfo* poin
 	info->alignment = 8;
 	info->aligned_size = 8;
 	info->ptr.pointing = pointing;
+	info->field_name = name;
 
 	return info;
 }

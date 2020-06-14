@@ -480,12 +480,10 @@ void _write_DeclareStmt(DeclareStmt* stmt) {
     fprintf(s_fp, "\"name\":\"(DECLARE)\"");
     fputs(",\n\"children\": [", s_fp);
     _write_ast(stmt->type);
-    fputs(",\n", s_fp);
-    if (stmt->identifiers != NULL)
-    {
+    if (stmt->identifiers) {
+        fputs(",\n", s_fp);
         _write_ast(stmt->identifiers);
     }
-    
     fputs("]\n", s_fp);
 }
 

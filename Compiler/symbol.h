@@ -236,7 +236,7 @@ Symbol* symbol_create_variable(char* name, enum SymbolAttributes attributes, Sym
 // ================================
 TypeInfo* type_create_array(uint64_t n, enum SymbolAttributes qualifers, TypeInfo* array_element_type);
 // TypeInfo* type_create_struct_or_union(enum Types type, char* name);
-TypeInfo* type_create_ptr(enum SymbolAttributes qualifers, struct TypeInfo* pointing);
+TypeInfo* type_create_ptr(enum SymbolAttributes qualifers, struct TypeInfo* pointing, const char* name);
 TypeInfo* type_create_func(struct TypeInfo* ret, char* name, struct TypeInfo* params);
 TypeInfo* create_struct_field(TypeInfo* type_info, enum SymbolAttributes attributes, char* field_name);
 // TypeInfo* create_struct_bitfield(TypeInfo* type_info, enum SymbolAttributes attributes, char* field_name, int bits);
