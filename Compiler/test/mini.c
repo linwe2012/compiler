@@ -1,8 +1,8 @@
 // char *xa[5];
 // char *( *(*xvar)() )[10]; <- 可以解析但是没法LLVM 编译
 // Windows API
-//int __stdcall SetConsoleTextAttribute(void * hConsoleOutput, unsigned short wAttributes);
-//__stdcall void* GetStdHandle(unsigned int nStdHandle); 
+int __stdcall SetConsoleTextAttribute(void * hConsoleOutput, unsigned short wAttributes);
+void __stdcall *  GetStdHandle(unsigned int nStdHandle); 
 
 struct Demo {
 	int a;

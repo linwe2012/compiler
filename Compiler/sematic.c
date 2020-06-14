@@ -661,7 +661,7 @@ static Symbol* eval_FuncDeclareStmt(AST* ast, TypeSpecifier* ret_typesp, const c
 	LLVMValueRef func = LLVMAddFunction(sem_ctx.module, name, func_type);
 	enum SymbolAttributes attributes = ATTR_NONE;
 	TRY_CAST(FunctionDefinitionStmt, fn_stmt, ast);
-	TRY_CAST(DeclaratorExpr, decl_stmt, ast);
+	TRY_CAST(DeclareStmt, decl_stmt, ast);
 
 	if (fn_stmt)
 	{

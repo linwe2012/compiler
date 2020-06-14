@@ -8,6 +8,10 @@ source_filename = "mini.c"
 
 declare i32 @putchar(i32)
 
+declare x86_stdcallcc i32 @SetConsoleTextAttribute(i8*, i16)
+
+declare x86_stdcallcc void @GetStdHandle(i32)
+
 declare i32 @printf(i8*, ...)
 
 define i32 @gcd(i32 %a, i32 %b) {
@@ -102,20 +106,20 @@ entry:
   store i32 100, i32* @g_a
   %a = alloca [10 x i32]
   %arr = alloca [10 x [2 x i32]]
-  %gep_res = getelementptr [10 x i32], [10 x i32]* %a, i32 1, i32 0
+  %gep_res = getelementptr [10 x i32], [10 x i32]* %a, i64 0, i32 1
   %arr_res = load i32, i32* %gep_res
-  %gep_res1 = getelementptr [10 x [2 x i32]], [10 x [2 x i32]]* %arr, i32 2, i32 0
-  %gep_res2 = getelementptr [2 x i32], [2 x i32]* %gep_res1, i32 1, i32 0
+  %gep_res1 = getelementptr [10 x [2 x i32]], [10 x [2 x i32]]* %arr, i64 0, i32 2
+  %gep_res2 = getelementptr [2 x i32], [2 x i32]* %gep_res1, i64 0, i32 1
   %arr_res3 = load i32, i32* %gep_res2
-  %gep_res4 = getelementptr [10 x i32], [10 x i32]* %a, i32 1, i32 0
+  %gep_res4 = getelementptr [10 x i32], [10 x i32]* %a, i64 0, i32 1
   store i32 %arr_res3, i32* %gep_res4
-  %gep_res5 = getelementptr [10 x [2 x i32]], [10 x [2 x i32]]* %arr, i32 3, i32 0
-  %gep_res6 = getelementptr [2 x i32], [2 x i32]* %gep_res5, i32 1, i32 0
+  %gep_res5 = getelementptr [10 x [2 x i32]], [10 x [2 x i32]]* %arr, i64 0, i32 3
+  %gep_res6 = getelementptr [2 x i32], [2 x i32]* %gep_res5, i64 0, i32 1
   %arr_res7 = load i32, i32* %gep_res6
-  %gep_res8 = getelementptr [10 x i32], [10 x i32]* %a, i32 2, i32 0
+  %gep_res8 = getelementptr [10 x i32], [10 x i32]* %a, i64 0, i32 2
   %arr_res9 = load i32, i32* %gep_res8
-  %gep_res10 = getelementptr [10 x [2 x i32]], [10 x [2 x i32]]* %arr, i32 3, i32 0
-  %gep_res11 = getelementptr [2 x i32], [2 x i32]* %gep_res10, i32 1, i32 0
+  %gep_res10 = getelementptr [10 x [2 x i32]], [10 x [2 x i32]]* %arr, i64 0, i32 3
+  %gep_res11 = getelementptr [2 x i32], [2 x i32]* %gep_res10, i64 0, i32 1
   store i32 %arr_res9, i32* %gep_res11
   %d = alloca [3 x [10 x double]]
   %na = alloca i32
