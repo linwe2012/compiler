@@ -37,6 +37,11 @@ int main()
 		printf("Parser failed\n");
 		return 1;
 	}
+	if(error_encountered)
+	{
+		printf("Error encountered, will not generate ir\n");
+		return 1;
+	}
 	// AST* ast = make_block(parser_result);// yylval.val;
 	ast_to_json(parser_result, "test/out.json");
 

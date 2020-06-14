@@ -22,3 +22,4 @@ struct FileLocation
 };
 
 extern struct FileLocation fileloc;
+extern int error_encountered;

@@ -17,6 +17,7 @@ static int nTokenNextStart = 0;
 static int lMaxBuffer = 4096 * 1024;
 static char* buffer = NULL;
 struct FileLocation fileloc;
+int error_encountered = 0;
 
 
 void SetFile(FILE* _file) {
@@ -26,6 +27,7 @@ void SetFile(FILE* _file) {
 		free(buffer);
 	}
 	buffer = malloc(lMaxBuffer);
+	error_encountered = 0;
 }
 
 char dumpChar(char c) {

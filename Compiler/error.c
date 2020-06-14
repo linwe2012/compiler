@@ -49,6 +49,7 @@ void yyerror(char const* s) {
 	}
 	printf("\n");
 	SetConsoleTextAttribute(hConsole, FOREGROUND_GREEN | FOREGROUND_RED | FOREGROUND_BLUE);
+	error_encountered = 1;
 }
 
 
