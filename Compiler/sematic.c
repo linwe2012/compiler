@@ -1818,6 +1818,7 @@ LLVMValueRef eval_FunctionDefinitionStmt(FunctionDefinitionStmt* ast) {
 	return NULL;
 }
 
+// 这些应该在更上层的函数里处理掉
 LLVMValueRef eval_DeclaratorExpr(DeclaratorExpr* ast)
 {
 	NOT_IMPLEMENTED;
@@ -1826,7 +1827,13 @@ LLVMValueRef eval_DeclaratorExpr(DeclaratorExpr* ast)
 LLVMValueRef eval_TypeSpecifier(TypeSpecifier* ast)
 {
 	NOT_IMPLEMENTED;
+
+	
+}
+/*
+LLVMValueRef handle_initializer_list(TypeInfo* info, ListExpr* ast)
+{
+	
 }
 
-
-
+*/

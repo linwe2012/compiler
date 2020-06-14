@@ -8,6 +8,10 @@ struct Demo {
 	int a;
 	void* b;
 	char c;
+	struct K{
+		int i;
+		double c;
+	} k;
 };
 
 int printf(char const* format, ...);
