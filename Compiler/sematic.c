@@ -1428,13 +1428,13 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 		case OP_INC:
 			if (!llvm_is_float(lhs))
 			{
-				tmp = LLVMBuildAdd(sem_ctx.builder, lhs, LLVMConstInt(dest_type, 1, 1), "inc_res");
+				tmp = LLVMBuildAdd(sem_ctx.builder, lhs, LLVMConstInt(dest_type, 1, 1), "prefix_inc_res");
 				value_ptr = get_OperatorExpr_LeftValue(operator->lhs);
 				LLVMBuildStore(sem_ctx.builder, tmp, value_ptr);
 			}
 			else
 			{
-				tmp = LLVMBuildFAdd(sem_ctx.builder, lhs, LLVMConstReal(dest_type, 1), "inc_res");
+				tmp = LLVMBuildFAdd(sem_ctx.builder, lhs, LLVMConstReal(dest_type, 1), "prefix_finc_res");
 				value_ptr = get_OperatorExpr_LeftValue(operator->lhs);
 				LLVMBuildStore(sem_ctx.builder, tmp, value_ptr);
 			}
@@ -1442,13 +1442,13 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 		case OP_DEC:
 			if (!llvm_is_float(lhs))
 			{
-				tmp = LLVMBuildAdd(sem_ctx.builder, lhs, LLVMConstInt(dest_type, -1, 1), "dec_res");
+				tmp = LLVMBuildAdd(sem_ctx.builder, lhs, LLVMConstInt(dest_type, -1, 1), "prefix_dec_res");
 				value_ptr = get_OperatorExpr_LeftValue(operator->lhs);
 				LLVMBuildStore(sem_ctx.builder, tmp, value_ptr);
 			}
 			else
 			{
-				tmp = LLVMBuildFAdd(sem_ctx.builder, lhs, LLVMConstReal(dest_type, -1), "dec_res");
+				tmp = LLVMBuildFAdd(sem_ctx.builder, lhs, LLVMConstReal(dest_type, -1), "prefix_fdec_res");
 				value_ptr = get_OperatorExpr_LeftValue(operator->lhs);
 				LLVMBuildStore(sem_ctx.builder, tmp, value_ptr);
 			}
@@ -1457,14 +1457,14 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 			if (!llvm_is_float(lhs))
 			{
 				tmp = lhs;
-				tmp1 = LLVMBuildAdd(sem_ctx.builder, lhs, LLVMConstInt(dest_type, 1, 1), "inc_res");
+				tmp1 = LLVMBuildAdd(sem_ctx.builder, lhs, LLVMConstInt(dest_type, 1, 1), "postfix_inc_res");
 				value_ptr = get_OperatorExpr_LeftValue(operator->lhs);
 				LLVMBuildStore(sem_ctx.builder, tmp1, value_ptr);
 			}
 			else
 			{
 				tmp = lhs;
-				tmp1 = LLVMBuildFAdd(sem_ctx.builder, lhs, LLVMConstReal(dest_type, 1), "inc_res");
+				tmp1 = LLVMBuildFAdd(sem_ctx.builder, lhs, LLVMConstReal(dest_type, 1), "postfix_finc_res");
 				value_ptr = get_OperatorExpr_LeftValue(operator->lhs);
 				LLVMBuildStore(sem_ctx.builder, tmp1, value_ptr);
 			}
@@ -1473,14 +1473,14 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 			if (!llvm_is_float(lhs))
 			{
 				tmp = lhs;
-				tmp1 = LLVMBuildAdd(sem_ctx.builder, lhs, LLVMConstInt(dest_type, -1, 1), "dec_res");
+				tmp1 = LLVMBuildAdd(sem_ctx.builder, lhs, LLVMConstInt(dest_type, -1, 1), "postfix_dec_res");
 				value_ptr = get_OperatorExpr_LeftValue(operator->lhs);
 				LLVMBuildStore(sem_ctx.builder, tmp1, value_ptr);
 			}
 			else
 			{
 				tmp = lhs;
-				tmp1 = LLVMBuildFAdd(sem_ctx.builder, lhs, LLVMConstReal(dest_type, -1), "dec_res");
+				tmp1 = LLVMBuildFAdd(sem_ctx.builder, lhs, LLVMConstReal(dest_type, -1), "postfix_fdec_res");
 				value_ptr = get_OperatorExpr_LeftValue(operator->lhs);
 				LLVMBuildStore(sem_ctx.builder, tmp1, value_ptr);
 			}
@@ -1493,7 +1493,7 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 			}
 			else
 			{
-				tmp = LLVMBuildFAdd(sem_ctx.builder, lhs, rhs, "add_res");
+				tmp = LLVMBuildFAdd(sem_ctx.builder, lhs, rhs, "fadd_res");
 			}
 			break;
 		case OP_SUB:
@@ -1503,7 +1503,7 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 			}
 			else
 			{
-				tmp = LLVMBuildFSub(sem_ctx.builder, lhs, rhs, "dec_res");
+				tmp = LLVMBuildFSub(sem_ctx.builder, lhs, rhs, "fdec_res");
 			}
 			break;
 		case OP_MUL:
@@ -1513,7 +1513,7 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 			}
 			else
 			{
-				tmp = LLVMBuildFMul(sem_ctx.builder, lhs, rhs, "mul_res");
+				tmp = LLVMBuildFMul(sem_ctx.builder, lhs, rhs, "fmul_res");
 			}
 			break;
 		case OP_DIV:
@@ -1523,7 +1523,7 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 			}
 			else
 			{
-				tmp = LLVMBuildFDiv(sem_ctx.builder, lhs, rhs, "div_res");
+				tmp = LLVMBuildFDiv(sem_ctx.builder, lhs, rhs, "fdiv_res");
 			}
 			break;
 		case OP_MOD:
@@ -1533,7 +1533,7 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 			}
 			else
 			{
-				tmp = LLVMBuildFRem(sem_ctx.builder, lhs, rhs, "mod_res");
+				tmp = LLVMBuildFRem(sem_ctx.builder, lhs, rhs, "fmod_res");
 			}
 			break;
 		case OP_SHIFT_LEFT:
