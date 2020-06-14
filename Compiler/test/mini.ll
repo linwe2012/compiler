@@ -1,12 +1,20 @@
 ; ModuleID = 'mini.c'
 source_filename = "mini.c"
 
+%"struct Demo" = type { i32, i8*, i8, %"struct K", %"struct Demo"* }
+%"struct K" = type { i32, double }
+%"struct A" = type { i32, double }
+
 @"2" = private unnamed_addr constant [16 x i8] c"\22\5CnHello world\22\00"
 @"4" = private unnamed_addr constant [48 x i8] c"\22My age is %d\5Cn, Im %f m, and my hobby is %d\5Cn\22\00"
 @"5" = private unnamed_addr constant [10 x i8] c"\22Running\22\00"
 @g_a = global i32 10
 
 declare i32 @putchar(i32)
+
+declare x86_stdcallcc i32 @SetConsoleTextAttribute(i8*, i16)
+
+declare x86_stdcallcc void @GetStdHandle(i32)
 
 declare i32 @printf(i8*, ...)
 
@@ -16,9 +24,9 @@ entry:
   store i32 %a, i32* %"0"
   %"1" = alloca i32
   store i32 %b, i32* %"1"
-  %load_val = load i32, i32* %"0"
-  %load_val1 = load i32, i32* %"1"
-  %mod_res = srem i32 %load_val, %load_val1
+  %a1 = load i32, i32* %"0"
+  %b2 = load i32, i32* %"1"
+  %mod_res = srem i32 %a1, %b2
   %equal_res = icmp eq i32 %mod_res, 0
   %"2" = icmp ne i1 %equal_res, false
   br i1 %"2", label %if.then, label %if.else
@@ -32,10 +40,10 @@ if.else:                                          ; preds = %entry
 
 if.after:                                         ; preds = %if.else
   %"4" = load i32, i32* %"1"
-  %load_val2 = load i32, i32* %"0"
-  %load_val3 = load i32, i32* %"1"
-  %mod_res4 = srem i32 %load_val2, %load_val3
-  %"5" = call i32 @gcd(i32 %"4", i32 %mod_res4)
+  %a3 = load i32, i32* %"0"
+  %b4 = load i32, i32* %"1"
+  %mod_res5 = srem i32 %a3, %b4
+  %"5" = call i32 @gcd(i32 %"4", i32 %mod_res5)
   ret i32 %"5"
 }
 
@@ -43,40 +51,40 @@ define void @disp_num(i32 %n) {
 entry:
   %"0" = alloca i32
   store i32 %n, i32* %"0"
-  %load_val = load i32, i32* %"0"
-  %less_res = icmp slt i32 %load_val, 0
+  %n1 = load i32, i32* %"0"
+  %less_res = icmp slt i32 %n1, 0
   %"1" = icmp ne i1 %less_res, false
   br i1 %"1", label %if.then, label %if.else
 
 if.then:                                          ; preds = %entry
-  %load_val1 = load i32, i32* %"0"
-  %load_val2 = load i32, i32* %"0"
-  %neg_res = sub i32 0, %load_val2
+  %n2 = load i32, i32* %"0"
+  %n3 = load i32, i32* %"0"
+  %neg_res = sub i32 0, %n3
   store i32 %neg_res, i32* %"0"
   %"2" = call i32 @putchar(i32 45)
   br label %if.after
 
-if.then4:                                         ; preds = %if.else
+if.then5:                                         ; preds = %if.else
   ret void
 
-if.else5:                                         ; preds = %if.else
-  br label %if.after6
+if.else6:                                         ; preds = %if.else
+  br label %if.after7
 
-if.after6:                                        ; preds = %if.else5
+if.after7:                                        ; preds = %if.else6
   br label %if.after
 
 if.else:                                          ; preds = %entry
-  %load_val3 = load i32, i32* %"0"
-  %equal_res = icmp eq i32 %load_val3, 0
+  %n4 = load i32, i32* %"0"
+  %equal_res = icmp eq i32 %n4, 0
   %"3" = icmp ne i1 %equal_res, false
-  br i1 %"3", label %if.then4, label %if.else5
+  br i1 %"3", label %if.then5, label %if.else6
 
-if.after:                                         ; preds = %if.after6, %if.then
-  %load_val7 = load i32, i32* %"0"
-  %div_res = sdiv exact i32 %load_val7, 10
+if.after:                                         ; preds = %if.after7, %if.then
+  %n8 = load i32, i32* %"0"
+  %div_res = sdiv exact i32 %n8, 10
   call void @disp_num(i32 %div_res)
-  %load_val8 = load i32, i32* %"0"
-  %mod_res = srem i32 %load_val8, 10
+  %n9 = load i32, i32* %"0"
+  %mod_res = srem i32 %n9, 10
   %add_res = add i32 %mod_res, 48
   %"4" = call i32 @putchar(i32 %add_res)
   ret void
@@ -84,8 +92,8 @@ if.after:                                         ; preds = %if.after6, %if.then
 
 define i32 @main() {
 entry:
-  %demo_b = alloca [24 x i8]
-  %st_A = alloca [16 x i8]
+  %demo_b = alloca %"struct Demo"
+  %st_A = alloca %"struct A"
   %nb = alloca i32
   store i32 16, i32* %nb
   %"0" = call i32 @gcd(i32 36, i32 60)
@@ -98,24 +106,24 @@ entry:
 
 define void @test() {
 entry:
-  %load_val = load i32, i32* @g_a
+  %g_a = load i32, i32* @g_a
   store i32 100, i32* @g_a
   %a = alloca [10 x i32]
   %arr = alloca [10 x [2 x i32]]
-  %gep_res = getelementptr [10 x i32], [10 x i32]* %a, i32 1, i32 0
+  %gep_res = getelementptr [10 x i32], [10 x i32]* %a, i64 0, i32 1
   %arr_res = load i32, i32* %gep_res
-  %gep_res1 = getelementptr [10 x [2 x i32]], [10 x [2 x i32]]* %arr, i32 2, i32 0
-  %gep_res2 = getelementptr [2 x i32], [2 x i32]* %gep_res1, i32 1, i32 0
+  %gep_res1 = getelementptr [10 x [2 x i32]], [10 x [2 x i32]]* %arr, i64 0, i32 2
+  %gep_res2 = getelementptr [2 x i32], [2 x i32]* %gep_res1, i64 0, i32 1
   %arr_res3 = load i32, i32* %gep_res2
-  %gep_res4 = getelementptr [10 x i32], [10 x i32]* %a, i32 1, i32 0
+  %gep_res4 = getelementptr [10 x i32], [10 x i32]* %a, i64 0, i32 1
   store i32 %arr_res3, i32* %gep_res4
-  %gep_res5 = getelementptr [10 x [2 x i32]], [10 x [2 x i32]]* %arr, i32 3, i32 0
-  %gep_res6 = getelementptr [2 x i32], [2 x i32]* %gep_res5, i32 1, i32 0
+  %gep_res5 = getelementptr [10 x [2 x i32]], [10 x [2 x i32]]* %arr, i64 0, i32 3
+  %gep_res6 = getelementptr [2 x i32], [2 x i32]* %gep_res5, i64 0, i32 1
   %arr_res7 = load i32, i32* %gep_res6
-  %gep_res8 = getelementptr [10 x i32], [10 x i32]* %a, i32 2, i32 0
+  %gep_res8 = getelementptr [10 x i32], [10 x i32]* %a, i64 0, i32 2
   %arr_res9 = load i32, i32* %gep_res8
-  %gep_res10 = getelementptr [10 x [2 x i32]], [10 x [2 x i32]]* %arr, i32 3, i32 0
-  %gep_res11 = getelementptr [2 x i32], [2 x i32]* %gep_res10, i32 1, i32 0
+  %gep_res10 = getelementptr [10 x [2 x i32]], [10 x [2 x i32]]* %arr, i64 0, i32 3
+  %gep_res11 = getelementptr [2 x i32], [2 x i32]* %gep_res10, i64 0, i32 1
   store i32 %arr_res9, i32* %gep_res11
   %d = alloca [3 x [10 x double]]
   %na = alloca i32

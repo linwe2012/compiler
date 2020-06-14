@@ -439,6 +439,20 @@ TypeInfo* extract_type(TypeSpecifier* spec)
 				aggregate = symbol_create_struct_or_union_incomplete(NULL, spec->type);
 			}
 
+			if (!found_in_symtbl && spec->name != NULL)
+			{
+				aggregate->name = type_name;
+
+				NEW_STRUCT(TypeSematic, sem);
+				sem->llvm_type = LLVMStructCreateNamed(LLVMGetGlobalContext(), aggregate->name);
+				aggregate->type.value = sem;
+				
+				symtbl_push(ctx->types, aggregate);
+			}
+			else {
+				free(type_name);
+			}
+
 			if (field_list == NULL) {
 				log_error(SUPER(spec), "Expected at least on field for struct");
 			}
@@ -481,21 +495,12 @@ TypeInfo* extract_type(TypeSpecifier* spec)
 			if (first != NULL)
 			{
 				symbol_create_struct_or_union(&aggregate->type, first);
-				NEW_STRUCT(TypeSematic, sem);
-				if (!found_in_symtbl && spec->name != NULL)
-				{
-					aggregate->name = type_name;
-					symtbl_push(ctx->types, aggregate);
-				}
-				else {
-					free(type_name);
-				}
 				
+				struct TypeSematic* sem = aggregate->type.value;
 				// sem->llvm_type = LLVMArrayType(LLVMInt8Type(), aggregate->type.aligned_size);
-				sem->llvm_type = LLVMStructCreateNamed(LLVMGetGlobalContext(), aggregate->name);
+				
 				LLVMStructSetBody(sem->llvm_type, llvm_fields, field_cnt, 0);
 				
-				aggregate->type.value = sem;
 				result = &aggregate->type;
 			}
 			break;
@@ -629,6 +634,7 @@ LLVMTypeRef extract_llvm_type(TypeInfo* info) {
 		{
 			return LLVMPointerType(LLVMInt8Type(), 0);
 		}
+		
 		ptr = extract_llvm_type(info->ptr.pointing);
 		return LLVMPointerType(ptr, 0);
 		
@@ -693,7 +699,7 @@ static Symbol* eval_FuncDeclareStmt(AST* ast, TypeSpecifier* ret_typesp, const c
 	LLVMValueRef func = LLVMAddFunction(sem_ctx.module, name, func_type);
 	enum SymbolAttributes attributes = ATTR_NONE;
 	TRY_CAST(FunctionDefinitionStmt, fn_stmt, ast);
-	TRY_CAST(DeclaratorExpr, decl_stmt, ast);
+	TRY_CAST(DeclareStmt, decl_stmt, ast);
 
 	if (fn_stmt)
 	{
@@ -1980,6 +1986,7 @@ LLVMValueRef eval_FunctionDefinitionStmt(FunctionDefinitionStmt* ast) {
 	return NULL;
 }
 
+// 这些应该在更上层的函数里处理掉
 LLVMValueRef eval_DeclaratorExpr(DeclaratorExpr* ast)
 {
 	NOT_IMPLEMENTED;
@@ -1988,7 +1995,13 @@ LLVMValueRef eval_DeclaratorExpr(DeclaratorExpr* ast)
 LLVMValueRef eval_TypeSpecifier(TypeSpecifier* ast)
 {
 	NOT_IMPLEMENTED;
+
+	
+}
+/*
+LLVMValueRef handle_initializer_list(TypeInfo* info, ListExpr* ast)
+{
+	
 }
 
-
-
+*/

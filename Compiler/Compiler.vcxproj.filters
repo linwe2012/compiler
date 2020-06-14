@@ -87,6 +87,9 @@
     <ClInclude Include="x86_64-asm.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="cheaders.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="lex.l">
