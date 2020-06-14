@@ -255,7 +255,7 @@ void do_eval(AST* ast, struct Context* _ctx, char* module_name, const char* outp
 	sem_ctx.tmp_top = NULL;
 
 	ctx = _ctx;
-	build_putchar();		// 内建printf
+	build_putchar();		// 内建putchar
 	eval_list(ast);
 
 	char** msg = NULL;
@@ -1120,17 +1120,15 @@ LLVMTypeRef llvm_get_res_type(LLVMValueRef lhs, LLVMValueRef rhs)
 }
 
 static LLVMValueRef eval_OP_ARRAY_ACCESS(OperatorExpr* op, int lv) {
-	LLVMValueRef lhs_v = get_OperatorExpr_LeftValue(op->lhs);
+	LLVMValueRef lhs_ptr = get_OperatorExpr_LeftValue(op->lhs);
+	LLVMValueRef rhs_v = eval_OperatorExpr(op->rhs);
 	LLVMValueRef* indices = calloc(2, sizeof(LLVMValueRef));
-	indices[0] = eval_OperatorExpr(op->rhs);
-	// TODO 这个值的类型是要根据数组类型变的
-	// 并且将来支持struct数组还需要知道offset，所以语义上是否应该在symbol中记录数组类型
-	indices[1] = LLVMConstInt(LLVMInt32Type(), 0, 1);
-	LLVMValueRef gep = LLVMBuildGEP(sem_ctx.builder, lhs_v, indices, 2, "gep_res");
+	indices[0] = LLVMConstInt(LLVMInt64Type(), 0, 1);
+	indices[1] = rhs_v;
+	LLVMValueRef gep = LLVMBuildGEP(sem_ctx.builder, lhs_ptr, indices, 2, "gep_res");
 	if (lv) {
 		return gep;
-	}
-	else {
+	} else {
 		return LLVMBuildLoad(sem_ctx.builder, gep, "arr_res");
 	}
 }
