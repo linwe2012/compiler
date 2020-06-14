@@ -34,7 +34,7 @@ AST* parser_result = NULL;
 %token <str> STRUCT UNION ENUM ELLIPSIS
 
 %token <str> CASE DEFAULT IF ELSE SWITCH WHILE DO FOR GOTO CONTINUE BREAK RETURN
-%token <str> MS_CDECL MS_STDCALL
+%token <str> MS_CDECL MS_STDCALL MS_FASTCALL
 
 %type <val> primary_expression
 %type <val> postfix_expression
@@ -103,6 +103,7 @@ declaration_specifiers
 attribute_specifier
 	: MS_CDECL      { $$ = ATTR_CDECL; }
 	| MS_STDCALL    { $$ = ATTR_STDCALL; }
+	| MS_FASTCALL   { $$ = ATTR_FASTCALL; }
 	;
 
 init_declarator_list

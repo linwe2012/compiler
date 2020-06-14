@@ -975,7 +975,7 @@ AST* make_declaration(AST* declaration_specifiers, enum SymbolAttributes attribu
 	ast->identifiers = init_declarator_list;
 	ast->type = SUPER(spec);
 	ast->attributes = attribute_specifier;
-
+	
 	return SUPER(ast);
 }
 

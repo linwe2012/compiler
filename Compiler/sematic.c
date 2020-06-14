@@ -15,7 +15,7 @@
 	for(AST* iterator__ = ast__; iterator__ != NULL; iterator__ = iterator__->next)
 #define TRY_CAST(type__, name__, from__) \
 	type__* name__ =  NULL; \
-	if(from__->type == AST_##type__) \
+	if(from__ != NULL && from__->type == AST_##type__) \
 	{ \
 		name__ =  (type__*) (from__); \
 	}
@@ -413,9 +413,13 @@ TypeInfo* extract_type(TypeSpecifier* spec)
 				if (aggregate)
 				{
 					found_in_symtbl = 1;
+					if (!aggregate->type.incomplete) {
+						result = &aggregate->type;
+						break;
+					}
 				}
 			}
-
+			
 			if (aggregate == NULL)
 			{
 				aggregate = symbol_create_struct_or_union_incomplete(NULL, spec->type);
@@ -568,6 +572,8 @@ TypeInfo* extract_type(TypeSpecifier* spec)
 
 
 LLVMTypeRef extract_llvm_type(TypeInfo* info) {
+	TypeInfo* ptr = NULL;
+
 	switch (info->type & TP_CLEAR_SIGNFLAGS) {
 	case TP_INT8:
 		return LLVMInt8Type();
@@ -586,7 +592,14 @@ LLVMTypeRef extract_llvm_type(TypeInfo* info) {
 	case TP_FLOAT64:
 		return LLVMDoubleType();
 	case TP_PTR:
-		return LLVMPointerType(extract_llvm_type(info->ptr.pointing), 0);
+		// void* 被当作 i8*, 因为 llvm 不支持 void *
+		if (info->ptr.pointing->type == TP_VOID)
+		{
+			return LLVMPointerType(LLVMInt8Type(), 0);
+		}
+		ptr = extract_llvm_type(info->ptr.pointing);
+		return LLVMPointerType(ptr, 0);
+		
 	case TP_ARRAY:
 		return LLVMArrayType(extract_llvm_type(info->arr.array_type), info->arr.array_count);
 	case TP_ENUM:
@@ -646,6 +659,32 @@ static Symbol* eval_FuncDeclareStmt(AST* ast, TypeSpecifier* ret_typesp, const c
 		is_var_arg			// TODO 支持...
 	);
 	LLVMValueRef func = LLVMAddFunction(sem_ctx.module, name, func_type);
+	enum SymbolAttributes attributes = ATTR_NONE;
+	TRY_CAST(FunctionDefinitionStmt, fn_stmt, ast);
+	TRY_CAST(DeclaratorExpr, decl_stmt, ast);
+
+	if (fn_stmt)
+	{
+		TRY_CAST(TypeSpecifier, spec, fn_stmt->specifier);
+		attributes = spec->attributes;
+	}
+	else if (decl_stmt)
+	{
+		attributes = decl_stmt->attributes;
+	}
+
+	if (attributes != ATTR_NONE)
+	{
+		if (attributes & ATTR_STDCALL)
+		{
+			LLVMSetFunctionCallConv(func, LLVMX86StdcallCallConv);
+		}
+		else if (attributes & ATTR_FASTCALL)
+		{
+			LLVMSetFunctionCallConv(func, LLVMX86FastcallCallConv);
+		}
+
+	}
 
 	func_sym = symbol_create_func(name, func, ret_type, argv, NULL, is_var_arg, argc);
 	symtbl_push(ctx->functions, func_sym);
@@ -668,6 +707,13 @@ LLVMValueRef eval_DeclareStmt(DeclareStmt* ast)
 	TRY_CAST(TypeSpecifier, spec, ast->type);
 	LLVMValueRef last_value = NULL;
 
+	if (spec && (spec->type == TP_STRUCT || spec->type == TP_UNION))
+	{
+		if (ast->identifiers == NULL)
+		{
+			extract_type(spec);
+		}
+	}
 
 	FOR_EACH(ast->identifiers, id_ast) {
 		if (id_ast->type == AST_EmptyExpr) {
@@ -1226,46 +1272,7 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 					LLVMValueRef ty = LLVMTypeOf(val);
 					tmp = LLVMSizeOf(ty);
 				}
-			}
-			/*
-			if (id != NULL)
-			{
-				Symbol* variable = symtbl_find(ctx->variables, id->name);
-
-				if (variable == NULL)
-				{
-					log_error(operator->lhs, "Undeclared identifier");
-				}
-				else {
-					if (variable->var.type->type.incomplete)
-					{
-						log_error(operator->lhs, "Identifier's type is not declared or incomplete");
-					}
-					else {
-						result = variable->var.type->type.aligned_size;
-					}
-				}
-			}
-			// TODO: Specifier 是否也可以用 value ref?
-			else if (spec != NULL)
-			{
-				TypeInfo* ty = extract_type(spec);
-				if (ty == NULL || ty->incomplete)
-				{
-					log_error(operator->lhs, "Type specifier is incomplete");
-				}
-				result = ty->aligned_size;
-			}
-			else {
-				LLVMValueRef val = eval_ast(operator->lhs);
-				if (val != NULL)
-				{
-					LLVMValueRef ty = LLVMTypeOf(val);
-					tmp = LLVMSizeOf(ty);
-				}
-			}
-			*/
-			
+			}			
 			return tmp;
 		}
 
@@ -1354,6 +1361,7 @@ LLVMValueRef eval_OperatorExpr(AST* ast)
 				LLVMBuildStore(sem_ctx.builder, tmp1, value_ptr);
 			}
 			break;
+		
 			// 二元运算符
 		case OP_ADD:
 			if (!type_is_float(dest_type))
