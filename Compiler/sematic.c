@@ -266,7 +266,10 @@ void do_eval(AST* ast, struct Context* _ctx, char* module_name, const char* outp
 	sem_ctx.tmp_top = NULL;
 
 	LLVMPassManagerRef passes = LLVMCreatePassManager();
-	LLVMAddMergedLoadStoreMotionPass(passes);
+	// LLVMAddGlobalOptimizerPass(passes);
+	LLVMAddStripDeadPrototypesPass(passes);
+	LLVMAddScalarReplAggregatesPassSSA(passes);
+	// LLVMAddNewGVNPass(passes);
 	LLVMAddVerifierPass(passes);
 
 	ctx = _ctx;
