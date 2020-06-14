@@ -770,7 +770,7 @@ AST* make_type_specifier(enum Types type)
 
 AST* make_type_specifier_extend(AST* me, AST* other, enum SymbolAttributes storage)
 {
-	if (me == NULL || other == NULL)
+	if (me == NULL && other == NULL)
 	{
 		NEW_AST(TypeSpecifier, ast);
 		init_type_specifier(ast, TypeSpecifier_None);
